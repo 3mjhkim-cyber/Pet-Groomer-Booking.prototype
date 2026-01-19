@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, type LoginInput } from "@shared/routes";
+import { api, type LoginInput, type UserWithShop } from "@shared/routes";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 
@@ -8,13 +8,13 @@ export function useAuth() {
   const [_, setLocation] = useLocation();
   const { toast } = useToast();
 
-  const { data: user, isLoading } = useQuery({
+  const { data: user, isLoading } = useQuery<UserWithShop | null>({
     queryKey: [api.auth.me.path],
     queryFn: async () => {
       const res = await fetch(api.auth.me.path);
       if (res.status === 401) return null;
       if (!res.ok) throw new Error("Failed to fetch user");
-      return api.auth.me.responses[200].parse(await res.json());
+      return await res.json();
     },
     retry: false,
   });
@@ -32,15 +32,24 @@ export function useAuth() {
         throw new Error("로그인에 실패했습니다.");
       }
       
-      return api.auth.login.responses[200].parse(await res.json());
+      return await res.json() as UserWithShop;
     },
     onSuccess: (data) => {
       queryClient.setQueryData([api.auth.me.path], data);
-      toast({
-        title: "환영합니다!",
-        description: `${data.shopName} 관리자님 로그인되었습니다.`,
-      });
-      setLocation("/admin/dashboard");
+      
+      if (data.role === 'super_admin') {
+        toast({
+          title: "환영합니다!",
+          description: "총 관리자님 로그인되었습니다.",
+        });
+        setLocation("/admin/platform");
+      } else {
+        toast({
+          title: "환영합니다!",
+          description: `${data.shop?.name || data.shopName} 관리자님 로그인되었습니다.`,
+        });
+        setLocation("/admin/dashboard");
+      }
     },
     onError: (error: Error) => {
       toast({

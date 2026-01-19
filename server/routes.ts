@@ -9,6 +9,7 @@ import session from "express-session";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import MemoryStore from "memorystore";
+import { insertShopSchema } from "@shared/schema";
 
 const scryptAsync = promisify(scrypt);
 
@@ -23,6 +24,27 @@ async function comparePasswords(supplied: string, stored: string) {
   const hashedBuf = Buffer.from(hashed, "hex");
   const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
   return timingSafeEqual(hashedBuf, suppliedBuf);
+}
+
+function requireAuth(req: any, res: any, next: any) {
+  if (!req.isAuthenticated()) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+  next();
+}
+
+function requireSuperAdmin(req: any, res: any, next: any) {
+  if (!req.isAuthenticated() || req.user.role !== 'super_admin') {
+    return res.status(403).json({ message: "Forbidden" });
+  }
+  next();
+}
+
+function requireShopOwner(req: any, res: any, next: any) {
+  if (!req.isAuthenticated() || (req.user.role !== 'shop_owner' && req.user.role !== 'super_admin')) {
+    return res.status(403).json({ message: "Forbidden" });
+  }
+  next();
 }
 
 export async function registerRoutes(
@@ -67,8 +89,13 @@ export async function registerRoutes(
   });
 
   // Auth Routes
-  app.post(api.auth.login.path, passport.authenticate("local"), (req, res) => {
-    res.json(req.user);
+  app.post(api.auth.login.path, passport.authenticate("local"), async (req, res) => {
+    const user = req.user as any;
+    let shop = null;
+    if (user.shopId) {
+      shop = await storage.getShop(user.shopId);
+    }
+    res.json({ ...user, shop });
   });
 
   app.post(api.auth.logout.path, (req, res, next) => {
@@ -78,50 +105,191 @@ export async function registerRoutes(
     });
   });
 
-  app.get(api.auth.me.path, (req, res) => {
-    res.json(req.user || null);
+  app.get(api.auth.me.path, async (req, res) => {
+    if (!req.user) return res.json(null);
+    const user = req.user as any;
+    let shop = null;
+    if (user.shopId) {
+      shop = await storage.getShop(user.shopId);
+    }
+    res.json({ ...user, shop });
   });
 
-  // Services
+  // Shop Registration
+  app.post('/api/shops/register', async (req, res) => {
+    try {
+      const shopInput = insertShopSchema.parse(req.body.shop);
+      const { email, password } = req.body;
+      
+      if (!email || !password) {
+        return res.status(400).json({ message: "Email and password required" });
+      }
+
+      const existingUser = await storage.getUserByUsername(email);
+      if (existingUser) {
+        return res.status(400).json({ message: "Email already exists" });
+      }
+
+      const existingShop = await storage.getShopBySlug(shopInput.slug);
+      if (existingShop) {
+        return res.status(400).json({ message: "Shop URL already exists" });
+      }
+
+      const shop = await storage.createShop(shopInput);
+      const hashedPassword = await hashPassword(password);
+      const user = await storage.createUser({
+        email,
+        password: hashedPassword,
+        role: 'shop_owner',
+        shopId: shop.id,
+        shopName: shop.name,
+        phone: shop.phone,
+        address: shop.address,
+      });
+
+      res.status(201).json({ shop, user: { ...user, password: undefined } });
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      throw err;
+    }
+  });
+
+  // Super Admin Routes
+  app.get('/api/admin/shops', requireSuperAdmin, async (req, res) => {
+    const shops = await storage.getShops();
+    res.json(shops);
+  });
+
+  app.patch('/api/admin/shops/:id/approve', requireSuperAdmin, async (req, res) => {
+    const shop = await storage.approveShop(Number(req.params.id));
+    if (!shop) {
+      return res.status(404).json({ message: "Shop not found" });
+    }
+    res.json(shop);
+  });
+
+  app.delete('/api/admin/shops/:id', requireSuperAdmin, async (req, res) => {
+    const shop = await storage.updateShop(Number(req.params.id), { isApproved: false });
+    if (!shop) {
+      return res.status(404).json({ message: "Shop not found" });
+    }
+    res.json(shop);
+  });
+
+  // Shop Settings (for shop owners)
+  app.get('/api/shop/settings', requireShopOwner, async (req, res) => {
+    const user = req.user as any;
+    if (!user.shopId) {
+      return res.status(400).json({ message: "No shop associated" });
+    }
+    const shop = await storage.getShop(user.shopId);
+    res.json(shop);
+  });
+
+  app.patch('/api/shop/settings', requireShopOwner, async (req, res) => {
+    const user = req.user as any;
+    if (!user.shopId) {
+      return res.status(400).json({ message: "No shop associated" });
+    }
+    const { name, phone, address, businessHours, depositAmount, depositRequired } = req.body;
+    const shop = await storage.updateShop(user.shopId, {
+      name, phone, address, businessHours, depositAmount, depositRequired
+    });
+    res.json(shop);
+  });
+
+  // Public shop info
+  app.get('/api/shops/:slug', async (req, res) => {
+    const shop = await storage.getShopBySlug(req.params.slug);
+    if (!shop || !shop.isApproved) {
+      return res.status(404).json({ message: "Shop not found" });
+    }
+    res.json({
+      id: shop.id,
+      name: shop.name,
+      slug: shop.slug,
+      phone: shop.phone,
+      address: shop.address,
+      businessHours: shop.businessHours,
+      depositAmount: shop.depositAmount,
+      depositRequired: shop.depositRequired,
+    });
+  });
+
+  // Services (shop-scoped)
   app.get(api.services.list.path, async (req, res) => {
     const services = await storage.getServices();
     res.json(services);
   });
 
-  // Customers
-  app.get(api.customers.list.path, async (req, res) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).json({ message: "Unauthorized" });
+  app.get('/api/shops/:slug/services', async (req, res) => {
+    const shop = await storage.getShopBySlug(req.params.slug);
+    if (!shop || !shop.isApproved) {
+      return res.status(404).json({ message: "Shop not found" });
     }
-    const customers = await storage.getCustomers();
+    const services = await storage.getServicesByShop(shop.id);
+    res.json(services);
+  });
+
+  app.get('/api/shop/services', requireShopOwner, async (req, res) => {
+    const user = req.user as any;
+    const services = await storage.getServices(user.shopId);
+    res.json(services);
+  });
+
+  app.post('/api/shop/services', requireShopOwner, async (req, res) => {
+    const user = req.user as any;
+    const { name, duration, price } = req.body;
+    const service = await storage.createService({
+      shopId: user.shopId,
+      name,
+      duration,
+      price,
+    });
+    res.status(201).json(service);
+  });
+
+  app.patch('/api/shop/services/:id', requireShopOwner, async (req, res) => {
+    const { name, duration, price, isActive } = req.body;
+    const service = await storage.updateService(Number(req.params.id), {
+      name, duration, price, isActive
+    });
+    res.json(service);
+  });
+
+  app.delete('/api/shop/services/:id', requireShopOwner, async (req, res) => {
+    await storage.deleteService(Number(req.params.id));
+    res.json({ message: "Service deleted" });
+  });
+
+  // Customers (shop-scoped)
+  app.get(api.customers.list.path, requireAuth, async (req, res) => {
+    const user = req.user as any;
+    const customers = await storage.getCustomers(user.shopId);
     res.json(customers);
   });
 
-  app.get('/api/customers/search', async (req, res) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
+  app.get('/api/customers/search', requireAuth, async (req, res) => {
+    const user = req.user as any;
     const query = req.query.q as string || '';
-    const customers = await storage.searchCustomers(query);
+    const customers = await storage.searchCustomers(query, user.shopId);
     res.json(customers);
   });
 
-  app.get('/api/customers/:phone/history', async (req, res) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
+  app.get('/api/customers/:phone/history', requireAuth, async (req, res) => {
+    const user = req.user as any;
     const phone = decodeURIComponent(req.params.phone);
-    const customer = await storage.getCustomerByPhone(phone);
-    const history = await storage.getCustomerHistory(phone);
+    const customer = await storage.getCustomerByPhone(phone, user.shopId);
+    const history = await storage.getCustomerHistory(phone, user.shopId);
     res.json({ customer, history });
   });
 
-  // Bookings
-  app.get(api.bookings.list.path, async (req, res) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
-    const bookings = await storage.getBookings();
+  // Bookings (shop-scoped)
+  app.get(api.bookings.list.path, requireAuth, async (req, res) => {
+    const user = req.user as any;
+    const bookings = await storage.getBookings(user.shopId);
     res.json(bookings);
   });
 
@@ -149,10 +317,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch('/api/bookings/:id/approve', async (req, res) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
+  app.patch('/api/bookings/:id/approve', requireAuth, async (req, res) => {
     const booking = await storage.updateBookingStatus(Number(req.params.id), 'confirmed');
     if (!booking) {
       return res.status(404).json({ message: "Booking not found" });
@@ -160,10 +325,7 @@ export async function registerRoutes(
     res.json(booking);
   });
 
-  app.patch('/api/bookings/:id/reject', async (req, res) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
+  app.patch('/api/bookings/:id/reject', requireAuth, async (req, res) => {
     const booking = await storage.updateBookingStatus(Number(req.params.id), 'rejected');
     if (!booking) {
       return res.status(404).json({ message: "Booking not found" });
@@ -171,10 +333,7 @@ export async function registerRoutes(
     res.json(booking);
   });
 
-  app.patch('/api/bookings/:id/deposit-request', async (req, res) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
+  app.patch('/api/bookings/:id/deposit-request', requireAuth, async (req, res) => {
     const booking = await storage.requestDeposit(Number(req.params.id));
     if (!booking) {
       return res.status(404).json({ message: "Booking not found" });
@@ -190,23 +349,53 @@ export async function registerRoutes(
     res.json(booking);
   });
 
-  // Seed Data
+  // Seed Data - Super Admin
+  if (await storage.getUserByUsername("admin@jeongrihagae.com") === undefined) {
+    const hashedPassword = await hashPassword("admin1234");
+    await storage.createUser({
+      email: "admin@jeongrihagae.com",
+      password: hashedPassword,
+      role: 'super_admin',
+      shopId: null,
+      shopName: null,
+      phone: null,
+      address: null,
+    });
+  }
+
+  // Seed Data - Demo Shop
+  let demoShop = await storage.getShopBySlug("gangnam");
+  if (!demoShop) {
+    demoShop = await storage.createShop({
+      name: "정리하개 강남점",
+      slug: "gangnam",
+      phone: "02-123-4567",
+      address: "서울 강남구 테헤란로 123",
+      businessHours: "09:00-18:00",
+      depositAmount: 10000,
+      depositRequired: true,
+    });
+    await storage.approveShop(demoShop.id);
+  }
+
   if (await storage.getUserByUsername("test@test.com") === undefined) {
     const hashedPassword = await hashPassword("1234");
     await storage.createUser({
       email: "test@test.com",
       password: hashedPassword,
+      role: 'shop_owner',
+      shopId: demoShop.id,
       shopName: "정리하개 강남점",
       phone: "02-123-4567",
       address: "서울 강남구 테헤란로 123"
     });
   }
 
-  const existingServices = await storage.getServices();
+  const existingServices = await storage.getServices(demoShop.id);
   if (existingServices.length === 0) {
-    await storage.createService({ name: "전체미용", duration: 120, price: 50000 });
-    await storage.createService({ name: "부분미용", duration: 60, price: 30000 });
-    await storage.createService({ name: "목욕", duration: 60, price: 20000 });
+    await storage.createService({ shopId: demoShop.id, name: "전체미용", duration: 120, price: 50000 });
+    await storage.createService({ shopId: demoShop.id, name: "부분미용", duration: 60, price: 30000 });
+    await storage.createService({ shopId: demoShop.id, name: "목욕", duration: 60, price: 20000 });
   }
 
   return httpServer;

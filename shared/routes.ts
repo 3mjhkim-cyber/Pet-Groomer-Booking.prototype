@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { insertBookingSchema, users, services, bookings, customers } from './schema';
+import { insertBookingSchema, users, services, bookings, customers, shops } from './schema';
 
 export const errorSchemas = {
   validation: z.object({
@@ -14,6 +14,8 @@ export const errorSchemas = {
   })
 };
 
+export type UserWithShop = typeof users.$inferSelect & { shop: typeof shops.$inferSelect | null };
+
 export const api = {
   auth: {
     login: {
@@ -21,7 +23,7 @@ export const api = {
       path: '/api/login',
       input: z.object({ username: z.string(), password: z.string() }),
       responses: {
-        200: z.custom<typeof users.$inferSelect>(),
+        200: z.custom<UserWithShop>(),
         401: errorSchemas.unauthorized,
       },
     },
@@ -36,7 +38,7 @@ export const api = {
       method: 'GET' as const,
       path: '/api/user',
       responses: {
-        200: z.custom<typeof users.$inferSelect | null>(),
+        200: z.custom<UserWithShop | null>(),
       },
     }
   },

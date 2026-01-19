@@ -1,11 +1,14 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useServices, useCreateBooking } from "@/hooks/use-shop";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Calendar as CalendarIcon, Clock, Scissors, User, Phone, CheckCircle2, Loader2, MapPin } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { useRoute } from "wouter";
+import { useToast } from "@/hooks/use-toast";
+import type { Shop, Service } from "@shared/schema";
 
 const bookingFormSchema = z.object({
   customerName: z.string().min(2, "이름을 2글자 이상 입력해주세요"),
@@ -18,8 +21,60 @@ const bookingFormSchema = z.object({
 type BookingForm = z.infer<typeof bookingFormSchema>;
 
 export default function Booking() {
-  const { data: services, isLoading: isLoadingServices } = useServices();
-  const { mutate: createBooking, isPending: isBooking } = useCreateBooking();
+  const [, params] = useRoute('/book/:slug');
+  const slug = params?.slug || 'gangnam';
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  
+  const { data: shop, isLoading: isLoadingShop, error: shopError } = useQuery<Shop>({
+    queryKey: ['/api/shops', slug],
+    queryFn: async () => {
+      const res = await fetch(`/api/shops/${slug}`);
+      if (!res.ok) throw new Error("Shop not found");
+      return res.json();
+    },
+  });
+
+  const { data: services, isLoading: isLoadingServices } = useQuery<Service[]>({
+    queryKey: ['/api/shops', slug, 'services'],
+    queryFn: async () => {
+      const res = await fetch(`/api/shops/${slug}/services`);
+      if (!res.ok) throw new Error("Services not found");
+      return res.json();
+    },
+    enabled: !!shop,
+  });
+
+  const createBookingMutation = useMutation({
+    mutationFn: async (data: BookingForm & { shopId: number }) => {
+      const res = await fetch('/api/bookings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "예약에 실패했습니다.");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "예약 신청 완료",
+        description: "예약이 접수되었습니다. 가게에서 확인 후 연락드리겠습니다.",
+      });
+      form.reset();
+      setSelectedService(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "예약 실패",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const [selectedService, setSelectedService] = useState<number | null>(null);
 
   const form = useForm<BookingForm>({
@@ -27,7 +82,8 @@ export default function Booking() {
   });
 
   const onSubmit = (data: BookingForm) => {
-    createBooking(data);
+    if (!shop) return;
+    createBookingMutation.mutate({ ...data, shopId: shop.id });
   };
 
   const timeSlots = Array.from({ length: 9 }, (_, i) => {
@@ -35,7 +91,7 @@ export default function Booking() {
     return `${hour}:00`;
   });
 
-  if (isLoadingServices) {
+  if (isLoadingShop || isLoadingServices) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="w-10 h-10 animate-spin text-primary" />
@@ -43,30 +99,44 @@ export default function Booking() {
     );
   }
 
+  if (shopError || !shop) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-2">가게를 찾을 수 없습니다</h1>
+          <p className="text-muted-foreground">URL을 다시 확인해주세요.</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background pb-20">
-      {/* Shop Info Header */}
       <div className="bg-primary text-white py-8 px-4">
         <div className="container mx-auto max-w-4xl">
-          <h1 className="text-3xl font-bold mb-2">정리하개 강남점</h1>
+          <h1 className="text-3xl font-bold mb-2">{shop.name}</h1>
           <div className="space-y-2 text-white/90">
             <div className="flex items-center gap-2">
               <Phone className="w-4 h-4" />
-              <span>02-123-4567</span>
+              <span>{shop.phone}</span>
             </div>
             <div className="flex items-center gap-2">
               <MapPin className="w-4 h-4" />
-              <span>서울 강남구 테헤란로 123</span>
+              <span>{shop.address}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Clock className="w-4 h-4" />
+              <span>영업시간: {shop.businessHours}</span>
             </div>
           </div>
           <div className="flex gap-3 mt-4">
-            <a href="tel:02-123-4567">
+            <a href={`tel:${shop.phone}`}>
               <Button variant="secondary" size="sm" className="gap-2" data-testid="button-call">
                 <Phone className="w-4 h-4" />
                 전화걸기
               </Button>
             </a>
-            <a href="https://map.naver.com/v5/search/강남구%20테헤란로%20123" target="_blank" rel="noopener noreferrer">
+            <a href={`https://map.naver.com/v5/search/${encodeURIComponent(shop.address)}`} target="_blank" rel="noopener noreferrer">
               <Button variant="secondary" size="sm" className="gap-2" data-testid="button-map">
                 <MapPin className="w-4 h-4" />
                 지도보기
@@ -79,7 +149,6 @@ export default function Booking() {
       <div className="container mx-auto px-4 max-w-4xl py-8">
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-12">
           
-          {/* Step 1: Service Selection */}
           <section>
             <div className="flex items-center gap-3 mb-6">
               <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-xl">1</div>
@@ -128,7 +197,6 @@ export default function Booking() {
             )}
           </section>
 
-          {/* Step 2: Date & Time */}
           <section>
             <div className="flex items-center gap-3 mb-6">
               <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-xl">2</div>
@@ -175,7 +243,6 @@ export default function Booking() {
             </div>
           </section>
 
-          {/* Step 3: Customer Info */}
           <section>
             <div className="flex items-center gap-3 mb-6">
               <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-xl">3</div>
@@ -211,13 +278,21 @@ export default function Booking() {
             </div>
           </section>
 
+          {shop.depositRequired && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 text-center">
+              <p className="text-yellow-800">
+                예약 확정 시 예약금 <strong>{shop.depositAmount.toLocaleString()}원</strong>이 필요합니다.
+              </p>
+            </div>
+          )}
+
           <button
             type="submit"
-            disabled={isBooking}
+            disabled={createBookingMutation.isPending}
             className="w-full py-5 rounded-2xl font-bold text-xl text-white bg-primary hover:bg-primary/90 shadow-lg shadow-primary/25 hover:shadow-xl hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-3"
             data-testid="button-submit-booking"
           >
-            {isBooking ? (
+            {createBookingMutation.isPending ? (
               <>
                 <Loader2 className="w-6 h-6 animate-spin" />
                 예약 처리중...

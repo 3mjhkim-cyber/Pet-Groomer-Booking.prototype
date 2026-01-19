@@ -95,10 +95,16 @@ export default function Login() {
             </button>
           </form>
           
-          <div className="mt-6 pt-6 border-t border-dashed border-border text-center">
+          <div className="mt-6 pt-6 border-t border-dashed border-border text-center space-y-3">
             <p className="text-sm text-muted-foreground">
               테스트 계정: test@test.com / 1234
             </p>
+            <p className="text-sm text-muted-foreground">
+              총관리자: admin@jeongrihagae.com / admin1234
+            </p>
+            <Link href="/register" className="text-sm text-primary hover:underline">
+              가맹점 등록 신청하기
+            </Link>
           </div>
         </div>
       </div>

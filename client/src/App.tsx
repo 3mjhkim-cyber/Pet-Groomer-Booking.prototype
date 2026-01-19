@@ -6,11 +6,14 @@ import { Navbar } from "@/components/Navbar";
 
 import Home from "@/pages/Home";
 import Login from "@/pages/Login";
+import Register from "@/pages/Register";
 import Booking from "@/pages/Booking";
 import Dashboard from "@/pages/Dashboard";
 import Customers from "@/pages/Customers";
 import Calendar from "@/pages/Calendar";
 import Deposit from "@/pages/Deposit";
+import PlatformAdmin from "@/pages/PlatformAdmin";
+import ShopSettings from "@/pages/ShopSettings";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -21,10 +24,13 @@ function Router() {
         <Switch>
           <Route path="/" component={Home} />
           <Route path="/login" component={Login} />
-          <Route path="/book/gangnam" component={Booking} />
+          <Route path="/register" component={Register} />
+          <Route path="/book/:slug" component={Booking} />
           <Route path="/admin/dashboard" component={Dashboard} />
           <Route path="/admin/customers" component={Customers} />
           <Route path="/admin/calendar" component={Calendar} />
+          <Route path="/admin/settings" component={ShopSettings} />
+          <Route path="/admin/platform" component={PlatformAdmin} />
           <Route path="/deposit/:id" component={Deposit} />
           <Route component={NotFound} />
         </Switch>

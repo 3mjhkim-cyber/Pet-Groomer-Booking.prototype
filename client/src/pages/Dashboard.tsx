@@ -82,7 +82,7 @@ export default function Dashboard() {
   const handleManualSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!manualForm.serviceId) return;
-    createBooking(manualForm);
+    createBooking({ ...manualForm, shopId: user.shopId });
     setIsManualDialogOpen(false);
     setManualForm({ customerName: '', customerPhone: '', serviceId: 0, date: '', time: '10:00' });
   };
@@ -99,10 +99,19 @@ export default function Dashboard() {
           </div>
           <div className="flex items-center gap-2">
             <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setLocation('/admin/settings')}
+              data-testid="button-settings"
+            >
+              <Scissors className="w-4 h-4" />
+            </Button>
+            <Button
               variant="outline"
               className="gap-2"
               onClick={() => {
-                const link = `${window.location.origin}/book/gangnam`;
+                const slug = user.shop?.slug || 'gangnam';
+                const link = `${window.location.origin}/book/${slug}`;
                 navigator.clipboard.writeText(link).then(() => {
                   toast({
                     title: "예약 링크 복사됨",
@@ -183,7 +192,7 @@ export default function Dashboard() {
                     data-testid="select-manual-service"
                   >
                     <option value={0}>선택하세요</option>
-                    {services?.map(s => (
+                    {services?.map((s: any) => (
                       <option key={s.id} value={s.id}>{s.name} - {s.price.toLocaleString()}원</option>
                     ))}
                   </select>
