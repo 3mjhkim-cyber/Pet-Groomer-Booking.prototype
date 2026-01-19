@@ -157,8 +157,12 @@ export default function Booking() {
             
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
               {services?.map((service) => (
-                <label
+                <div
                   key={service.id}
+                  onClick={() => {
+                    setSelectedService(service.id);
+                    form.setValue("serviceId", service.id, { shouldValidate: true });
+                  }}
                   className={cn(
                     "relative cursor-pointer rounded-2xl p-6 border-2 transition-all duration-200 hover:shadow-lg",
                     selectedService === service.id
@@ -167,15 +171,6 @@ export default function Booking() {
                   )}
                   data-testid={`service-${service.id}`}
                 >
-                  <input
-                    type="radio"
-                    value={service.id}
-                    className="sr-only"
-                    {...form.register("serviceId", { 
-                      valueAsNumber: true,
-                      onChange: () => setSelectedService(service.id)
-                    })}
-                  />
                   {selectedService === service.id && (
                     <div className="absolute top-4 right-4 text-primary">
                       <CheckCircle2 className="w-6 h-6 fill-current" />
@@ -189,7 +184,7 @@ export default function Booking() {
                     </span>
                     <span className="font-bold text-foreground">{service.price.toLocaleString()}원</span>
                   </div>
-                </label>
+                </div>
               ))}
             </div>
             {form.formState.errors.serviceId && (

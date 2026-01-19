@@ -17,12 +17,6 @@ export default function Login() {
   const { login, isLoggingIn, user } = useAuth();
   const [_, setLocation] = useLocation();
 
-  // Redirect if already logged in
-  if (user) {
-    setLocation("/admin/dashboard");
-    return null;
-  }
-
   const form = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
@@ -34,6 +28,12 @@ export default function Login() {
   const onSubmit = (data: LoginForm) => {
     login(data);
   };
+
+  // Redirect if already logged in
+  if (user) {
+    setLocation("/admin/dashboard");
+    return null;
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-secondary/20 p-4">
