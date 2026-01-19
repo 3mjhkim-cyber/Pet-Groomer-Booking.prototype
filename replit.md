@@ -2,13 +2,19 @@
 
 ## Overview
 
-A full-stack booking management system for pet grooming shops built with React, Express, and PostgreSQL. The application provides customer-facing booking functionality and an admin dashboard for managing appointments, customers, and deposit requests. The interface is in Korean, targeting the Korean pet grooming market.
+A multi-tenant SaaS platform for pet grooming shop management built with React, Express, and PostgreSQL. The platform allows multiple grooming shops to register as franchises, each with their own booking page, service management, and customer tracking. Features include super admin platform management, shop registration with approval workflow, per-shop service/deposit configuration, and customer visit tracking. All UI is in Korean, targeting the Korean pet grooming market.
 
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
 
 ## System Architecture
+
+### Multi-Tenant Architecture
+- **Super Admin**: Platform-wide management of franchise shops
+- **Shop Owners**: Individual shop management with isolated data
+- **Public Booking**: Each shop has unique URL (e.g., /book/gangnam)
+- **Data Isolation**: Services, bookings, customers scoped to shop
 
 ### Frontend Architecture
 - **Framework**: React 18 with TypeScript
@@ -23,9 +29,10 @@ Preferred communication style: Simple, everyday language.
 ### Backend Architecture
 - **Runtime**: Node.js with Express
 - **Language**: TypeScript (ES modules)
-- **API Design**: RESTful endpoints defined in `shared/routes.ts` with Zod schemas for type-safe request/response validation
-- **Authentication**: Passport.js with local strategy, session-based auth using express-session
+- **API Design**: RESTful endpoints with role-based access control
+- **Authentication**: Passport.js with local strategy, session-based auth
 - **Password Security**: scrypt hashing with random salts
+- **Middleware**: requireAuth, requireSuperAdmin, requireShopOwner for RBAC
 
 ### Data Storage
 - **Database**: PostgreSQL
@@ -34,10 +41,11 @@ Preferred communication style: Simple, everyday language.
 - **Schema Location**: `shared/schema.ts` defines all database tables
 
 ### Database Schema
-- `users`: Shop owners/admins with email, password, shop name, phone, address
-- `customers`: Customer records with visit tracking
-- `services`: Available grooming services with duration and pricing
-- `bookings`: Appointment records linking customers to services with status and deposit tracking
+- `shops`: Franchise shops with settings (name, slug, phone, address, business hours, deposit settings, approval status)
+- `users`: Shop owners/admins with email, password, role (super_admin/shop_owner), shopId
+- `customers`: Customer records with visit tracking, scoped to shop
+- `services`: Available grooming services with duration and pricing, scoped to shop
+- `bookings`: Appointment records with status and deposit tracking, scoped to shop
 
 ### Build System
 - **Development**: Vite with HMR for frontend, tsx for backend
@@ -51,15 +59,40 @@ client/           # React frontend
     components/   # UI components including shadcn/ui
     hooks/        # Custom React hooks (auth, shop data)
     pages/        # Route components
+      - PlatformAdmin.tsx  # Super admin dashboard
+      - ShopSettings.tsx   # Shop owner settings
+      - Register.tsx       # Shop registration
+      - Booking.tsx        # Public booking page
+      - Dashboard.tsx      # Shop admin dashboard
     lib/          # Utilities and query client
 server/           # Express backend
-  routes.ts       # API route definitions
+  routes.ts       # API route definitions with RBAC middleware
   storage.ts      # Database access layer
   db.ts           # Database connection
 shared/           # Shared between client/server
   schema.ts       # Drizzle database schema
   routes.ts       # API contract definitions
 ```
+
+## Test Accounts
+
+- **Super Admin**: admin@jeongrihagae.com / admin1234
+- **Shop Owner**: test@test.com / 1234
+- **Demo Shop**: 정리하개 강남점 (slug: gangnam)
+
+## Key Pages & Routes
+
+### Public Routes
+- `/book/:slug` - Public booking page for each shop
+- `/register` - New shop registration
+- `/login` - User login
+
+### Super Admin Routes
+- `/admin/platform` - Platform management dashboard
+
+### Shop Owner Routes
+- `/admin/dashboard` - Shop dashboard with bookings
+- `/admin/settings` - Shop settings (services, deposit config)
 
 ## External Dependencies
 
@@ -69,7 +102,7 @@ shared/           # Shared between client/server
 
 ### Third-Party Services
 - No external APIs currently integrated
-- Session secret via `SESSION_SECRET` environment variable (defaults to "secret" in development)
+- Session secret via `SESSION_SECRET` environment variable
 
 ### Key npm Packages
 - `@tanstack/react-query`: Server state management
