@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { useRoute } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import type { Shop, Service } from "@shared/schema";
+import { formatKoreanPhone } from "@/lib/phone";
 
 const bookingFormSchema = z.object({
   customerName: z.string().min(2, "이름을 2글자 이상 입력해주세요"),
@@ -263,7 +264,11 @@ export default function Booking() {
                   <Phone className="w-4 h-4" /> 연락처
                 </label>
                 <input
-                  {...form.register("customerPhone")}
+                  value={form.watch("customerPhone") || ""}
+                  onChange={(e) => {
+                    const formatted = formatKoreanPhone(e.target.value);
+                    form.setValue("customerPhone", formatted, { shouldValidate: true });
+                  }}
                   placeholder="010-1234-5678"
                   className="w-full px-4 py-3 rounded-xl bg-background border-2 border-border focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all"
                   data-testid="input-phone"

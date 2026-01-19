@@ -124,6 +124,11 @@ export async function registerRoutes(
         return res.status(400).json({ message: "이메일과 비밀번호를 입력해주세요." });
       }
 
+      const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]).{10,}$/;
+      if (!passwordRegex.test(password)) {
+        return res.status(400).json({ message: "비밀번호는 영문 대문자, 소문자, 숫자, 특수문자를 포함하여 10자 이상이어야 합니다." });
+      }
+
       const name = shopData?.name?.trim();
       const phone = shopData?.phone?.trim();
       const address = shopData?.address?.trim();
