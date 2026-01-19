@@ -1,7 +1,8 @@
 import { useAuth } from "@/hooks/use-auth";
 import { useBookings, useServices, useApproveBooking, useRejectBooking, useRequestDeposit, useCreateBooking } from "@/hooks/use-shop";
 import { useLocation } from "wouter";
-import { Loader2, Calendar, Clock, User, Phone, Scissors, Check, X, Banknote, Plus } from "lucide-react";
+import { Loader2, Calendar, Clock, User, Phone, Scissors, Check, X, Banknote, Plus, Link, Copy } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -16,6 +17,17 @@ export default function Dashboard() {
   const { mutate: createBooking, isPending: isCreating } = useCreateBooking();
   const [_, setLocation] = useLocation();
   const [isManualDialogOpen, setIsManualDialogOpen] = useState(false);
+  const { toast } = useToast();
+
+  const copyDepositLink = (bookingId: number) => {
+    const link = `${window.location.origin}/deposit/${bookingId}`;
+    navigator.clipboard.writeText(link).then(() => {
+      toast({
+        title: "링크 복사됨",
+        description: "입금 페이지 링크가 클립보드에 복사되었습니다.",
+      });
+    });
+  };
   const [manualForm, setManualForm] = useState({
     customerName: '',
     customerPhone: '',
@@ -242,12 +254,24 @@ export default function Dashboard() {
                         </Button>
                       )}
                       {booking.depositStatus === 'waiting' && (
-                        <a href={`/deposit/${booking.id}`} target="_blank" rel="noopener noreferrer">
-                          <Button size="sm" variant="secondary" className="w-full gap-1">
-                            <Clock className="w-4 h-4" />
-                            입금 페이지 보기
+                        <div className="flex gap-2">
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            className="flex-1 gap-1" 
+                            onClick={() => copyDepositLink(booking.id)}
+                            data-testid={`button-copy-link-${booking.id}`}
+                          >
+                            <Copy className="w-4 h-4" />
+                            링크 복사
                           </Button>
-                        </a>
+                          <a href={`/deposit/${booking.id}`} target="_blank" rel="noopener noreferrer" className="flex-1">
+                            <Button size="sm" variant="secondary" className="w-full gap-1">
+                              <Link className="w-4 h-4" />
+                              페이지 보기
+                            </Button>
+                          </a>
+                        </div>
                       )}
                     </div>
                   ))}
