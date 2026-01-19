@@ -2,11 +2,11 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useServices, useCreateBooking } from "@/hooks/use-shop";
-import { Calendar as CalendarIcon, Clock, Scissors, User, Phone, CheckCircle2, Loader2 } from "lucide-react";
+import { Calendar as CalendarIcon, Clock, Scissors, User, Phone, CheckCircle2, Loader2, MapPin } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
-// Schema matching the API input
 const bookingFormSchema = z.object({
   customerName: z.string().min(2, "이름을 2글자 이상 입력해주세요"),
   customerPhone: z.string().regex(/^01([0|1|6|7|8|9])-?([0-9]{3,4})-?([0-9]{4})$/, "올바른 휴대폰 번호를 입력해주세요"),
@@ -30,7 +30,6 @@ export default function Booking() {
     createBooking(data);
   };
 
-  // Generate time slots (10:00 to 18:00)
   const timeSlots = Array.from({ length: 9 }, (_, i) => {
     const hour = i + 10;
     return `${hour}:00`;
@@ -46,14 +45,38 @@ export default function Booking() {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <div className="bg-secondary/30 py-16 px-4 mb-8">
-        <div className="container mx-auto text-center">
-          <h1 className="text-3xl md:text-5xl font-bold mb-4">예약하기</h1>
-          <p className="text-muted-foreground text-lg">안녕 강아지와 고양이 강남점</p>
+      {/* Shop Info Header */}
+      <div className="bg-primary text-white py-8 px-4">
+        <div className="container mx-auto max-w-4xl">
+          <h1 className="text-3xl font-bold mb-2">정리하개 강남점</h1>
+          <div className="space-y-2 text-white/90">
+            <div className="flex items-center gap-2">
+              <Phone className="w-4 h-4" />
+              <span>02-123-4567</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <MapPin className="w-4 h-4" />
+              <span>서울 강남구 테헤란로 123</span>
+            </div>
+          </div>
+          <div className="flex gap-3 mt-4">
+            <a href="tel:02-123-4567">
+              <Button variant="secondary" size="sm" className="gap-2" data-testid="button-call">
+                <Phone className="w-4 h-4" />
+                전화걸기
+              </Button>
+            </a>
+            <a href="https://map.naver.com/v5/search/강남구%20테헤란로%20123" target="_blank" rel="noopener noreferrer">
+              <Button variant="secondary" size="sm" className="gap-2" data-testid="button-map">
+                <MapPin className="w-4 h-4" />
+                지도보기
+              </Button>
+            </a>
+          </div>
         </div>
       </div>
 
-      <div className="container mx-auto px-4 max-w-4xl">
+      <div className="container mx-auto px-4 max-w-4xl py-8">
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-12">
           
           {/* Step 1: Service Selection */}
@@ -73,6 +96,7 @@ export default function Booking() {
                       ? "border-primary bg-primary/5 ring-4 ring-primary/10"
                       : "border-border bg-white hover:border-primary/50"
                   )}
+                  data-testid={`service-${service.id}`}
                 >
                   <input
                     type="radio"
@@ -121,6 +145,7 @@ export default function Booking() {
                   min={new Date().toISOString().split('T')[0]}
                   {...form.register("date")}
                   className="w-full px-4 py-3 rounded-xl border-2 border-border focus:border-primary focus:outline-none transition-colors"
+                  data-testid="input-date"
                 />
                 {form.formState.errors.date && <p className="text-destructive text-sm">{form.formState.errors.date.message}</p>}
               </div>
@@ -137,6 +162,7 @@ export default function Booking() {
                         value={time}
                         {...form.register("time")}
                         className="peer sr-only"
+                        data-testid={`time-${time}`}
                       />
                       <div className="text-center py-2 rounded-lg border border-border peer-checked:bg-primary peer-checked:text-white peer-checked:border-primary peer-hover:bg-secondary/20 transition-all">
                         {time}
@@ -165,6 +191,7 @@ export default function Booking() {
                   {...form.register("customerName")}
                   placeholder="홍길동"
                   className="w-full px-4 py-3 rounded-xl bg-background border-2 border-border focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all"
+                  data-testid="input-name"
                 />
                 {form.formState.errors.customerName && <p className="text-destructive text-sm">{form.formState.errors.customerName.message}</p>}
               </div>
@@ -177,6 +204,7 @@ export default function Booking() {
                   {...form.register("customerPhone")}
                   placeholder="010-1234-5678"
                   className="w-full px-4 py-3 rounded-xl bg-background border-2 border-border focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all"
+                  data-testid="input-phone"
                 />
                 {form.formState.errors.customerPhone && <p className="text-destructive text-sm">{form.formState.errors.customerPhone.message}</p>}
               </div>
@@ -187,6 +215,7 @@ export default function Booking() {
             type="submit"
             disabled={isBooking}
             className="w-full py-5 rounded-2xl font-bold text-xl text-white bg-primary hover:bg-primary/90 shadow-lg shadow-primary/25 hover:shadow-xl hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-3"
+            data-testid="button-submit-booking"
           >
             {isBooking ? (
               <>
@@ -195,7 +224,7 @@ export default function Booking() {
               </>
             ) : (
               <>
-                예약 완료하기
+                예약 신청하기
                 <CheckCircle2 className="w-6 h-6" />
               </>
             )}

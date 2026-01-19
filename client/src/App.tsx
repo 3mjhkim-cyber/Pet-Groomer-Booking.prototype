@@ -4,11 +4,13 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { Navbar } from "@/components/Navbar";
 
-// Pages
 import Home from "@/pages/Home";
 import Login from "@/pages/Login";
 import Booking from "@/pages/Booking";
 import Dashboard from "@/pages/Dashboard";
+import Customers from "@/pages/Customers";
+import Calendar from "@/pages/Calendar";
+import Deposit from "@/pages/Deposit";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -21,13 +23,15 @@ function Router() {
           <Route path="/login" component={Login} />
           <Route path="/book/gangnam" component={Booking} />
           <Route path="/admin/dashboard" component={Dashboard} />
+          <Route path="/admin/customers" component={Customers} />
+          <Route path="/admin/calendar" component={Calendar} />
+          <Route path="/deposit/:id" component={Deposit} />
           <Route component={NotFound} />
         </Switch>
       </main>
       
-      {/* Footer */}
-      <footer className="py-8 text-center text-muted-foreground text-sm border-t border-border">
-        <p>© 2024 안녕 강아지와 고양이. All rights reserved.</p>
+      <footer className="py-6 text-center text-muted-foreground text-sm border-t border-border bg-white">
+        <p>&copy; 2024 정리하개. All rights reserved.</p>
       </footer>
     </div>
   );

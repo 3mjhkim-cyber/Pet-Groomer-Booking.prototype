@@ -27,6 +27,30 @@ export function useBookings() {
   });
 }
 
+export function useBooking(id: number) {
+  return useQuery({
+    queryKey: ['/api/bookings', id],
+    queryFn: async () => {
+      const res = await fetch(`/api/bookings/${id}`);
+      if (!res.ok) throw new Error("Failed to fetch booking");
+      return res.json();
+    },
+  });
+}
+
+export function useCustomers() {
+  return useQuery({
+    queryKey: [api.customers.list.path],
+    queryFn: async () => {
+      const res = await fetch(api.customers.list.path);
+      if (res.status === 401) throw new Error("Unauthorized");
+      if (!res.ok) throw new Error("Failed to fetch customers");
+      return api.customers.list.responses[200].parse(await res.json());
+    },
+    retry: false,
+  });
+}
+
 export function useCreateBooking() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -34,7 +58,6 @@ export function useCreateBooking() {
 
   return useMutation({
     mutationFn: async (data: CreateBookingInput) => {
-      // Validate with schema first
       const validated = api.bookings.create.input.parse(data);
       
       const res = await fetch(api.bookings.create.path, {
@@ -53,8 +76,8 @@ export function useCreateBooking() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.bookings.list.path] });
       toast({
-        title: "예약 완료! 🐾",
-        description: "예약이 성공적으로 접수되었습니다. 방문해 주셔서 감사합니다.",
+        title: "예약 신청 완료!",
+        description: "예약이 접수되었습니다. 업체 승인 후 확정됩니다.",
       });
       setLocation("/");
     },
@@ -64,6 +87,82 @@ export function useCreateBooking() {
         description: error.message,
         variant: "destructive",
       });
+    },
+  });
+}
+
+export function useApproveBooking() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (id: number) => {
+      const res = await fetch(`/api/bookings/${id}/approve`, {
+        method: 'PATCH',
+      });
+      if (!res.ok) throw new Error("Failed to approve booking");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.bookings.list.path] });
+      toast({ title: "예약 승인됨", description: "예약이 승인되었습니다." });
+    },
+  });
+}
+
+export function useRejectBooking() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (id: number) => {
+      const res = await fetch(`/api/bookings/${id}/reject`, {
+        method: 'PATCH',
+      });
+      if (!res.ok) throw new Error("Failed to reject booking");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.bookings.list.path] });
+      toast({ title: "예약 거절됨", description: "예약이 거절되었습니다.", variant: "destructive" });
+    },
+  });
+}
+
+export function useRequestDeposit() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (id: number) => {
+      const res = await fetch(`/api/bookings/${id}/deposit-request`, {
+        method: 'PATCH',
+      });
+      if (!res.ok) throw new Error("Failed to request deposit");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.bookings.list.path] });
+      toast({ title: "예약금 요청됨", description: "고객에게 예약금 요청이 전송되었습니다." });
+    },
+  });
+}
+
+export function useConfirmDeposit() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (id: number) => {
+      const res = await fetch(`/api/bookings/${id}/deposit-confirm`, {
+        method: 'PATCH',
+      });
+      if (!res.ok) throw new Error("Failed to confirm deposit");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/bookings'] });
+      toast({ title: "입금 확인됨", description: "예약금 입금이 확인되었습니다." });
     },
   });
 }

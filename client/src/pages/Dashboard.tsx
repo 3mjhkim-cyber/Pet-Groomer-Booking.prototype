@@ -1,12 +1,28 @@
 import { useAuth } from "@/hooks/use-auth";
-import { useBookings } from "@/hooks/use-shop";
+import { useBookings, useServices, useApproveBooking, useRejectBooking, useRequestDeposit, useCreateBooking } from "@/hooks/use-shop";
 import { useLocation } from "wouter";
-import { Loader2, Calendar, Clock, User, Phone, Scissors, LogOut } from "lucide-react";
+import { Loader2, Calendar, Clock, User, Phone, Scissors, Check, X, Banknote, Plus } from "lucide-react";
+import { useState } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 export default function Dashboard() {
-  const { user, isLoading: isAuthLoading, logout } = useAuth();
+  const { user, isLoading: isAuthLoading } = useAuth();
   const { data: bookings, isLoading: isBookingsLoading } = useBookings();
+  const { data: services } = useServices();
+  const { mutate: approveBooking } = useApproveBooking();
+  const { mutate: rejectBooking } = useRejectBooking();
+  const { mutate: requestDeposit } = useRequestDeposit();
+  const { mutate: createBooking, isPending: isCreating } = useCreateBooking();
   const [_, setLocation] = useLocation();
+  const [isManualDialogOpen, setIsManualDialogOpen] = useState(false);
+  const [manualForm, setManualForm] = useState({
+    customerName: '',
+    customerPhone: '',
+    serviceId: 0,
+    date: '',
+    time: '10:00'
+  });
 
   if (isAuthLoading) return <div className="h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
 
@@ -15,117 +31,229 @@ export default function Dashboard() {
     return null;
   }
 
-  // Group bookings by date
-  const groupedBookings = bookings?.reduce((acc, booking) => {
-    if (!acc[booking.date]) acc[booking.date] = [];
-    acc[booking.date].push(booking);
-    return acc;
-  }, {} as Record<string, typeof bookings>);
+  const pendingBookings = bookings?.filter(b => b.status === 'pending') || [];
+  const confirmedBookings = bookings?.filter(b => b.status === 'confirmed') || [];
 
-  // Sort dates
-  const sortedDates = Object.keys(groupedBookings || {}).sort();
+  const handleManualSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!manualForm.serviceId) return;
+    createBooking(manualForm);
+    setIsManualDialogOpen(false);
+    setManualForm({ customerName: '', customerPhone: '', serviceId: 0, date: '', time: '10:00' });
+  };
+
+  const timeSlots = Array.from({ length: 9 }, (_, i) => `${i + 10}:00`);
 
   return (
     <div className="min-h-screen bg-secondary/10 pb-20">
-      {/* Header */}
-      <div className="bg-white border-b border-border shadow-sm sticky top-0 z-10">
-        <div className="container mx-auto px-4 h-20 flex items-center justify-between">
+      <div className="bg-white border-b border-border shadow-sm sticky top-16 z-10">
+        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold">{user.shopName}</h1>
+            <h1 className="text-xl font-bold">{user.shopName}</h1>
             <p className="text-sm text-muted-foreground">관리자 대시보드</p>
           </div>
-          <div className="flex items-center gap-4">
-            <span className="text-sm font-medium bg-secondary/50 px-3 py-1 rounded-full text-secondary-foreground">
-              {user.email}
-            </span>
-            <button
-              onClick={() => logout()}
-              className="p-2 hover:bg-destructive/10 hover:text-destructive rounded-lg transition-colors"
-            >
-              <LogOut className="w-5 h-5" />
-            </button>
-          </div>
+          <Dialog open={isManualDialogOpen} onOpenChange={setIsManualDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="gap-2" data-testid="button-manual-booking">
+                <Plus className="w-4 h-4" />
+                수동 예약 추가
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>수동 예약 추가</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleManualSubmit} className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium">고객명</label>
+                  <input
+                    type="text"
+                    value={manualForm.customerName}
+                    onChange={e => setManualForm(f => ({...f, customerName: e.target.value}))}
+                    className="w-full px-3 py-2 border rounded-lg mt-1"
+                    required
+                    data-testid="input-manual-name"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">전화번호</label>
+                  <input
+                    type="tel"
+                    value={manualForm.customerPhone}
+                    onChange={e => setManualForm(f => ({...f, customerPhone: e.target.value}))}
+                    className="w-full px-3 py-2 border rounded-lg mt-1"
+                    required
+                    data-testid="input-manual-phone"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">서비스</label>
+                  <select
+                    value={manualForm.serviceId}
+                    onChange={e => setManualForm(f => ({...f, serviceId: Number(e.target.value)}))}
+                    className="w-full px-3 py-2 border rounded-lg mt-1"
+                    required
+                    data-testid="select-manual-service"
+                  >
+                    <option value={0}>선택하세요</option>
+                    {services?.map(s => (
+                      <option key={s.id} value={s.id}>{s.name} - {s.price.toLocaleString()}원</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium">날짜</label>
+                    <input
+                      type="date"
+                      value={manualForm.date}
+                      onChange={e => setManualForm(f => ({...f, date: e.target.value}))}
+                      className="w-full px-3 py-2 border rounded-lg mt-1"
+                      required
+                      data-testid="input-manual-date"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">시간</label>
+                    <select
+                      value={manualForm.time}
+                      onChange={e => setManualForm(f => ({...f, time: e.target.value}))}
+                      className="w-full px-3 py-2 border rounded-lg mt-1"
+                      data-testid="select-manual-time"
+                    >
+                      {timeSlots.map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <Button type="submit" className="w-full" disabled={isCreating} data-testid="button-submit-manual">
+                  {isCreating ? <Loader2 className="w-4 h-4 animate-spin" /> : '예약 추가'}
+                </Button>
+              </form>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-8 max-w-5xl">
-        <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
-          <Calendar className="w-5 h-5 text-primary" />
-          예약 현황
-        </h2>
-
+      <div className="container mx-auto px-4 py-8 max-w-6xl">
         {isBookingsLoading ? (
           <div className="flex justify-center py-20">
             <Loader2 className="w-10 h-10 animate-spin text-primary" />
           </div>
-        ) : bookings?.length === 0 ? (
-          <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-border">
-            <Calendar className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-bold text-foreground">예약이 없습니다</h3>
-            <p className="text-muted-foreground">새로운 예약이 들어오면 이곳에 표시됩니다.</p>
-          </div>
         ) : (
-          <div className="space-y-8">
-            {sortedDates.map(date => (
-              <div key={date} className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <div className="flex items-center gap-4 mb-4">
-                  <h3 className="text-lg font-bold bg-white px-4 py-1 rounded-full border border-border shadow-sm">
-                    {date}
-                  </h3>
-                  <div className="h-px bg-border flex-1" />
+          <div className="space-y-10">
+            {/* Pending Section */}
+            <section>
+              <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+                <Clock className="w-5 h-5 text-orange-500" />
+                승인 대기 ({pendingBookings.length})
+              </h2>
+              {pendingBookings.length === 0 ? (
+                <div className="text-center py-10 bg-white rounded-2xl border border-dashed border-border">
+                  <p className="text-muted-foreground">대기 중인 예약이 없습니다</p>
                 </div>
-
+              ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {groupedBookings![date].sort((a,b) => a.time.localeCompare(b.time)).map(booking => (
-                    <div 
-                      key={booking.id}
-                      className="bg-white rounded-2xl p-6 border border-border hover:shadow-lg hover:border-primary/30 transition-all group"
-                    >
-                      <div className="flex justify-between items-start mb-4">
-                        <div className="flex items-center gap-2 text-primary font-bold text-lg bg-primary/5 px-3 py-1 rounded-lg">
+                  {pendingBookings.map(booking => (
+                    <div key={booking.id} className="bg-white rounded-2xl p-5 border border-orange-200 shadow-sm" data-testid={`card-pending-${booking.id}`}>
+                      <div className="flex justify-between items-start mb-3">
+                        <div className="flex items-center gap-2 text-orange-600 font-bold bg-orange-50 px-3 py-1 rounded-lg">
                           <Clock className="w-4 h-4" />
                           {booking.time}
                         </div>
-                        <span className={`px-2 py-1 rounded text-xs font-bold ${
-                          booking.status === 'confirmed' 
-                            ? 'bg-green-100 text-green-700' 
-                            : 'bg-red-100 text-red-700'
-                        }`}>
-                          {booking.status === 'confirmed' ? '예약확정' : '취소됨'}
-                        </span>
+                        <span className="text-sm text-muted-foreground">{booking.date}</span>
                       </div>
-
-                      <div className="space-y-3">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-secondary/30 flex items-center justify-center text-secondary-foreground">
-                            <User className="w-4 h-4" />
-                          </div>
-                          <div>
-                            <div className="font-bold">{booking.customerName}</div>
-                            <div className="text-xs text-muted-foreground">고객님</div>
-                          </div>
+                      <div className="space-y-2 mb-4">
+                        <div className="flex items-center gap-2">
+                          <User className="w-4 h-4 text-muted-foreground" />
+                          <span className="font-medium">{booking.customerName}</span>
                         </div>
-
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-accent/30 flex items-center justify-center text-accent-foreground">
-                            <Scissors className="w-4 h-4" />
-                          </div>
-                          <div>
-                            <div className="font-medium">{booking.serviceName}</div>
-                            <div className="text-xs text-muted-foreground">서비스</div>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-3 pt-3 border-t border-dashed border-border">
+                        <div className="flex items-center gap-2">
                           <Phone className="w-4 h-4 text-muted-foreground" />
-                          <span className="text-sm font-mono text-muted-foreground">{booking.customerPhone}</span>
+                          <span className="text-sm font-mono">{booking.customerPhone}</span>
                         </div>
+                        <div className="flex items-center gap-2">
+                          <Scissors className="w-4 h-4 text-muted-foreground" />
+                          <span className="text-sm">{booking.serviceName}</span>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button size="sm" className="flex-1 gap-1" onClick={() => approveBooking(booking.id)} data-testid={`button-approve-${booking.id}`}>
+                          <Check className="w-4 h-4" />
+                          승인
+                        </Button>
+                        <Button size="sm" variant="destructive" className="flex-1 gap-1" onClick={() => rejectBooking(booking.id)} data-testid={`button-reject-${booking.id}`}>
+                          <X className="w-4 h-4" />
+                          거절
+                        </Button>
                       </div>
                     </div>
                   ))}
                 </div>
-              </div>
-            ))}
+              )}
+            </section>
+
+            {/* Confirmed Section */}
+            <section>
+              <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-primary" />
+                확정된 예약 ({confirmedBookings.length})
+              </h2>
+              {confirmedBookings.length === 0 ? (
+                <div className="text-center py-10 bg-white rounded-2xl border border-dashed border-border">
+                  <p className="text-muted-foreground">확정된 예약이 없습니다</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {confirmedBookings.map(booking => (
+                    <div key={booking.id} className="bg-white rounded-2xl p-5 border border-green-200 shadow-sm" data-testid={`card-confirmed-${booking.id}`}>
+                      <div className="flex justify-between items-start mb-3">
+                        <div className="flex items-center gap-2 text-green-600 font-bold bg-green-50 px-3 py-1 rounded-lg">
+                          <Clock className="w-4 h-4" />
+                          {booking.time}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-muted-foreground">{booking.date}</span>
+                          {booking.depositStatus === 'paid' && (
+                            <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full font-medium">입금완료</span>
+                          )}
+                          {booking.depositStatus === 'waiting' && (
+                            <span className="px-2 py-0.5 bg-yellow-100 text-yellow-700 text-xs rounded-full font-medium">입금대기</span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="space-y-2 mb-4">
+                        <div className="flex items-center gap-2">
+                          <User className="w-4 h-4 text-muted-foreground" />
+                          <span className="font-medium">{booking.customerName}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Phone className="w-4 h-4 text-muted-foreground" />
+                          <span className="text-sm font-mono">{booking.customerPhone}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Scissors className="w-4 h-4 text-muted-foreground" />
+                          <span className="text-sm">{booking.serviceName}</span>
+                        </div>
+                      </div>
+                      {booking.depositStatus === 'none' && (
+                        <Button size="sm" variant="outline" className="w-full gap-1" onClick={() => requestDeposit(booking.id)} data-testid={`button-deposit-${booking.id}`}>
+                          <Banknote className="w-4 h-4" />
+                          예약금 요청
+                        </Button>
+                      )}
+                      {booking.depositStatus === 'waiting' && (
+                        <a href={`/deposit/${booking.id}`} target="_blank" rel="noopener noreferrer">
+                          <Button size="sm" variant="secondary" className="w-full gap-1">
+                            <Clock className="w-4 h-4" />
+                            입금 페이지 보기
+                          </Button>
+                        </a>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
           </div>
         )}
       </div>

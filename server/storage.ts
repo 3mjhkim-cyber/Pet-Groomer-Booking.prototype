@@ -1,4 +1,4 @@
-import { users, services, bookings, type User, type InsertUser, type Service, type InsertService, type Booking, type InsertBooking } from "@shared/schema";
+import { users, services, bookings, customers, type User, type InsertUser, type Service, type InsertService, type Booking, type InsertBooking, type Customer, type InsertCustomer } from "@shared/schema";
 import { db } from "./db";
 import { eq } from "drizzle-orm";
 
@@ -10,8 +10,17 @@ export interface IStorage {
   getServices(): Promise<Service[]>;
   createService(service: InsertService): Promise<Service>;
   
+  getCustomers(): Promise<Customer[]>;
+  getCustomerByPhone(phone: string): Promise<Customer | undefined>;
+  createCustomer(customer: InsertCustomer): Promise<Customer>;
+  incrementVisitCount(phone: string): Promise<void>;
+  
   getBookings(): Promise<(Booking & { serviceName: string })[]>;
+  getBooking(id: number): Promise<(Booking & { serviceName: string }) | undefined>;
   createBooking(booking: InsertBooking): Promise<Booking>;
+  updateBookingStatus(id: number, status: string): Promise<Booking | undefined>;
+  requestDeposit(id: number): Promise<Booking | undefined>;
+  confirmDeposit(id: number): Promise<Booking | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -39,6 +48,29 @@ export class DatabaseStorage implements IStorage {
     return service;
   }
 
+  async getCustomers(): Promise<Customer[]> {
+    return await db.select().from(customers);
+  }
+
+  async getCustomerByPhone(phone: string): Promise<Customer | undefined> {
+    const [customer] = await db.select().from(customers).where(eq(customers.phone, phone));
+    return customer;
+  }
+
+  async createCustomer(insertCustomer: InsertCustomer): Promise<Customer> {
+    const [customer] = await db.insert(customers).values(insertCustomer).returning();
+    return customer;
+  }
+
+  async incrementVisitCount(phone: string): Promise<void> {
+    const customer = await this.getCustomerByPhone(phone);
+    if (customer) {
+      await db.update(customers)
+        .set({ visitCount: customer.visitCount + 1, lastVisit: new Date() })
+        .where(eq(customers.phone, phone));
+    }
+  }
+
   async getBookings(): Promise<(Booking & { serviceName: string })[]> {
     const result = await db.select({
       id: bookings.id,
@@ -48,6 +80,8 @@ export class DatabaseStorage implements IStorage {
       customerPhone: bookings.customerPhone,
       status: bookings.status,
       serviceId: bookings.serviceId,
+      depositStatus: bookings.depositStatus,
+      depositDeadline: bookings.depositDeadline,
       serviceName: services.name,
     })
     .from(bookings)
@@ -56,8 +90,67 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
+  async getBooking(id: number): Promise<(Booking & { serviceName: string }) | undefined> {
+    const [result] = await db.select({
+      id: bookings.id,
+      date: bookings.date,
+      time: bookings.time,
+      customerName: bookings.customerName,
+      customerPhone: bookings.customerPhone,
+      status: bookings.status,
+      serviceId: bookings.serviceId,
+      depositStatus: bookings.depositStatus,
+      depositDeadline: bookings.depositDeadline,
+      serviceName: services.name,
+    })
+    .from(bookings)
+    .innerJoin(services, eq(bookings.serviceId, services.id))
+    .where(eq(bookings.id, id));
+    
+    return result;
+  }
+
   async createBooking(insertBooking: InsertBooking): Promise<Booking> {
     const [booking] = await db.insert(bookings).values(insertBooking).returning();
+    
+    const existingCustomer = await this.getCustomerByPhone(insertBooking.customerPhone);
+    if (!existingCustomer) {
+      await this.createCustomer({
+        name: insertBooking.customerName,
+        phone: insertBooking.customerPhone,
+      });
+    }
+    
+    return booking;
+  }
+
+  async updateBookingStatus(id: number, status: string): Promise<Booking | undefined> {
+    const [booking] = await db.update(bookings)
+      .set({ status })
+      .where(eq(bookings.id, id))
+      .returning();
+    
+    if (booking && status === 'confirmed') {
+      await this.incrementVisitCount(booking.customerPhone);
+    }
+    
+    return booking;
+  }
+
+  async requestDeposit(id: number): Promise<Booking | undefined> {
+    const deadline = new Date(Date.now() + 2 * 60 * 60 * 1000);
+    const [booking] = await db.update(bookings)
+      .set({ depositStatus: 'waiting', depositDeadline: deadline })
+      .where(eq(bookings.id, id))
+      .returning();
+    return booking;
+  }
+
+  async confirmDeposit(id: number): Promise<Booking | undefined> {
+    const [booking] = await db.update(bookings)
+      .set({ depositStatus: 'paid' })
+      .where(eq(bookings.id, id))
+      .returning();
     return booking;
   }
 }

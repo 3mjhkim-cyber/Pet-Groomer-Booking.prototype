@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { insertUserSchema, insertBookingSchema, users, services, bookings } from './schema';
+import { insertBookingSchema, users, services, bookings, customers } from './schema';
 
 export const errorSchemas = {
   validation: z.object({
@@ -7,9 +7,6 @@ export const errorSchemas = {
     field: z.string().optional(),
   }),
   notFound: z.object({
-    message: z.string(),
-  }),
-  internal: z.object({
     message: z.string(),
   }),
   unauthorized: z.object({
@@ -52,6 +49,16 @@ export const api = {
       },
     },
   },
+  customers: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/customers',
+      responses: {
+        200: z.array(z.custom<typeof customers.$inferSelect>()),
+        401: errorSchemas.unauthorized,
+      },
+    },
+  },
   bookings: {
     list: {
       method: 'GET' as const,
@@ -61,6 +68,14 @@ export const api = {
         401: errorSchemas.unauthorized,
       },
     },
+    get: {
+      method: 'GET' as const,
+      path: '/api/bookings/:id',
+      responses: {
+        200: z.custom<typeof bookings.$inferSelect & { serviceName: string }>(),
+        404: errorSchemas.notFound,
+      },
+    },
     create: {
       method: 'POST' as const,
       path: '/api/bookings',
@@ -68,6 +83,38 @@ export const api = {
       responses: {
         201: z.custom<typeof bookings.$inferSelect>(),
         400: errorSchemas.validation,
+      },
+    },
+    approve: {
+      method: 'PATCH' as const,
+      path: '/api/bookings/:id/approve',
+      responses: {
+        200: z.custom<typeof bookings.$inferSelect>(),
+        404: errorSchemas.notFound,
+      },
+    },
+    reject: {
+      method: 'PATCH' as const,
+      path: '/api/bookings/:id/reject',
+      responses: {
+        200: z.custom<typeof bookings.$inferSelect>(),
+        404: errorSchemas.notFound,
+      },
+    },
+    requestDeposit: {
+      method: 'PATCH' as const,
+      path: '/api/bookings/:id/deposit-request',
+      responses: {
+        200: z.custom<typeof bookings.$inferSelect>(),
+        404: errorSchemas.notFound,
+      },
+    },
+    confirmDeposit: {
+      method: 'PATCH' as const,
+      path: '/api/bookings/:id/deposit-confirm',
+      responses: {
+        200: z.custom<typeof bookings.$inferSelect>(),
+        404: errorSchemas.notFound,
       },
     },
   },

@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { createServer, type Server } from "http";
+import { type Server } from "http";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
@@ -66,7 +66,7 @@ export async function registerRoutes(
     }
   });
 
-  // API Routes
+  // Auth Routes
   app.post(api.auth.login.path, passport.authenticate("local"), (req, res) => {
     res.json(req.user);
   });
@@ -82,11 +82,22 @@ export async function registerRoutes(
     res.json(req.user || null);
   });
 
+  // Services
   app.get(api.services.list.path, async (req, res) => {
     const services = await storage.getServices();
     res.json(services);
   });
 
+  // Customers
+  app.get(api.customers.list.path, async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const customers = await storage.getCustomers();
+    res.json(customers);
+  });
+
+  // Bookings
   app.get(api.bookings.list.path, async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Unauthorized" });
@@ -95,20 +106,69 @@ export async function registerRoutes(
     res.json(bookings);
   });
 
+  app.get('/api/bookings/:id', async (req, res) => {
+    const booking = await storage.getBooking(Number(req.params.id));
+    if (!booking) {
+      return res.status(404).json({ message: "Booking not found" });
+    }
+    res.json(booking);
+  });
+
   app.post(api.bookings.create.path, async (req, res) => {
     try {
       const input = api.bookings.create.input.parse(req.body);
       const booking = await storage.createBooking(input);
       res.status(201).json(booking);
     } catch (err) {
-       if (err instanceof z.ZodError) {
-          return res.status(400).json({
-            message: err.errors[0].message,
-            field: err.errors[0].path.join('.'),
-          });
-        }
-        throw err;
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({
+          message: err.errors[0].message,
+          field: err.errors[0].path.join('.'),
+        });
+      }
+      throw err;
     }
+  });
+
+  app.patch('/api/bookings/:id/approve', async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const booking = await storage.updateBookingStatus(Number(req.params.id), 'confirmed');
+    if (!booking) {
+      return res.status(404).json({ message: "Booking not found" });
+    }
+    res.json(booking);
+  });
+
+  app.patch('/api/bookings/:id/reject', async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const booking = await storage.updateBookingStatus(Number(req.params.id), 'rejected');
+    if (!booking) {
+      return res.status(404).json({ message: "Booking not found" });
+    }
+    res.json(booking);
+  });
+
+  app.patch('/api/bookings/:id/deposit-request', async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const booking = await storage.requestDeposit(Number(req.params.id));
+    if (!booking) {
+      return res.status(404).json({ message: "Booking not found" });
+    }
+    res.json(booking);
+  });
+
+  app.patch('/api/bookings/:id/deposit-confirm', async (req, res) => {
+    const booking = await storage.confirmDeposit(Number(req.params.id));
+    if (!booking) {
+      return res.status(404).json({ message: "Booking not found" });
+    }
+    res.json(booking);
   });
 
   // Seed Data
@@ -117,8 +177,9 @@ export async function registerRoutes(
     await storage.createUser({
       email: "test@test.com",
       password: hashedPassword,
-      shopName: "안녕 강아지와 고양이 강남점",
-      phone: "010-1234-5678"
+      shopName: "정리하개 강남점",
+      phone: "02-123-4567",
+      address: "서울 강남구 테헤란로 123"
     });
   }
 

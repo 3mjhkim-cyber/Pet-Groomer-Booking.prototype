@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
-import { Scissors, User, LogOut, LayoutDashboard } from "lucide-react";
+import { Scissors, User, LogOut, LayoutDashboard, Users, CalendarDays } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function Navbar() {
@@ -14,10 +14,10 @@ export function Navbar() {
           <div className="bg-primary/20 p-2 rounded-full group-hover:bg-primary/30 transition-colors">
             <Scissors className="h-6 w-6 text-primary group-hover:rotate-12 transition-transform" />
           </div>
-          <span className="text-xl font-bold text-foreground">안녕 강아지와 고양이</span>
+          <span className="text-xl font-bold text-foreground">정리하개</span>
         </Link>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
           <Link href="/book/gangnam">
             <button className={cn(
               "hidden sm:flex items-center px-4 py-2 rounded-full font-medium transition-all",
@@ -30,31 +30,54 @@ export function Navbar() {
           </Link>
 
           {user ? (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1">
               <Link href="/admin/dashboard">
                 <button className={cn(
-                  "flex items-center gap-2 px-4 py-2 rounded-full font-medium transition-all",
+                  "flex items-center gap-2 px-3 py-2 rounded-full font-medium transition-all",
                   location === "/admin/dashboard" 
                     ? "bg-secondary text-secondary-foreground" 
                     : "text-foreground/70 hover:bg-secondary/30"
-                )}>
+                )} data-testid="link-dashboard">
                   <LayoutDashboard className="h-4 w-4" />
-                  <span className="hidden sm:inline">관리자</span>
+                  <span className="hidden sm:inline">대시보드</span>
+                </button>
+              </Link>
+              <Link href="/admin/customers">
+                <button className={cn(
+                  "flex items-center gap-2 px-3 py-2 rounded-full font-medium transition-all",
+                  location === "/admin/customers" 
+                    ? "bg-secondary text-secondary-foreground" 
+                    : "text-foreground/70 hover:bg-secondary/30"
+                )} data-testid="link-customers">
+                  <Users className="h-4 w-4" />
+                  <span className="hidden sm:inline">고객</span>
+                </button>
+              </Link>
+              <Link href="/admin/calendar">
+                <button className={cn(
+                  "flex items-center gap-2 px-3 py-2 rounded-full font-medium transition-all",
+                  location === "/admin/calendar" 
+                    ? "bg-secondary text-secondary-foreground" 
+                    : "text-foreground/70 hover:bg-secondary/30"
+                )} data-testid="link-calendar">
+                  <CalendarDays className="h-4 w-4" />
+                  <span className="hidden sm:inline">캘린더</span>
                 </button>
               </Link>
               <button 
                 onClick={() => logout()}
                 className="p-2 text-muted-foreground hover:text-destructive transition-colors"
                 title="로그아웃"
+                data-testid="button-logout"
               >
                 <LogOut className="h-5 w-5" />
               </button>
             </div>
           ) : (
             <Link href="/login">
-              <button className="flex items-center gap-2 px-4 py-2 rounded-full border border-border hover:bg-secondary/20 transition-all text-sm font-medium text-foreground/80">
+              <button className="flex items-center gap-2 px-4 py-2 rounded-full border border-border hover:bg-secondary/20 transition-all text-sm font-medium text-foreground/80" data-testid="link-login">
                 <User className="h-4 w-4" />
-                <span>사장님 로그인</span>
+                <span>로그인</span>
               </button>
             </Link>
           )}
