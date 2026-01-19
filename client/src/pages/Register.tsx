@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,7 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Store, ArrowLeft } from "lucide-react";
+import { Loader2, Store, ArrowLeft, Search } from "lucide-react";
+
+declare global {
+  interface Window {
+    daum: any;
+  }
+}
 
 export default function Register() {
   const [_, setLocation] = useLocation();
@@ -17,16 +23,51 @@ export default function Register() {
     password: '',
     confirmPassword: '',
     shopName: '',
-    shopSlug: '',
     phone: '',
     address: '',
+    addressDetail: '',
   });
+
+  useEffect(() => {
+    const script = document.createElement('script');
+    script.src = '//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js';
+    script.async = true;
+    document.head.appendChild(script);
+    return () => {
+      document.head.removeChild(script);
+    };
+  }, []);
+
+  const openAddressSearch = () => {
+    if (!window.daum) {
+      toast({
+        title: "주소 검색 로드 중",
+        description: "잠시 후 다시 시도해주세요.",
+        variant: "destructive",
+      });
+      return;
+    }
+    new window.daum.Postcode({
+      oncomplete: (data: any) => {
+        const fullAddress = data.roadAddress || data.jibunAddress;
+        setFormData(f => ({ ...f, address: fullAddress }));
+      },
+    }).open();
+  };
 
   const registerMutation = useMutation({
     mutationFn: async () => {
       if (formData.password !== formData.confirmPassword) {
         throw new Error("비밀번호가 일치하지 않습니다.");
       }
+
+      if (!formData.address) {
+        throw new Error("주소를 검색하여 선택해주세요.");
+      }
+
+      const fullAddress = formData.addressDetail 
+        ? `${formData.address} ${formData.addressDetail}`
+        : formData.address;
 
       const res = await fetch('/api/shops/register', {
         method: 'POST',
@@ -36,9 +77,8 @@ export default function Register() {
           password: formData.password,
           shop: {
             name: formData.shopName,
-            slug: formData.shopSlug,
             phone: formData.phone,
-            address: formData.address,
+            address: fullAddress,
           },
         }),
       });
@@ -69,13 +109,6 @@ export default function Register() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     registerMutation.mutate();
-  };
-
-  const generateSlug = (name: string) => {
-    return name.toLowerCase()
-      .replace(/[^a-z0-9가-힣]/g, '-')
-      .replace(/-+/g, '-')
-      .replace(/^-|-$/g, '');
   };
 
   return (
@@ -135,34 +168,11 @@ export default function Register() {
               <Input 
                 id="shopName"
                 value={formData.shopName}
-                onChange={e => {
-                  const name = e.target.value;
-                  setFormData(f => ({
-                    ...f, 
-                    shopName: name,
-                    shopSlug: formData.shopSlug || generateSlug(name)
-                  }));
-                }}
+                onChange={e => setFormData(f => ({...f, shopName: e.target.value}))}
                 placeholder="정리하개 강남점"
                 required
                 data-testid="input-shop-name"
               />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="shopSlug">예약 페이지 URL</Label>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">/book/</span>
-                <Input 
-                  id="shopSlug"
-                  value={formData.shopSlug}
-                  onChange={e => setFormData(f => ({...f, shopSlug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '')}))}
-                  placeholder="gangnam"
-                  required
-                  data-testid="input-shop-slug"
-                />
-              </div>
-              <p className="text-xs text-muted-foreground">영문 소문자와 숫자, 하이픈만 사용 가능합니다</p>
             </div>
 
             <div className="space-y-2">
@@ -178,14 +188,37 @@ export default function Register() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="address">주소</Label>
+              <Label htmlFor="address">도로명 주소</Label>
+              <div className="flex gap-2">
+                <Input 
+                  id="address"
+                  value={formData.address}
+                  placeholder="주소 검색을 눌러주세요"
+                  readOnly
+                  className="flex-1 bg-muted cursor-pointer"
+                  onClick={openAddressSearch}
+                  data-testid="input-address"
+                />
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={openAddressSearch}
+                  data-testid="button-address-search"
+                >
+                  <Search className="w-4 h-4 mr-2" />
+                  검색
+                </Button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="addressDetail">상세 주소</Label>
               <Input 
-                id="address"
-                value={formData.address}
-                onChange={e => setFormData(f => ({...f, address: e.target.value}))}
-                placeholder="서울 강남구 테헤란로 123"
-                required
-                data-testid="input-address"
+                id="addressDetail"
+                value={formData.addressDetail}
+                onChange={e => setFormData(f => ({...f, addressDetail: e.target.value}))}
+                placeholder="건물명, 층, 호수 등"
+                data-testid="input-address-detail"
               />
             </div>
 

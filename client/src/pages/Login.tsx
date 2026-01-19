@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
 import { Loader2, Dog, ArrowLeft } from "lucide-react";
 import { Link } from "wouter";
+import { useEffect } from "react";
 
 const loginSchema = z.object({
   username: z.string().email("올바른 이메일 형식이 아닙니다."),
@@ -30,8 +31,14 @@ export default function Login() {
   };
 
   // Redirect if already logged in
+  useEffect(() => {
+    if (user) {
+      const targetPath = user.role === 'super_admin' ? '/admin/platform' : '/admin/dashboard';
+      setLocation(targetPath);
+    }
+  }, [user, setLocation]);
+
   if (user) {
-    setLocation("/admin/dashboard");
     return null;
   }
 

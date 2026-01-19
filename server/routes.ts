@@ -9,7 +9,7 @@ import session from "express-session";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import MemoryStore from "memorystore";
-import { insertShopSchema } from "@shared/schema";
+import { insertShopSchema, Shop } from "@shared/schema";
 
 const scryptAsync = promisify(scrypt);
 
@@ -118,22 +118,48 @@ export async function registerRoutes(
   // Shop Registration
   app.post('/api/shops/register', async (req, res) => {
     try {
-      const shopInput = insertShopSchema.parse(req.body.shop);
-      const { email, password } = req.body;
+      const { email, password, shop: shopData } = req.body;
       
       if (!email || !password) {
-        return res.status(400).json({ message: "Email and password required" });
+        return res.status(400).json({ message: "이메일과 비밀번호를 입력해주세요." });
+      }
+
+      const name = shopData?.name?.trim();
+      const phone = shopData?.phone?.trim();
+      const address = shopData?.address?.trim();
+
+      if (!name || name.length < 2) {
+        return res.status(400).json({ message: "가게 이름을 2글자 이상 입력해주세요." });
+      }
+      if (!phone || phone.length < 9) {
+        return res.status(400).json({ message: "전화번호를 올바르게 입력해주세요." });
+      }
+      if (!address || address.length < 5) {
+        return res.status(400).json({ message: "주소를 검색하여 선택해주세요." });
       }
 
       const existingUser = await storage.getUserByUsername(email);
       if (existingUser) {
-        return res.status(400).json({ message: "Email already exists" });
+        return res.status(400).json({ message: "이미 사용중인 이메일입니다." });
       }
 
-      const existingShop = await storage.getShopBySlug(shopInput.slug);
-      if (existingShop) {
-        return res.status(400).json({ message: "Shop URL already exists" });
-      }
+      const generateSlug = (shopName: string) => {
+        const base = shopName.toLowerCase()
+          .replace(/[^a-z0-9가-힣]/g, '-')
+          .replace(/-+/g, '-')
+          .replace(/^-|-$/g, '') || 'shop';
+        return `${base}-${Date.now()}`;
+      };
+
+      const shopInput = {
+        name,
+        slug: generateSlug(name),
+        phone,
+        address,
+        businessHours: shopData.businessHours || '09:00-18:00',
+        depositAmount: shopData.depositAmount || 10000,
+        depositRequired: shopData.depositRequired ?? true,
+      };
 
       const shop = await storage.createShop(shopInput);
       const hashedPassword = await hashPassword(password);
@@ -375,7 +401,10 @@ export async function registerRoutes(
       depositAmount: 10000,
       depositRequired: true,
     });
+  }
+  if (!demoShop.isApproved) {
     await storage.approveShop(demoShop.id);
+    demoShop = await storage.getShop(demoShop.id) as Shop;
   }
 
   if (await storage.getUserByUsername("test@test.com") === undefined) {
