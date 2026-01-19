@@ -64,6 +64,24 @@ export default function Dashboard() {
             <h1 className="text-xl font-bold">{user.shopName}</h1>
             <p className="text-sm text-muted-foreground">관리자 대시보드</p>
           </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              className="gap-2"
+              onClick={() => {
+                const link = `${window.location.origin}/book/gangnam`;
+                navigator.clipboard.writeText(link).then(() => {
+                  toast({
+                    title: "예약 링크 복사됨",
+                    description: "고객에게 공유할 수 있는 예약 페이지 링크가 복사되었습니다.",
+                  });
+                });
+              }}
+              data-testid="button-copy-booking-link"
+            >
+              <Link className="w-4 h-4" />
+              예약 링크 복사
+            </Button>
           <Dialog open={isManualDialogOpen} onOpenChange={setIsManualDialogOpen}>
             <DialogTrigger asChild>
               <Button className="gap-2" data-testid="button-manual-booking">
@@ -143,6 +161,7 @@ export default function Dashboard() {
               </form>
             </DialogContent>
           </Dialog>
+          </div>
         </div>
       </div>
 
