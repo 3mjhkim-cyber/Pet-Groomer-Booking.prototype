@@ -1,6 +1,6 @@
 import { users, services, bookings, customers, type User, type InsertUser, type Service, type InsertService, type Booking, type InsertBooking, type Customer, type InsertCustomer } from "@shared/schema";
 import { db } from "./db";
-import { eq } from "drizzle-orm";
+import { eq, ilike, or, desc } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
@@ -12,6 +12,8 @@ export interface IStorage {
   
   getCustomers(): Promise<Customer[]>;
   getCustomerByPhone(phone: string): Promise<Customer | undefined>;
+  searchCustomers(query: string): Promise<Customer[]>;
+  getCustomerHistory(phone: string): Promise<(Booking & { serviceName: string })[]>;
   createCustomer(customer: InsertCustomer): Promise<Customer>;
   incrementVisitCount(phone: string): Promise<void>;
   
@@ -55,6 +57,38 @@ export class DatabaseStorage implements IStorage {
   async getCustomerByPhone(phone: string): Promise<Customer | undefined> {
     const [customer] = await db.select().from(customers).where(eq(customers.phone, phone));
     return customer;
+  }
+
+  async searchCustomers(query: string): Promise<Customer[]> {
+    if (!query || query.length < 1) return [];
+    const searchPattern = `%${query}%`;
+    return await db.select().from(customers).where(
+      or(
+        ilike(customers.name, searchPattern),
+        ilike(customers.phone, searchPattern)
+      )
+    ).limit(10);
+  }
+
+  async getCustomerHistory(phone: string): Promise<(Booking & { serviceName: string })[]> {
+    const result = await db.select({
+      id: bookings.id,
+      date: bookings.date,
+      time: bookings.time,
+      customerName: bookings.customerName,
+      customerPhone: bookings.customerPhone,
+      status: bookings.status,
+      serviceId: bookings.serviceId,
+      depositStatus: bookings.depositStatus,
+      depositDeadline: bookings.depositDeadline,
+      serviceName: services.name,
+    })
+    .from(bookings)
+    .innerJoin(services, eq(bookings.serviceId, services.id))
+    .where(eq(bookings.customerPhone, phone))
+    .orderBy(desc(bookings.date));
+    
+    return result;
   }
 
   async createCustomer(insertCustomer: InsertCustomer): Promise<Customer> {

@@ -166,3 +166,29 @@ export function useConfirmDeposit() {
     },
   });
 }
+
+export function useSearchCustomers(query: string) {
+  return useQuery({
+    queryKey: ['/api/customers/search', query],
+    queryFn: async () => {
+      if (!query || query.length < 1) return [];
+      const res = await fetch(`/api/customers/search?q=${encodeURIComponent(query)}`);
+      if (!res.ok) throw new Error("Failed to search customers");
+      return res.json();
+    },
+    enabled: query.length >= 1,
+  });
+}
+
+export function useCustomerHistory(phone: string | null) {
+  return useQuery({
+    queryKey: ['/api/customers/history', phone],
+    queryFn: async () => {
+      if (!phone) return null;
+      const res = await fetch(`/api/customers/${encodeURIComponent(phone)}/history`);
+      if (!res.ok) throw new Error("Failed to fetch customer history");
+      return res.json();
+    },
+    enabled: !!phone,
+  });
+}

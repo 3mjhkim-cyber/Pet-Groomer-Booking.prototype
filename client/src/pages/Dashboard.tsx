@@ -1,11 +1,12 @@
 import { useAuth } from "@/hooks/use-auth";
-import { useBookings, useServices, useApproveBooking, useRejectBooking, useRequestDeposit, useCreateBooking } from "@/hooks/use-shop";
+import { useBookings, useServices, useApproveBooking, useRejectBooking, useRequestDeposit, useCreateBooking, useSearchCustomers, useCustomerHistory } from "@/hooks/use-shop";
 import { useLocation } from "wouter";
-import { Loader2, Calendar, Clock, User, Phone, Scissors, Check, X, Banknote, Plus, Link, Copy } from "lucide-react";
+import { Loader2, Calendar, Clock, User, Phone, Scissors, Check, X, Banknote, Plus, Link, Copy, History } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import type { Customer } from "@shared/schema";
 
 export default function Dashboard() {
   const { user, isLoading: isAuthLoading } = useAuth();
@@ -18,6 +19,14 @@ export default function Dashboard() {
   const [_, setLocation] = useLocation();
   const [isManualDialogOpen, setIsManualDialogOpen] = useState(false);
   const { toast } = useToast();
+  
+  const [selectedCustomerPhone, setSelectedCustomerPhone] = useState<string | null>(null);
+  const [isHistoryDialogOpen, setIsHistoryDialogOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  
+  const { data: searchResults } = useSearchCustomers(searchQuery);
+  const { data: customerHistoryData } = useCustomerHistory(selectedCustomerPhone);
 
   const copyDepositLink = (bookingId: number) => {
     const link = `${window.location.origin}/deposit/${bookingId}`;
@@ -28,6 +37,22 @@ export default function Dashboard() {
       });
     });
   };
+  
+  const openCustomerHistory = (phone: string) => {
+    setSelectedCustomerPhone(phone);
+    setIsHistoryDialogOpen(true);
+  };
+  
+  const selectCustomer = (customer: Customer) => {
+    setManualForm(f => ({
+      ...f, 
+      customerName: customer.name, 
+      customerPhone: customer.phone
+    }));
+    setSearchQuery('');
+    setShowSuggestions(false);
+  };
+  
   const [manualForm, setManualForm] = useState({
     customerName: '',
     customerPhone: '',
@@ -35,6 +60,14 @@ export default function Dashboard() {
     date: '',
     time: '10:00'
   });
+  
+  useEffect(() => {
+    if (manualForm.customerName.length >= 1) {
+      setSearchQuery(manualForm.customerName);
+    } else {
+      setSearchQuery('');
+    }
+  }, [manualForm.customerName]);
 
   if (isAuthLoading) return <div className="h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
 
@@ -94,16 +127,40 @@ export default function Dashboard() {
                 <DialogTitle>수동 예약 추가</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleManualSubmit} className="space-y-4">
-                <div>
+                <div className="relative">
                   <label className="text-sm font-medium">고객명</label>
                   <input
                     type="text"
                     value={manualForm.customerName}
                     onChange={e => setManualForm(f => ({...f, customerName: e.target.value}))}
+                    onFocus={() => setShowSuggestions(true)}
+                    onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
                     className="w-full px-3 py-2 border rounded-lg mt-1"
                     required
+                    autoComplete="off"
                     data-testid="input-manual-name"
                   />
+                  {showSuggestions && searchResults && searchResults.length > 0 && (
+                    <div className="absolute z-20 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                      {searchResults.map((customer: Customer) => (
+                        <button
+                          key={customer.id}
+                          type="button"
+                          onClick={() => selectCustomer(customer)}
+                          className="w-full px-3 py-2 text-left hover:bg-secondary/50 flex justify-between items-center"
+                          data-testid={`customer-suggestion-${customer.id}`}
+                        >
+                          <div>
+                            <span className="font-medium">{customer.name}</span>
+                            <span className="text-sm text-muted-foreground ml-2">{customer.phone}</span>
+                          </div>
+                          <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                            방문 {customer.visitCount}회
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className="text-sm font-medium">전화번호</label>
@@ -196,7 +253,14 @@ export default function Dashboard() {
                       <div className="space-y-2 mb-4">
                         <div className="flex items-center gap-2">
                           <User className="w-4 h-4 text-muted-foreground" />
-                          <span className="font-medium">{booking.customerName}</span>
+                          <button 
+                            onClick={() => openCustomerHistory(booking.customerPhone)}
+                            className="font-medium text-primary hover:underline flex items-center gap-1"
+                            data-testid={`button-customer-history-${booking.id}`}
+                          >
+                            {booking.customerName}
+                            <History className="w-3 h-3" />
+                          </button>
                         </div>
                         <div className="flex items-center gap-2">
                           <Phone className="w-4 h-4 text-muted-foreground" />
@@ -255,7 +319,14 @@ export default function Dashboard() {
                       <div className="space-y-2 mb-4">
                         <div className="flex items-center gap-2">
                           <User className="w-4 h-4 text-muted-foreground" />
-                          <span className="font-medium">{booking.customerName}</span>
+                          <button 
+                            onClick={() => openCustomerHistory(booking.customerPhone)}
+                            className="font-medium text-primary hover:underline flex items-center gap-1"
+                            data-testid={`button-customer-history-confirmed-${booking.id}`}
+                          >
+                            {booking.customerName}
+                            <History className="w-3 h-3" />
+                          </button>
                         </div>
                         <div className="flex items-center gap-2">
                           <Phone className="w-4 h-4 text-muted-foreground" />
@@ -300,6 +371,64 @@ export default function Dashboard() {
           </div>
         )}
       </div>
+      
+      {/* Customer History Dialog */}
+      <Dialog open={isHistoryDialogOpen} onOpenChange={setIsHistoryDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <History className="w-5 h-5" />
+              고객 이력
+            </DialogTitle>
+          </DialogHeader>
+          {customerHistoryData && (
+            <div className="space-y-4">
+              {customerHistoryData.customer && (
+                <div className="bg-secondary/30 rounded-lg p-4">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="font-bold text-lg">{customerHistoryData.customer.name}</span>
+                    <span className="bg-primary text-primary-foreground px-3 py-1 rounded-full text-sm font-medium">
+                      방문 {customerHistoryData.customer.visitCount}회
+                    </span>
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    <p>{customerHistoryData.customer.phone}</p>
+                    {customerHistoryData.customer.lastVisit && (
+                      <p>최근 방문: {new Date(customerHistoryData.customer.lastVisit).toLocaleDateString('ko-KR')}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+              
+              <div>
+                <h4 className="font-medium mb-2">예약 이력</h4>
+                {customerHistoryData.history && customerHistoryData.history.length > 0 ? (
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {customerHistoryData.history.map((booking: any) => (
+                      <div key={booking.id} className="flex justify-between items-center p-3 bg-white border rounded-lg">
+                        <div>
+                          <p className="font-medium">{booking.serviceName}</p>
+                          <p className="text-sm text-muted-foreground">{booking.date} {booking.time}</p>
+                        </div>
+                        <span className={`text-xs px-2 py-1 rounded-full ${
+                          booking.status === 'confirmed' ? 'bg-green-100 text-green-700' :
+                          booking.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                          'bg-red-100 text-red-700'
+                        }`}>
+                          {booking.status === 'confirmed' ? '확정' : 
+                           booking.status === 'pending' ? '대기' : '거절'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-4">예약 이력이 없습니다</p>
+                )}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

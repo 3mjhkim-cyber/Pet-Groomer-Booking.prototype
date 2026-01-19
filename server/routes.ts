@@ -97,6 +97,25 @@ export async function registerRoutes(
     res.json(customers);
   });
 
+  app.get('/api/customers/search', async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const query = req.query.q as string || '';
+    const customers = await storage.searchCustomers(query);
+    res.json(customers);
+  });
+
+  app.get('/api/customers/:phone/history', async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const phone = decodeURIComponent(req.params.phone);
+    const customer = await storage.getCustomerByPhone(phone);
+    const history = await storage.getCustomerHistory(phone);
+    res.json({ customer, history });
+  });
+
   // Bookings
   app.get(api.bookings.list.path, async (req, res) => {
     if (!req.isAuthenticated()) {
