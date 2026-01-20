@@ -105,7 +105,8 @@ export async function registerRoutes(
         return res.status(403).json({ message: "가맹점 승인 대기중입니다. 승인 후 로그인이 가능합니다." });
       }
     }
-    res.json({ ...user, shop });
+    const { password: _, ...userWithoutPassword } = user;
+    res.json({ ...userWithoutPassword, shop });
   });
 
   app.post(api.auth.logout.path, (req, res, next) => {
@@ -122,7 +123,8 @@ export async function registerRoutes(
     if (user.shopId) {
       shop = await storage.getShop(user.shopId);
     }
-    res.json({ ...user, shop });
+    const { password: _, ...userWithoutPassword } = user;
+    res.json({ ...userWithoutPassword, shop });
   });
 
   // Shop Registration
