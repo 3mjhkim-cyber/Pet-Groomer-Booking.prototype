@@ -62,8 +62,9 @@ export async function registerRoutes(
     saveUninitialized: false,
     store: new SessionStore({ checkPeriod: 86400000 }),
     cookie: { 
-      secure: "auto" as any,
-      sameSite: "lax"
+      secure: false,
+      sameSite: "lax",
+      httpOnly: true
     }
   }));
 
