@@ -64,19 +64,22 @@ export async function registerRoutes(
   app.use(passport.initialize());
   app.use(passport.session());
 
-  passport.use(new LocalStrategy(async (username, password, done) => {
-    try {
-      const user = await storage.getUserByUsername(username);
-      if (!user) return done(null, false);
-      
-      const isValid = await comparePasswords(password, user.password);
-      if (!isValid) return done(null, false);
-      
-      return done(null, user);
-    } catch (err) {
-      return done(err);
+  passport.use(new LocalStrategy(
+    { usernameField: 'email', passwordField: 'password' },
+    async (email, password, done) => {
+      try {
+        const user = await storage.getUserByUsername(email);
+        if (!user) return done(null, false);
+        
+        const isValid = await comparePasswords(password, user.password);
+        if (!isValid) return done(null, false);
+        
+        return done(null, user);
+      } catch (err) {
+        return done(err);
+      }
     }
-  }));
+  ));
 
   passport.serializeUser((user: any, done) => done(null, user.id));
   passport.deserializeUser(async (id: number, done) => {
@@ -94,6 +97,12 @@ export async function registerRoutes(
     let shop = null;
     if (user.shopId) {
       shop = await storage.getShop(user.shopId);
+      if (shop && !shop.isApproved && user.role !== 'super_admin') {
+        req.logout((err) => {
+          if (err) console.error('Logout error:', err);
+        });
+        return res.status(403).json({ message: "가맹점 승인 대기중입니다. 승인 후 로그인이 가능합니다." });
+      }
     }
     res.json({ ...user, shop });
   });

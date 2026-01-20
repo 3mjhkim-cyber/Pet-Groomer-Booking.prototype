@@ -29,6 +29,10 @@ export function useAuth() {
       
       if (!res.ok) {
         if (res.status === 401) throw new Error("이메일 또는 비밀번호가 올바르지 않습니다.");
+        if (res.status === 403) {
+          const data = await res.json();
+          throw new Error(data.message || "가맹점 승인 대기중입니다.");
+        }
         throw new Error("로그인에 실패했습니다.");
       }
       
