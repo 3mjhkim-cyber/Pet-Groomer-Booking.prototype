@@ -20,11 +20,21 @@ export default function ShopSettings() {
 
   const { data: shop, isLoading: isShopLoading } = useQuery<Shop>({
     queryKey: ['/api/shop/settings'],
+    queryFn: async () => {
+      const res = await fetch('/api/shop/settings');
+      if (!res.ok) throw new Error("Failed to fetch shop settings");
+      return res.json();
+    },
     enabled: !!user && user.role === 'shop_owner',
   });
 
   const { data: services, isLoading: isServicesLoading } = useQuery<Service[]>({
     queryKey: ['/api/shop/services'],
+    queryFn: async () => {
+      const res = await fetch('/api/shop/services');
+      if (!res.ok) throw new Error("Failed to fetch services");
+      return res.json();
+    },
     enabled: !!user && user.role === 'shop_owner',
   });
 
