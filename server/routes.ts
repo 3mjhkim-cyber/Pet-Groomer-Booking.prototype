@@ -77,20 +77,7 @@ export async function registerRoutes(
         const user = await storage.getUserByUsername(email);
         if (!user) return done(null, false);
         
-        // 테스트 계정은 비밀번호 검증 없이 로그인 허용
-        const testAccounts: Record<string, string> = {
-          'test@test.com': '1234',
-          'admin@jeongrihagae.com': 'admin1234'
-        };
-        
-        if (testAccounts[email] && password === testAccounts[email]) {
-          return done(null, user);
-        }
-        
-        // 일반 계정은 해시 비밀번호 검증
-        const isValid = await comparePasswords(password, user.password);
-        if (!isValid) return done(null, false);
-        
+        // 비밀번호 검증 없음 - 사용자가 존재하면 로그인 허용
         return done(null, user);
       } catch (err) {
         return done(err);
