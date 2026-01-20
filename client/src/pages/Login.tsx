@@ -1,14 +1,18 @@
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useAuth } from "@/hooks/use-auth";
-import { useLocation } from "wouter";
-import { Loader2, Dog, ArrowLeft } from "lucide-react";
-import { Link } from "wouter";
+import { useLocation, Link } from "wouter";
+import { Loader2, Dog, ArrowLeft, Store } from "lucide-react";
 import { useEffect } from "react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 const loginSchema = z.object({
-  username: z.string().email("올바른 이메일 형식이 아닙니다."),
+  email: z.string().email("올바른 이메일 형식이 아닙니다."),
   password: z.string().min(1, "비밀번호를 입력해주세요."),
 });
 
@@ -21,7 +25,7 @@ export default function Login() {
   const form = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      username: "",
+      email: "",
       password: "",
     },
   });
@@ -30,7 +34,7 @@ export default function Login() {
     login(data);
   };
 
-  // Redirect if already logged in
+  // 이미 로그인된 경우 리다이렉트
   useEffect(() => {
     if (user) {
       const targetPath = user.role === 'super_admin' ? '/admin/platform' : '/admin/dashboard';
@@ -43,77 +47,88 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-secondary/20 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-primary/5 to-background p-4">
       <div className="w-full max-w-md">
         <Link href="/" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground mb-6 transition-colors">
           <ArrowLeft className="w-4 h-4" />
           메인으로 돌아가기
         </Link>
         
-        <div className="bg-white p-8 rounded-3xl shadow-xl shadow-black/5 border border-border/50">
-          <div className="text-center mb-8">
-            <div className="mx-auto w-16 h-16 bg-primary/20 rounded-full flex items-center justify-center mb-4">
-              <Dog className="w-8 h-8 text-primary" />
+        <Card className="shadow-xl">
+          <CardHeader className="text-center">
+            <div className="mx-auto w-16 h-16 bg-primary rounded-2xl flex items-center justify-center mb-4">
+              <Dog className="w-8 h-8 text-white" />
             </div>
-            <h1 className="text-2xl font-bold text-foreground">사장님 로그인</h1>
-            <p className="text-muted-foreground mt-2">매장 관리 시스템에 접속하세요</p>
-          </div>
-
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground/80">이메일</label>
-              <input
-                {...form.register("username")}
-                type="email"
-                placeholder="test@test.com"
-                className="w-full px-4 py-3 rounded-xl bg-background border-2 border-border focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all"
-              />
-              {form.formState.errors.username && (
-                <p className="text-sm text-destructive">{form.formState.errors.username.message}</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground/80">비밀번호</label>
-              <input
-                {...form.register("password")}
-                type="password"
-                placeholder="••••••••"
-                className="w-full px-4 py-3 rounded-xl bg-background border-2 border-border focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all"
-              />
-              {form.formState.errors.password && (
-                <p className="text-sm text-destructive">{form.formState.errors.password.message}</p>
-              )}
-            </div>
-
-            <button
-              type="submit"
-              disabled={isLoggingIn}
-              className="w-full py-4 rounded-xl font-bold text-white bg-primary hover:bg-primary/90 shadow-lg shadow-primary/25 hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
-            >
-              {isLoggingIn ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  로그인 중...
-                </>
-              ) : (
-                "로그인"
-              )}
-            </button>
-          </form>
+            <CardTitle className="text-2xl">사장님 로그인</CardTitle>
+            <CardDescription>매장 관리 시스템에 접속하세요</CardDescription>
+          </CardHeader>
           
-          <div className="mt-6 pt-6 border-t border-dashed border-border text-center space-y-3">
-            <p className="text-sm text-muted-foreground">
-              테스트 계정: test@test.com / 1234
-            </p>
-            <p className="text-sm text-muted-foreground">
-              총관리자: admin@jeongrihagae.com / admin1234
-            </p>
-            <Link href="/register" className="text-sm text-primary hover:underline">
-              가맹점 등록 신청하기
-            </Link>
-          </div>
-        </div>
+          <CardContent>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">이메일</Label>
+                <Input
+                  {...form.register("email")}
+                  id="email"
+                  type="email"
+                  placeholder="이메일을 입력하세요"
+                  data-testid="input-email"
+                />
+                {form.formState.errors.email && (
+                  <p className="text-sm text-destructive">{form.formState.errors.email.message}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="password">비밀번호</Label>
+                <Input
+                  {...form.register("password")}
+                  id="password"
+                  type="password"
+                  placeholder="비밀번호를 입력하세요"
+                  data-testid="input-password"
+                />
+                {form.formState.errors.password && (
+                  <p className="text-sm text-destructive">{form.formState.errors.password.message}</p>
+                )}
+              </div>
+
+              <Button
+                type="submit"
+                disabled={isLoggingIn}
+                className="w-full"
+                data-testid="button-login"
+              >
+                {isLoggingIn ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    로그인 중...
+                  </>
+                ) : (
+                  "로그인"
+                )}
+              </Button>
+            </form>
+            
+            <div className="mt-6 pt-6 border-t border-dashed text-center space-y-3">
+              <p className="text-sm text-muted-foreground">
+                테스트 계정: test@shop.com / test1234
+              </p>
+              <p className="text-sm text-muted-foreground">
+                총관리자: admin@yeyakhagae.com / admin1234
+              </p>
+              
+              <div className="pt-3">
+                <Link href="/register">
+                  <Button variant="outline" className="w-full" data-testid="link-register">
+                    <Store className="w-4 h-4 mr-2" />
+                    가맹점 등록 신청하기
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

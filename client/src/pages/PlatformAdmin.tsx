@@ -1,7 +1,7 @@
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useLocation } from "wouter";
-import { Loader2, Store, Check, X, Users, Calendar, LogOut, Settings } from "lucide-react";
+import { useLocation, Link } from "wouter";
+import { Loader2, Store, Check, X, Users, Calendar, LogOut, Settings, Bell, UserCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -86,15 +86,20 @@ export default function PlatformAdmin() {
               <div className="text-2xl font-bold">{shops?.length || 0}</div>
             </CardContent>
           </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">승인 대기</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-orange-600">{pendingShops.length}</div>
-            </CardContent>
-          </Card>
+          <Link href="/admin/approvals">
+            <Card className="hover-elevate cursor-pointer">
+              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">계정 승인 관리</CardTitle>
+                <UserCheck className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-orange-600 flex items-center gap-2">
+                  <Bell className="w-5 h-5" />
+                  <span>바로가기</span>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">운영 중</CardTitle>
