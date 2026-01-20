@@ -3,18 +3,40 @@ import { api, type LoginInput, type UserWithShop } from "@shared/routes";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 
+// 로그인 없이 자동 접속되는 기본 사용자
+const DEFAULT_USER: UserWithShop = {
+  id: 1,
+  email: "test@test.com",
+  password: "",
+  role: "shop_owner",
+  shopId: 1,
+  shopName: "정리하개 강남점",
+  phone: "010-1234-5678",
+  address: "서울 강남구 테헤란로 123",
+  shop: {
+    id: 1,
+    name: "정리하개 강남점",
+    slug: "gangnam",
+    phone: "02-123-4567",
+    address: "서울 강남구 테헤란로 123",
+    businessHours: "09:00-18:00",
+    depositAmount: 10000,
+    depositRequired: true,
+    isApproved: true,
+    createdAt: new Date()
+  }
+};
+
 export function useAuth() {
   const queryClient = useQueryClient();
   const [_, setLocation] = useLocation();
   const { toast } = useToast();
 
+  // 로그인 기능 제거 - 항상 기본 사용자로 접속
   const { data: user, isLoading } = useQuery<UserWithShop | null>({
     queryKey: [api.auth.me.path],
     queryFn: async () => {
-      const res = await fetch(api.auth.me.path);
-      if (res.status === 401) return null;
-      if (!res.ok) throw new Error("Failed to fetch user");
-      return await res.json();
+      return DEFAULT_USER;
     },
     retry: false,
   });
