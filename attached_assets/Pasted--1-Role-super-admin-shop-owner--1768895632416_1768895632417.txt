@@ -1,0 +1,88 @@
+로그인 및 권한 관리 시스템을 구현해줘:
+
+1. 사용자 역할(Role) 구조:
+   - super_admin: 시스템 전체 관리자
+   - shop_owner: 미용샵 사장님 (승인 필요)
+   - 초기 계정 2개 생성:
+     * super_admin 계정 1개 (이메일: admin@yeyakhagae.com, 비밀번호: admin1234)
+     * shop_owner 테스트 계정 1개 (이메일: test@shop.com, 비밀번호: test1234, 상태: approved)
+
+2. 로그인 페이지 (/login):
+   - 기존 가맹점 신청 화면 그대로 유지 (이전 로그인 기능 있었을 때와 동일하게)
+   - 로그인 폼 추가:
+     * 이메일 입력
+     * 비밀번호 입력
+     * "로그인" 버튼
+   - 로그인 시 role과 status 확인:
+     * super_admin → 바로 로그인, /admin/dashboard로 이동
+     * shop_owner + approved → 로그인, /shop/dashboard로 이동
+     * shop_owner + pending → 로그인 차단, "승인 대기 중입니다. 관리자 승인 후 이용 가능합니다." 알림
+     * shop_owner + rejected → 로그인 차단, "계정이 거절되었습니다. 문의: admin@yeyakhagae.com" 알림
+   - 가맹점 신청 버튼/링크는 기존과 동일하게 유지
+
+3. 가맹점 신청 프로세스 (기존 방식 유지):
+   - 기존 가맹점 신청 화면/폼 그대로 사용
+   - 신청 완료 시:
+     * 자동으로 shop_owner 계정 생성
+     * status='pending', role='shop_owner'
+     * "가입 신청이 완료되었습니다. 관리자 승인 후 로그인 가능합니다." 메시지
+     * 로그인 페이지로 리다이렉트
+
+4. Super Admin 전용 페이지 - 계정 승인 관리:
+   - "/admin/approvals" 경로에 페이지 생성
+   - super_admin만 접근 가능 (권한 체크)
+   - 승인 대기 중인 계정 목록 표시:
+     * 이메일, 미용샵 이름, 전화번호, 주소, 가입 날짜
+     * 액션 버튼: "승인", "거절"
+   - 승인 버튼 클릭 시:
+     * 해당 계정 status를 approved로 변경
+     * 목록에서 제거 (또는 승인됨 표시)
+   - 거절 버튼 클릭 시:
+     * status를 rejected로 변경
+     * 거절 사유 입력 옵션 (선택)
+
+5. 승인 알림 기능:
+   - super_admin 대시보드 상단에 알림 배지 추가
+   - pending 상태 계정 수를 표시 (예: 🔔 3)
+   - 클릭 시 /admin/approvals로 이동
+   - 사이드바 메뉴에도 "계정 승인 관리" 항목 추가
+
+6. 데이터 구조:
+{
+  users: [
+    {
+      id: string,
+      email: string,
+      password: string,
+      role: 'super_admin' | 'shop_owner',
+      status: 'pending' | 'approved' | 'rejected',
+      shopName: string,
+      phone: string,
+      address: string,
+      businessNumber: string (사업자번호, 있으면),
+      createdAt: timestamp
+    }
+  ]
+}
+
+7. 라우팅 보호:
+   - 로그인하지 않은 사용자는 /login으로 리다이렉트
+   - super_admin 전용 페이지(/admin/*)는 role='super_admin'만 접근
+   - shop_owner는 /shop/* 경로만 접근, 자기 가게 데이터만 조회 가능
+   - 권한 없는 페이지 접근 시 "접근 권한이 없습니다" 알림 후 리다이렉트
+
+8. localStorage에 로그인 정보 저장:
+{
+  userId: string,
+  email: string,
+  role: string,
+  shopId: string (shop_owner인 경우),
+  shopName: string
+}
+
+9. 로그아웃 기능:
+   - 모든 페이지 상단에 로그아웃 버튼
+   - 클릭 시 localStorage 클리어하고 /login으로 이동
+
+중요: 기존 가맹점 신청 화면의 디자인, 입력 필드, 흐름은 모두 그대로 유지해줘.
+모든 텍스트는 한글로, 주석도 한글로 작성해줘.

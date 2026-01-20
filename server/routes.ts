@@ -26,30 +26,33 @@ async function comparePasswords(supplied: string, stored: string) {
   return timingSafeEqual(hashedBuf, suppliedBuf);
 }
 
-// 인증 우회: 기본 사용자를 req.user에 주입
-async function injectDefaultUser(req: any, res: any, next: any) {
+// 인증 미들웨어: 로그인 여부 확인
+function requireAuth(req: any, res: any, next: any) {
   if (!req.user) {
-    // 기본 사용자 (test@test.com)를 세션에 주입
-    const defaultUser = await storage.getUserByUsername("test@test.com");
-    if (defaultUser) {
-      req.user = defaultUser;
-    }
+    return res.status(401).json({ message: "로그인이 필요합니다." });
   }
   next();
 }
 
-function requireAuth(req: any, res: any, next: any) {
-  // 인증 우회: 항상 통과
-  next();
-}
-
+// Super Admin 권한 체크
 function requireSuperAdmin(req: any, res: any, next: any) {
-  // 인증 우회: 항상 통과
+  if (!req.user) {
+    return res.status(401).json({ message: "로그인이 필요합니다." });
+  }
+  if (req.user.role !== 'super_admin') {
+    return res.status(403).json({ message: "접근 권한이 없습니다." });
+  }
   next();
 }
 
+// Shop Owner 권한 체크
 function requireShopOwner(req: any, res: any, next: any) {
-  // 인증 우회: 항상 통과
+  if (!req.user) {
+    return res.status(401).json({ message: "로그인이 필요합니다." });
+  }
+  if (req.user.role !== 'shop_owner' && req.user.role !== 'super_admin') {
+    return res.status(403).json({ message: "접근 권한이 없습니다." });
+  }
   next();
 }
 
@@ -59,7 +62,6 @@ export async function registerRoutes(
 ): Promise<Server> {
   const SessionStore = MemoryStore(session);
   
-  // 프록시 뒤에서 HTTPS 감지를 위해 필요
   app.set("trust proxy", 1);
   
   app.use(session({
@@ -76,17 +78,6 @@ export async function registerRoutes(
 
   app.use(passport.initialize());
   app.use(passport.session());
-  
-  // 모든 요청에 기본 사용자 주입 (인증 우회)
-  app.use(async (req: any, res: any, next: any) => {
-    if (!req.user) {
-      const defaultUser = await storage.getUserByUsername("test@test.com");
-      if (defaultUser) {
-        req.user = defaultUser;
-      }
-    }
-    next();
-  });
 
   passport.use(new LocalStrategy(
     { usernameField: 'email', passwordField: 'password' },
@@ -95,7 +86,10 @@ export async function registerRoutes(
         const user = await storage.getUserByUsername(email);
         if (!user) return done(null, false);
         
-        // 비밀번호 검증 없음 - 사용자가 존재하면 로그인 허용
+        // 비밀번호 검증
+        const isValid = await comparePasswords(password, user.password);
+        if (!isValid) return done(null, false);
+        
         return done(null, user);
       } catch (err) {
         return done(err);
@@ -113,17 +107,34 @@ export async function registerRoutes(
     }
   });
 
-  // Auth Routes - 단순화된 로그인 (비밀번호 검증 없음)
+  // 로그인 API
   app.post(api.auth.login.path, async (req, res) => {
     try {
-      const { email } = req.body;
-      if (!email) {
-        return res.status(400).json({ message: "이메일을 입력해주세요." });
+      const { email, password } = req.body;
+      if (!email || !password) {
+        return res.status(400).json({ message: "이메일과 비밀번호를 입력해주세요." });
       }
       
       const user = await storage.getUserByUsername(email);
       if (!user) {
-        return res.status(401).json({ message: "사용자를 찾을 수 없습니다." });
+        return res.status(401).json({ message: "이메일 또는 비밀번호가 올바르지 않습니다." });
+      }
+      
+      // 비밀번호 검증
+      const isValid = await comparePasswords(password, user.password);
+      if (!isValid) {
+        return res.status(401).json({ message: "이메일 또는 비밀번호가 올바르지 않습니다." });
+      }
+      
+      // super_admin은 status 체크 없이 바로 로그인
+      if (user.role !== 'super_admin') {
+        // shop_owner는 status 체크
+        if (user.status === 'pending') {
+          return res.status(403).json({ message: "승인 대기 중입니다. 관리자 승인 후 이용 가능합니다." });
+        }
+        if (user.status === 'rejected') {
+          return res.status(403).json({ message: "계정이 거절되었습니다. 문의: admin@yeyakhagae.com" });
+        }
       }
       
       let shop = null;
@@ -164,7 +175,7 @@ export async function registerRoutes(
     res.json({ ...userWithoutPassword, shop });
   });
 
-  // Shop Registration
+  // 가맹점 등록 (pending 상태로 생성)
   app.post('/api/shops/register', async (req, res) => {
     try {
       const { email, password, shop: shopData } = req.body;
@@ -181,6 +192,7 @@ export async function registerRoutes(
       const name = shopData?.name?.trim();
       const phone = shopData?.phone?.trim();
       const address = shopData?.address?.trim();
+      const businessNumber = shopData?.businessNumber?.trim() || null;
 
       if (!name || name.length < 2) {
         return res.status(400).json({ message: "가게 이름을 2글자 이상 입력해주세요." });
@@ -215,19 +227,28 @@ export async function registerRoutes(
         depositRequired: shopData.depositRequired ?? true,
       };
 
+      // 가게는 미승인 상태로 생성
       const shop = await storage.createShop(shopInput);
       const hashedPassword = await hashPassword(password);
+      
+      // 사용자는 pending 상태로 생성
       const user = await storage.createUser({
         email,
         password: hashedPassword,
         role: 'shop_owner',
+        status: 'pending',
         shopId: shop.id,
         shopName: shop.name,
         phone: shop.phone,
         address: shop.address,
+        businessNumber,
       });
 
-      res.status(201).json({ shop, user: { ...user, password: undefined } });
+      res.status(201).json({ 
+        message: "가입 신청이 완료되었습니다. 관리자 승인 후 로그인 가능합니다.",
+        shop, 
+        user: { ...user, password: undefined } 
+      });
     } catch (err) {
       if (err instanceof z.ZodError) {
         return res.status(400).json({ message: err.errors[0].message });
@@ -256,6 +277,37 @@ export async function registerRoutes(
       return res.status(404).json({ message: "Shop not found" });
     }
     res.json(shop);
+  });
+
+  // 계정 승인 관리 API (Super Admin 전용)
+  app.get('/api/admin/pending-users', requireSuperAdmin, async (req, res) => {
+    const users = await storage.getPendingUsers();
+    res.json(users);
+  });
+
+  app.get('/api/admin/pending-users/count', requireSuperAdmin, async (req, res) => {
+    const count = await storage.getPendingUsersCount();
+    res.json({ count });
+  });
+
+  app.patch('/api/admin/users/:id/approve', requireSuperAdmin, async (req, res) => {
+    const user = await storage.updateUserStatus(Number(req.params.id), 'approved');
+    if (!user) {
+      return res.status(404).json({ message: "사용자를 찾을 수 없습니다." });
+    }
+    // 사용자의 가게도 승인
+    if (user.shopId) {
+      await storage.approveShop(user.shopId);
+    }
+    res.json(user);
+  });
+
+  app.patch('/api/admin/users/:id/reject', requireSuperAdmin, async (req, res) => {
+    const user = await storage.updateUserStatus(Number(req.params.id), 'rejected');
+    if (!user) {
+      return res.status(404).json({ message: "사용자를 찾을 수 없습니다." });
+    }
+    res.json(user);
   });
 
   // Shop Settings (for shop owners)
@@ -429,17 +481,19 @@ export async function registerRoutes(
     res.json(booking);
   });
 
-  // Seed Data - Super Admin
-  if (await storage.getUserByUsername("admin@jeongrihagae.com") === undefined) {
+  // Seed Data - Super Admin (새 이메일)
+  if (await storage.getUserByUsername("admin@yeyakhagae.com") === undefined) {
     const hashedPassword = await hashPassword("admin1234");
     await storage.createUser({
-      email: "admin@jeongrihagae.com",
+      email: "admin@yeyakhagae.com",
       password: hashedPassword,
       role: 'super_admin',
+      status: 'approved',
       shopId: null,
       shopName: null,
       phone: null,
       address: null,
+      businessNumber: null,
     });
   }
 
@@ -461,16 +515,19 @@ export async function registerRoutes(
     demoShop = await storage.getShop(demoShop.id) as Shop;
   }
 
-  if (await storage.getUserByUsername("test@test.com") === undefined) {
-    const hashedPassword = await hashPassword("1234");
+  // Seed Data - 테스트 Shop Owner (새 이메일)
+  if (await storage.getUserByUsername("test@shop.com") === undefined) {
+    const hashedPassword = await hashPassword("test1234");
     await storage.createUser({
-      email: "test@test.com",
+      email: "test@shop.com",
       password: hashedPassword,
       role: 'shop_owner',
+      status: 'approved',
       shopId: demoShop.id,
       shopName: "정리하개 강남점",
       phone: "02-123-4567",
-      address: "서울 강남구 테헤란로 123"
+      address: "서울 강남구 테헤란로 123",
+      businessNumber: null,
     });
   }
 

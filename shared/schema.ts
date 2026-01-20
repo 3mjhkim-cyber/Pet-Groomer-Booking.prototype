@@ -20,10 +20,13 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
   role: text("role").default("shop_owner").notNull(),
+  status: text("status").default("pending").notNull(), // pending, approved, rejected
   shopId: integer("shop_id").references(() => shops.id),
   shopName: text("shop_name"),
   phone: text("phone"),
   address: text("address"),
+  businessNumber: text("business_number"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 export const customers = pgTable("customers", {
@@ -58,7 +61,7 @@ export const bookings = pgTable("bookings", {
 });
 
 export const insertShopSchema = createInsertSchema(shops).omit({ id: true, createdAt: true, isApproved: true });
-export const insertUserSchema = createInsertSchema(users).omit({ id: true });
+export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
 export const insertCustomerSchema = createInsertSchema(customers).omit({ id: true, visitCount: true, lastVisit: true });
 export const insertServiceSchema = createInsertSchema(services).omit({ id: true, isActive: true });
 export const insertBookingSchema = createInsertSchema(bookings).omit({ id: true, status: true, depositStatus: true, depositDeadline: true });

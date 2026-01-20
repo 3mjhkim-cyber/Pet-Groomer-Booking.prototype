@@ -1,11 +1,14 @@
 import { users, services, bookings, customers, shops, type User, type InsertUser, type Service, type InsertService, type Booking, type InsertBooking, type Customer, type InsertCustomer, type Shop, type InsertShop } from "@shared/schema";
 import { db } from "./db";
-import { eq, ilike, or, desc, and } from "drizzle-orm";
+import { eq, ilike, or, desc, and, count } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  getPendingUsers(): Promise<User[]>;
+  getPendingUsersCount(): Promise<number>;
+  updateUserStatus(id: number, status: string): Promise<User | undefined>;
   
   getShops(): Promise<Shop[]>;
   getShop(id: number): Promise<Shop | undefined>;
@@ -48,6 +51,27 @@ export class DatabaseStorage implements IStorage {
 
   async createUser(insertUser: InsertUser): Promise<User> {
     const [user] = await db.insert(users).values(insertUser).returning();
+    return user;
+  }
+
+  async getPendingUsers(): Promise<User[]> {
+    return await db.select().from(users)
+      .where(and(eq(users.status, 'pending'), eq(users.role, 'shop_owner')))
+      .orderBy(desc(users.createdAt));
+  }
+
+  async getPendingUsersCount(): Promise<number> {
+    const [result] = await db.select({ count: count() })
+      .from(users)
+      .where(and(eq(users.status, 'pending'), eq(users.role, 'shop_owner')));
+    return result?.count || 0;
+  }
+
+  async updateUserStatus(id: number, status: string): Promise<User | undefined> {
+    const [user] = await db.update(users)
+      .set({ status })
+      .where(eq(users.id, id))
+      .returning();
     return user;
   }
 
