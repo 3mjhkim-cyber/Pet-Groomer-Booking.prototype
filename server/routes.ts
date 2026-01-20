@@ -436,6 +436,25 @@ export async function registerRoutes(
   app.post(api.bookings.create.path, async (req, res) => {
     try {
       const input = api.bookings.create.input.parse(req.body);
+      
+      // 시간대 중복 체크
+      const bookedSlots = await storage.getBookedTimeSlots(input.shopId!, input.date);
+      const service = await storage.getService(input.serviceId);
+      const serviceDuration = service?.duration || 60;
+      
+      const newTimeMinutes = parseInt(input.time.split(':')[0]) * 60 + parseInt(input.time.split(':')[1]);
+      const newEndMinutes = newTimeMinutes + serviceDuration;
+      
+      for (const slot of bookedSlots) {
+        const slotMinutes = parseInt(slot.time.split(':')[0]) * 60 + parseInt(slot.time.split(':')[1]);
+        const slotEndMinutes = slotMinutes + slot.duration;
+        
+        // 시간대가 겹치는지 확인
+        if (newTimeMinutes < slotEndMinutes && newEndMinutes > slotMinutes) {
+          return res.status(400).json({ message: "이미 예약된 시간입니다. 다른 시간을 선택해주세요." });
+        }
+      }
+      
       const booking = await storage.createBooking(input);
       res.status(201).json(booking);
     } catch (err) {
@@ -481,11 +500,136 @@ export async function registerRoutes(
     res.json(booking);
   });
 
-  // Seed Data - Super Admin (새 이메일)
-  if (await storage.getUserByUsername("admin@yeyakhagae.com") === undefined) {
+  // 예약 취소 (cancelled 상태로 변경, 시간대 해제)
+  app.patch('/api/bookings/:id/cancel', requireAuth, async (req, res) => {
+    const booking = await storage.updateBookingStatus(Number(req.params.id), 'cancelled');
+    if (!booking) {
+      return res.status(404).json({ message: "예약을 찾을 수 없습니다." });
+    }
+    res.json(booking);
+  });
+
+  // 예약 정보 수정 (날짜, 시간, 서비스)
+  app.patch('/api/bookings/:id', requireAuth, async (req, res) => {
+    const { date, time, serviceId } = req.body;
+    const bookingId = Number(req.params.id);
+    
+    // 기존 예약 조회
+    const existingBooking = await storage.getBooking(bookingId);
+    if (!existingBooking) {
+      return res.status(404).json({ message: "예약을 찾을 수 없습니다." });
+    }
+    
+    // 새 시간대로 변경하는 경우 중복 체크
+    if (date || time) {
+      const newDate = date || existingBooking.date;
+      const newTime = time || existingBooking.time;
+      const newServiceId = serviceId || existingBooking.serviceId;
+      
+      // 해당 날짜의 예약된 시간대 조회 (자기 자신 제외)
+      const bookedSlots = await storage.getBookedTimeSlots(existingBooking.shopId!, newDate);
+      const filteredSlots = bookedSlots.filter(slot => {
+        // 자기 자신의 예약은 제외
+        if (existingBooking.date === newDate && existingBooking.time === slot.time) {
+          return false;
+        }
+        return true;
+      });
+      
+      // 새 서비스의 소요시간 가져오기
+      const newService = await storage.getService(newServiceId);
+      const newDuration = newService?.duration || 60;
+      
+      // 시간대 충돌 체크
+      const newTimeMinutes = parseInt(newTime.split(':')[0]) * 60 + parseInt(newTime.split(':')[1]);
+      const newEndMinutes = newTimeMinutes + newDuration;
+      
+      for (const slot of filteredSlots) {
+        const slotMinutes = parseInt(slot.time.split(':')[0]) * 60 + parseInt(slot.time.split(':')[1]);
+        const slotEndMinutes = slotMinutes + slot.duration;
+        
+        // 시간대가 겹치는지 확인
+        if (newTimeMinutes < slotEndMinutes && newEndMinutes > slotMinutes) {
+          return res.status(400).json({ message: "해당 시간에 이미 예약이 있습니다." });
+        }
+      }
+    }
+    
+    const booking = await storage.updateBooking(bookingId, { date, time, serviceId });
+    if (!booking) {
+      return res.status(404).json({ message: "예약을 찾을 수 없습니다." });
+    }
+    res.json(booking);
+  });
+
+  // 고객 정보 수정
+  app.patch('/api/bookings/:id/customer', requireAuth, async (req, res) => {
+    const { customerName, customerPhone } = req.body;
+    const booking = await storage.updateBookingCustomer(Number(req.params.id), { customerName, customerPhone });
+    if (!booking) {
+      return res.status(404).json({ message: "예약을 찾을 수 없습니다." });
+    }
+    res.json(booking);
+  });
+
+  // 예약 가능 시간 조회 (서비스 소요시간 고려)
+  app.get('/api/shops/:slug/available-times/:date', async (req, res) => {
+    const shop = await storage.getShopBySlug(req.params.slug);
+    if (!shop || !shop.isApproved) {
+      return res.status(404).json({ message: "가맹점을 찾을 수 없습니다." });
+    }
+    
+    const { date } = req.params;
+    const serviceDuration = parseInt(req.query.duration as string) || 60;
+    
+    // 영업시간 파싱 (예: "09:00-18:00")
+    const [startTime, endTime] = shop.businessHours.split('-');
+    const startHour = parseInt(startTime.split(':')[0]);
+    const endHour = parseInt(endTime.split(':')[0]);
+    
+    // 30분 단위로 시간대 생성
+    const allSlots: string[] = [];
+    for (let hour = startHour; hour < endHour; hour++) {
+      allSlots.push(`${hour.toString().padStart(2, '0')}:00`);
+      allSlots.push(`${hour.toString().padStart(2, '0')}:30`);
+    }
+    
+    // 해당 날짜의 예약된 시간대 조회
+    const bookedSlots = await storage.getBookedTimeSlots(shop.id, date);
+    
+    // 각 시간대에 대해 가능 여부 확인
+    const availableSlots = allSlots.map(slot => {
+      const slotMinutes = parseInt(slot.split(':')[0]) * 60 + parseInt(slot.split(':')[1]);
+      const slotEndMinutes = slotMinutes + serviceDuration;
+      
+      // 영업종료 시간 이후면 불가
+      const endMinutes = endHour * 60;
+      if (slotEndMinutes > endMinutes) {
+        return { time: slot, available: false, reason: '영업시간 초과' };
+      }
+      
+      // 예약된 시간대와 충돌 여부 확인
+      for (const booked of bookedSlots) {
+        const bookedMinutes = parseInt(booked.time.split(':')[0]) * 60 + parseInt(booked.time.split(':')[1]);
+        const bookedEndMinutes = bookedMinutes + booked.duration;
+        
+        // 시간대가 겹치는지 확인
+        if (slotMinutes < bookedEndMinutes && slotEndMinutes > bookedMinutes) {
+          return { time: slot, available: false, reason: '예약 불가' };
+        }
+      }
+      
+      return { time: slot, available: true };
+    });
+    
+    res.json(availableSlots);
+  });
+
+  // Seed Data - Super Admin
+  if (await storage.getUserByUsername("admin@admin.com") === undefined) {
     const hashedPassword = await hashPassword("admin1234");
     await storage.createUser({
-      email: "admin@yeyakhagae.com",
+      email: "admin@admin.com",
       password: hashedPassword,
       role: 'super_admin',
       status: 'approved',

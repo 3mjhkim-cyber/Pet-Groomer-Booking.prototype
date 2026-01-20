@@ -1,0 +1,165 @@
+예약 관리 시스템 전체 기능을 구현해줘:
+
+1. 초기 계정 설정:
+   - super_admin 계정: 
+     * 이메일: admin@admin.com
+     * 비밀번호: admin1234
+   - shop_owner 테스트 계정:
+     * 이메일: test@shop.com
+     * 비밀번호: test1234
+     * 상태: approved
+
+2. 예약 상태(status) 및 흐름:
+   - pending: 승인 대기 (시간대 잠금 ✅)
+   - confirmed: 예약 확정 (시간대 잠금 ✅)
+   - cancelled: 예약 취소됨 (시간대 해제, 표시 안 함)
+   - rejected: 예약 거절됨 (시간대 해제, 표시 안 함)
+
+3. 관리자 승인 대기 화면 (실시간 업데이트):
+   - 신청된 예약이 즉시, 딜레이 없이 목록에 표시되도록 구현
+   - 새로고침 없이 자동으로 업데이트 (1-2초마다 데이터 폴링 또는 실시간 감지)
+   - 각 예약마다 3개 버튼:
+     * [예약금 링크 전송]: 고객에게 예약금 입금 링크 전송 (알림 또는 SMS/카카오톡)
+     * [바로 확정]: 예약금 없이 즉시 confirmed 상태로 변경, 확정된 예약으로 이동
+     * [거절]: rejected 상태로 변경, 시간대 해제, 목록에서 제거
+   - 표시 정보: 고객명, 전화번호, 서비스, 날짜, 시간, 신청 시각
+
+4. 확정된 예약 관리 (유동적 수정):
+   - confirmed 상태 예약 목록 표시
+   - 각 예약마다 액션:
+     * [변경하기]: 날짜, 시간, 서비스 수정 가능
+       - 수정 시 새 시간대 중복 체크
+       - 기존 시간대는 해제, 새 시간대는 잠금
+     * [취소하기]: cancelled 상태로 변경
+       - 시간대 즉시 해제
+       - 캘린더/목록에서 표시 안 함
+       - 다른 고객 예약 가능
+     * [고객 정보 수정]: 이름, 전화번호 수정
+
+5. 예약 시간대 중복 방지:
+   - 고객 예약 신청 화면:
+     * 날짜 선택 시 예약 가능 시간만 표시
+     * status가 'pending' 또는 'confirmed'인 시간대는 선택 불가
+     * 비활성화 + 회색 처리 + "예약 불가" 표시
+   - 예약 신청 시:
+     * 해당 날짜+시간에 pending/confirmed 예약 있으면 차단
+     * "이미 예약된 시간입니다" 알림 표시
+   - 관리자 수동 예약 추가 시:
+     * 동일한 중복 체크
+     * 경고 메시지 + "강제 추가" 옵션 제공 (선택)
+
+6. 캘린더 및 목록 표시 규칙:
+   - 표시되는 예약:
+     * pending (승인 대기) - 노란색 또는 주황색
+     * confirmed (확정됨) - 파란색 또는 초록색
+   - 표시 안 되는 예약:
+     * cancelled (취소됨) - 완전히 제거, 표시 안 함
+     * rejected (거절됨) - 완전히 제거, 표시 안 함
+   - 취소/거절된 예약은 시간대 해제하여 다시 예약 가능
+
+7. 예약 가능 시간 조회 로직:
+   - getAvailableTimeSlots(shopId, date) 함수:
+     * 영업 시간대 가져오기
+     * 해당 날짜의 모든 예약 조회
+     * status가 'pending' 또는 'confirmed'인 예약 필터링
+     * 잠긴 시간대 제외하고 반환
+   - 서비스 소요시간 고려:
+     * 60분 서비스면 시작 시간부터 60분간 전체 잠금
+     * 예: 10:00 예약 시 10:00, 10:30 모두 불가
+
+8. 실시간 업데이트 구현:
+   - 관리자 승인 대기 화면:
+     * setInterval로 2초마다 pending 예약 조회
+     * 새 예약 있으면 즉시 목록에 추가
+     * 알림음 또는 배지 표시 (선택)
+   - 확정된 예약 화면:
+     * 동일하게 실시간 업데이트
+
+9. 데이터 구조:
+{
+  users: [
+    {
+      id: string,
+      email: string,
+      password: string,
+      role: 'super_admin' | 'shop_owner',
+      status: 'pending' | 'approved' | 'rejected',
+      shopName: string,
+      phone: string,
+      address: string,
+      createdAt: timestamp
+    }
+  ],
+  reservations: [
+    {
+      id: string,
+      shopId: string,
+      customerId: string,
+      customerName: string,
+      customerPhone: string,
+      serviceId: string,
+      serviceName: string,
+      date: "2026-01-25",
+      time: "10:00",
+      duration: 60,
+      status: 'pending' | 'confirmed' | 'cancelled' | 'rejected',
+      depositPaid: boolean,
+      createdAt: timestamp,
+      updatedAt: timestamp
+    }
+  ]
+}
+
+10. 예약 액션 플로우:
+
+고객 신청:
+→ status='pending', 시간대 잠김
+→ 관리자 화면에 즉시 표시 (실시간)
+
+관리자 [바로 확정]:
+→ status='confirmed', 시간대 계속 잠김
+→ 확정된 예약 목록으로 이동
+
+관리자 [거절]:
+→ status='rejected', 시간대 해제
+→ 목록/캘린더에서 완전히 제거
+→ 다른 고객 예약 가능
+
+관리자 [취소]:
+→ status='cancelled', 시간대 해제
+→ 목록/캘린더에서 완전히 제거
+→ 다른 고객 예약 가능
+
+확정된 예약 [변경]:
+→ 기존 시간대 해제
+→ 새 시간대 중복 체크
+→ 새 시간대 잠금
+
+11. UI 구성:
+
+관리자 대시보드:
+├─ 승인 대기 (Pending) 탭
+│  ├─ 실시간 목록 (자동 새로고침)
+│  └─ 각 예약: [예약금 링크] [바로 확정] [거절]
+│
+└─ 확정된 예약 (Confirmed) 탭
+   ├─ 확정된 예약 목록
+   └─ 각 예약: [변경하기] [취소하기] [정보 수정]
+
+캘린더 뷰:
+- Pending: 노란색/주황색
+- Confirmed: 파란색/초록색
+- Cancelled/Rejected: 표시 안 함
+
+고객 예약 화면:
+- 날짜 선택
+- 예약 가능 시간만 표시 (pending/confirmed 제외)
+- 🔒 예약 불가 시간은 비활성화
+
+중요:
+- 신청된 예약은 즉시 관리자 화면에 표시 (최대한 딜레이 없이)
+- 취소/거절된 예약은 캘린더나 목록에 표시 안 함
+- pending/confirmed 상태만 시간대 잠금
+- 모든 액션 후 시간대 상태 즉시 업데이트
+
+모든 텍스트는 한글로, 주석도 한글로 작성해줘.

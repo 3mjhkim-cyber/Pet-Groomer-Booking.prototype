@@ -18,6 +18,7 @@ export interface IStorage {
   approveShop(id: number): Promise<Shop | undefined>;
   
   getServices(shopId?: number | null): Promise<Service[]>;
+  getService(id: number): Promise<Service | undefined>;
   getServicesByShop(shopId: number): Promise<Service[]>;
   createService(service: InsertService): Promise<Service>;
   updateService(id: number, data: Partial<Service>): Promise<Service | undefined>;
@@ -32,7 +33,10 @@ export interface IStorage {
   
   getBookings(shopId?: number | null): Promise<(Booking & { serviceName: string })[]>;
   getBooking(id: number): Promise<(Booking & { serviceName: string }) | undefined>;
+  getBookedTimeSlots(shopId: number, date: string): Promise<{ time: string; duration: number }[]>;
   createBooking(booking: InsertBooking): Promise<Booking>;
+  updateBooking(id: number, data: { date?: string; time?: string; serviceId?: number }): Promise<Booking | undefined>;
+  updateBookingCustomer(id: number, data: { customerName?: string; customerPhone?: string }): Promise<Booking | undefined>;
   updateBookingStatus(id: number, status: string): Promise<Booking | undefined>;
   requestDeposit(id: number): Promise<Booking | undefined>;
   confirmDeposit(id: number): Promise<Booking | undefined>;
@@ -109,6 +113,11 @@ export class DatabaseStorage implements IStorage {
       return await db.select().from(services).where(eq(services.shopId, shopId));
     }
     return await db.select().from(services);
+  }
+
+  async getService(id: number): Promise<Service | undefined> {
+    const [service] = await db.select().from(services).where(eq(services.id, id));
+    return service;
   }
 
   async getServicesByShop(shopId: number): Promise<Service[]> {
@@ -260,6 +269,23 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
+  async getBookedTimeSlots(shopId: number, date: string): Promise<{ time: string; duration: number }[]> {
+    const results = await db.select({
+      time: bookings.time,
+      duration: services.duration,
+    })
+    .from(bookings)
+    .innerJoin(services, eq(bookings.serviceId, services.id))
+    .where(
+      and(
+        eq(bookings.shopId, shopId),
+        eq(bookings.date, date),
+        or(eq(bookings.status, 'pending'), eq(bookings.status, 'confirmed'))
+      )
+    );
+    return results;
+  }
+
   async createBooking(insertBooking: InsertBooking): Promise<Booking> {
     const [booking] = await db.insert(bookings).values(insertBooking).returning();
     
@@ -272,6 +298,22 @@ export class DatabaseStorage implements IStorage {
       });
     }
     
+    return booking;
+  }
+
+  async updateBooking(id: number, data: { date?: string; time?: string; serviceId?: number }): Promise<Booking | undefined> {
+    const [booking] = await db.update(bookings)
+      .set(data)
+      .where(eq(bookings.id, id))
+      .returning();
+    return booking;
+  }
+
+  async updateBookingCustomer(id: number, data: { customerName?: string; customerPhone?: string }): Promise<Booking | undefined> {
+    const [booking] = await db.update(bookings)
+      .set(data)
+      .where(eq(bookings.id, id))
+      .returning();
     return booking;
   }
 
