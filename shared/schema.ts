@@ -20,7 +20,7 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
   role: text("role").default("shop_owner").notNull(),
-  status: text("status").default("pending").notNull(), // pending, approved, rejected
+  status: text("status").default("pending").notNull(),
   shopId: integer("shop_id").references(() => shops.id),
   shopName: text("shop_name"),
   phone: text("phone"),
@@ -34,8 +34,18 @@ export const customers = pgTable("customers", {
   shopId: integer("shop_id").references(() => shops.id),
   name: text("name").notNull(),
   phone: text("phone").notNull(),
+  petName: text("pet_name"),
+  petBreed: text("pet_breed"),
+  petAge: text("pet_age"),
+  petWeight: text("pet_weight"),
+  firstVisitDate: timestamp("first_visit_date"),
   visitCount: integer("visit_count").default(0).notNull(),
   lastVisit: timestamp("last_visit"),
+  memo: text("memo"),
+  behaviorNotes: text("behavior_notes"),
+  specialNotes: text("special_notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 export const services = pgTable("services", {
@@ -50,21 +60,30 @@ export const services = pgTable("services", {
 export const bookings = pgTable("bookings", {
   id: serial("id").primaryKey(),
   shopId: integer("shop_id").references(() => shops.id),
+  customerId: integer("customer_id").references(() => customers.id),
   date: text("date").notNull(),
   time: text("time").notNull(),
   customerName: text("customer_name").notNull(),
   customerPhone: text("customer_phone").notNull(),
+  petName: text("pet_name"),
+  petBreed: text("pet_breed"),
   status: text("status").default("pending").notNull(),
   serviceId: integer("service_id").references(() => services.id).notNull(),
+  memo: text("memo"),
   depositStatus: text("deposit_status").default("none").notNull(),
   depositDeadline: timestamp("deposit_deadline"),
+  isFirstVisit: boolean("is_first_visit").default(false).notNull(),
+  remindSent: boolean("remind_sent").default(false).notNull(),
+  remindSentAt: timestamp("remind_sent_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 export const insertShopSchema = createInsertSchema(shops).omit({ id: true, createdAt: true, isApproved: true });
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
-export const insertCustomerSchema = createInsertSchema(customers).omit({ id: true, visitCount: true, lastVisit: true });
+export const insertCustomerSchema = createInsertSchema(customers).omit({ id: true, visitCount: true, lastVisit: true, firstVisitDate: true, createdAt: true, updatedAt: true });
 export const insertServiceSchema = createInsertSchema(services).omit({ id: true, isActive: true });
-export const insertBookingSchema = createInsertSchema(bookings).omit({ id: true, status: true, depositStatus: true, depositDeadline: true });
+export const insertBookingSchema = createInsertSchema(bookings).omit({ id: true, status: true, depositStatus: true, depositDeadline: true, isFirstVisit: true, remindSent: true, remindSentAt: true, createdAt: true, updatedAt: true });
 
 export type Shop = typeof shops.$inferSelect;
 export type InsertShop = z.infer<typeof insertShopSchema>;

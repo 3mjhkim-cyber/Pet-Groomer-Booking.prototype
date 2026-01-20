@@ -1,7 +1,7 @@
 import { useAuth } from "@/hooks/use-auth";
 import { useBookings, useServices, useApproveBooking, useRejectBooking, useRequestDeposit, useAdminCreateBooking, useSearchCustomers, useCustomerHistory, useCancelBooking, useUpdateBooking, useUpdateBookingCustomer } from "@/hooks/use-shop";
 import { useLocation } from "wouter";
-import { Loader2, Calendar, Clock, User, Phone, Scissors, Check, X, Banknote, Plus, Link, Copy, History, Edit, XCircle, UserCog } from "lucide-react";
+import { Loader2, Calendar, Clock, User, Phone, Scissors, Check, X, Banknote, Plus, Link, Copy, History, Edit, XCircle, UserCog, PawPrint, FileText, Bell, MessageCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
@@ -10,8 +10,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import type { Customer, Booking } from "@shared/schema";
 import { formatKoreanPhone } from "@/lib/phone";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useMutation, useQuery } from "@tanstack/react-query";
 import { api } from "@shared/routes";
+import { apiRequest } from "@/lib/queryClient";
 
 export default function Dashboard() {
   const { user, isLoading: isAuthLoading } = useAuth();
@@ -45,16 +46,44 @@ export default function Dashboard() {
   // 취소 확인 다이얼로그 상태
   const [cancelConfirmBooking, setCancelConfirmBooking] = useState<(Booking & { serviceName: string }) | null>(null);
   
+  // 고객 정보 상세 모달 상태
+  const [customerDetailId, setCustomerDetailId] = useState<number | null>(null);
+  const [isCustomerDetailOpen, setIsCustomerDetailOpen] = useState(false);
+  
+  // 리마인드 모달 상태
+  const [remindBooking, setRemindBooking] = useState<(Booking & { serviceName: string }) | null>(null);
+  
   const { data: searchResults } = useSearchCustomers(searchQuery);
   const { data: customerHistoryData } = useCustomerHistory(selectedCustomerPhone);
+  
+  // 리마인드 전송 mutation
+  const { mutate: sendRemind, isPending: isSendingRemind } = useMutation({
+    mutationFn: async (bookingId: number) => {
+      const res = await apiRequest('PATCH', `/api/bookings/${bookingId}/remind`);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "리마인드 전송 완료",
+        description: "리마인드가 전송된 것으로 표시되었습니다.",
+      });
+      queryClient.invalidateQueries({ queryKey: [api.bookings.list.path] });
+      setRemindBooking(null);
+    },
+  });
 
-  // 실시간 업데이트: 2초마다 예약 데이터 갱신
+  // 다이얼로그가 열려있는지 확인
+  const isAnyDialogOpen = isHistoryDialogOpen || isCustomerDetailOpen || !!remindBooking || !!editBooking || !!editCustomerBooking || !!cancelConfirmBooking || isManualDialogOpen;
+  
+  // 실시간 업데이트: 2초마다 예약 데이터 갱신 (다이얼로그가 열려있으면 일시 중지)
   useEffect(() => {
+    if (isAnyDialogOpen) return;
+    
     const interval = setInterval(() => {
       queryClient.invalidateQueries({ queryKey: [api.bookings.list.path] });
     }, 2000);
     return () => clearInterval(interval);
-  }, [queryClient]);
+  }, [queryClient, isAnyDialogOpen]);
 
   const copyDepositLink = (bookingId: number) => {
     const link = `${window.location.origin}/deposit/${bookingId}`;
@@ -348,12 +377,20 @@ export default function Dashboard() {
                   {pendingBookings.map(booking => (
                     <div key={booking.id} className="bg-white rounded-2xl p-5 border-2 border-orange-300 shadow-sm" data-testid={`card-pending-${booking.id}`}>
                       <div className="flex justify-between items-start mb-3">
+                        <div className="flex items-center gap-2">
+                          {booking.isFirstVisit ? (
+                            <Badge className="bg-blue-500 hover:bg-blue-600 text-white">첫 방문</Badge>
+                          ) : (
+                            <Badge className="bg-green-500 hover:bg-green-600 text-white">재방문</Badge>
+                          )}
+                        </div>
                         <div className="flex items-center gap-2 text-orange-600 font-bold bg-orange-50 px-3 py-1 rounded-lg">
                           <Clock className="w-4 h-4" />
                           {booking.time}
                         </div>
-                        <span className="text-sm text-muted-foreground">{booking.date}</span>
                       </div>
+                      <div className="text-sm text-muted-foreground mb-2">{booking.date}</div>
+                      
                       <div className="space-y-2 mb-4">
                         <div className="flex items-center gap-2">
                           <User className="w-4 h-4 text-muted-foreground" />
@@ -365,18 +402,49 @@ export default function Dashboard() {
                             {booking.customerName}
                             <History className="w-3 h-3" />
                           </button>
+                          <span className="text-sm font-mono text-muted-foreground">{booking.customerPhone}</span>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Phone className="w-4 h-4 text-muted-foreground" />
-                          <span className="text-sm font-mono">{booking.customerPhone}</span>
-                        </div>
+                        
+                        {(booking.petName || booking.petBreed) && (
+                          <div className="flex items-center gap-2 text-sm">
+                            <PawPrint className="w-4 h-4 text-amber-500" />
+                            <span className="font-medium">{booking.petName}</span>
+                            {booking.petBreed && <span className="text-muted-foreground">({booking.petBreed})</span>}
+                          </div>
+                        )}
+                        
                         <div className="flex items-center gap-2">
                           <Scissors className="w-4 h-4 text-muted-foreground" />
                           <span className="text-sm">{booking.serviceName}</span>
                         </div>
+                        
+                        {booking.memo && (
+                          <div className="p-2 bg-muted/50 rounded-lg text-sm">
+                            <div className="flex items-start gap-2">
+                              <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                              <span className="text-muted-foreground">{booking.memo}</span>
+                            </div>
+                          </div>
+                        )}
                       </div>
+                      
                       <div className="space-y-2">
                         <div className="flex gap-2">
+                          {booking.customerId && (
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              className="gap-1" 
+                              onClick={() => {
+                                setCustomerDetailId(booking.customerId);
+                                setIsCustomerDetailOpen(true);
+                              }}
+                              data-testid={`button-customer-info-${booking.id}`}
+                            >
+                              <User className="w-4 h-4" />
+                              고객 정보
+                            </Button>
+                          )}
                           <Button 
                             size="sm" 
                             variant="outline" 
@@ -420,20 +488,28 @@ export default function Dashboard() {
                   {confirmedBookings.map(booking => (
                     <div key={booking.id} className="bg-white rounded-2xl p-5 border-2 border-green-300 shadow-sm" data-testid={`card-confirmed-${booking.id}`}>
                       <div className="flex justify-between items-start mb-3">
+                        <div className="flex items-center gap-2">
+                          {booking.isFirstVisit ? (
+                            <Badge className="bg-blue-500 hover:bg-blue-600 text-white">첫 방문</Badge>
+                          ) : (
+                            <Badge className="bg-green-500 hover:bg-green-600 text-white">재방문</Badge>
+                          )}
+                        </div>
                         <div className="flex items-center gap-2 text-green-600 font-bold bg-green-50 px-3 py-1 rounded-lg">
                           <Check className="w-4 h-4" />
                           {booking.time}
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm text-muted-foreground">{booking.date}</span>
-                          {booking.depositStatus === 'paid' && (
-                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">입금완료</Badge>
-                          )}
-                          {booking.depositStatus === 'waiting' && (
-                            <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">입금대기</Badge>
-                          )}
-                        </div>
                       </div>
+                      <div className="flex items-center gap-2 mb-2 text-sm text-muted-foreground">
+                        <span>{booking.date}</span>
+                        {booking.depositStatus === 'paid' && (
+                          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">입금완료</Badge>
+                        )}
+                        {booking.depositStatus === 'waiting' && (
+                          <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">입금대기</Badge>
+                        )}
+                      </div>
+                      
                       <div className="space-y-2 mb-4">
                         <div className="flex items-center gap-2">
                           <User className="w-4 h-4 text-muted-foreground" />
@@ -445,19 +521,74 @@ export default function Dashboard() {
                             {booking.customerName}
                             <History className="w-3 h-3" />
                           </button>
+                          <span className="text-sm font-mono text-muted-foreground">{booking.customerPhone}</span>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Phone className="w-4 h-4 text-muted-foreground" />
-                          <span className="text-sm font-mono">{booking.customerPhone}</span>
-                        </div>
+                        
+                        {(booking.petName || booking.petBreed) && (
+                          <div className="flex items-center gap-2 text-sm">
+                            <PawPrint className="w-4 h-4 text-amber-500" />
+                            <span className="font-medium">{booking.petName}</span>
+                            {booking.petBreed && <span className="text-muted-foreground">({booking.petBreed})</span>}
+                          </div>
+                        )}
+                        
                         <div className="flex items-center gap-2">
                           <Scissors className="w-4 h-4 text-muted-foreground" />
                           <span className="text-sm">{booking.serviceName}</span>
+                        </div>
+                        
+                        {booking.memo && (
+                          <div className="p-2 bg-muted/50 rounded-lg text-sm">
+                            <div className="flex items-start gap-2">
+                              <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                              <span className="text-muted-foreground">{booking.memo}</span>
+                            </div>
+                          </div>
+                        )}
+                        
+                        <div className="flex items-center gap-2 text-sm">
+                          <Bell className="w-4 h-4 text-muted-foreground" />
+                          {booking.remindSent ? (
+                            <span className="text-green-600 flex items-center gap-1">
+                              <Check className="w-3 h-3" />
+                              전송됨 {booking.remindSentAt && `(${new Date(booking.remindSentAt).toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })})`}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">리마인드 미전송</span>
+                          )}
                         </div>
                       </div>
                       
                       {/* 확정된 예약 액션 버튼 */}
                       <div className="space-y-2">
+                        <div className="flex gap-2">
+                          {booking.customerId && (
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              className="gap-1" 
+                              onClick={() => {
+                                setCustomerDetailId(booking.customerId);
+                                setIsCustomerDetailOpen(true);
+                              }}
+                              data-testid={`button-customer-info-confirmed-${booking.id}`}
+                            >
+                              <User className="w-4 h-4" />
+                              고객 정보
+                            </Button>
+                          )}
+                          <Button 
+                            size="sm" 
+                            variant={booking.remindSent ? "ghost" : "outline"}
+                            className="flex-1 gap-1" 
+                            onClick={() => setRemindBooking(booking)}
+                            data-testid={`button-remind-${booking.id}`}
+                          >
+                            <MessageCircle className="w-4 h-4" />
+                            {booking.remindSent ? '재전송' : '리마인드 전송'}
+                          </Button>
+                        </div>
+                        
                         {booking.depositStatus === 'none' && (
                           <Button size="sm" variant="outline" className="w-full gap-1" onClick={() => requestDeposit(booking.id)} data-testid={`button-deposit-${booking.id}`}>
                             <Banknote className="w-4 h-4" />
@@ -709,6 +840,177 @@ export default function Dashboard() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      
+      {/* 리마인드 전송 다이얼로그 */}
+      <Dialog open={!!remindBooking} onOpenChange={() => setRemindBooking(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MessageCircle className="w-5 h-5" />
+              {remindBooking?.remindSent ? '리마인드 재전송' : '리마인드 전송'}
+            </DialogTitle>
+            <DialogDescription>
+              {remindBooking?.remindSent 
+                ? '이미 리마인드가 전송된 예약입니다. 다시 전송하시겠습니까?' 
+                : '고객에게 예약 리마인드를 전송합니다.'}
+            </DialogDescription>
+          </DialogHeader>
+          {remindBooking && (
+            <div className="bg-secondary/30 rounded-lg p-4 my-4">
+              <p className="font-medium">{remindBooking.customerName}</p>
+              <p className="text-sm text-muted-foreground">{remindBooking.customerPhone}</p>
+              <p className="text-sm mt-2">{remindBooking.date} {remindBooking.time}</p>
+              <p className="text-sm text-muted-foreground">{remindBooking.serviceName}</p>
+              {remindBooking.petName && (
+                <div className="flex items-center gap-2 text-sm mt-2">
+                  <PawPrint className="w-4 h-4 text-amber-500" />
+                  <span>{remindBooking.petName}</span>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setRemindBooking(null)}>취소</Button>
+            <Button 
+              type="button" 
+              onClick={() => remindBooking && sendRemind(remindBooking.id)}
+              disabled={isSendingRemind}
+              data-testid="button-confirm-remind"
+            >
+              {isSendingRemind ? <Loader2 className="w-4 h-4 animate-spin" /> : (remindBooking?.remindSent ? '재전송' : '전송')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* 고객 상세 정보 다이얼로그 */}
+      <CustomerDetailDialog 
+        customerId={customerDetailId} 
+        open={isCustomerDetailOpen} 
+        onOpenChange={setIsCustomerDetailOpen} 
+      />
     </div>
+  );
+}
+
+// 고객 상세 정보 다이얼로그 컴포넌트
+function CustomerDetailDialog({ customerId, open, onOpenChange }: { customerId: number | null, open: boolean, onOpenChange: (open: boolean) => void }) {
+  const { data: customer, isLoading } = useQuery<Customer>({
+    queryKey: ['/api/customers', customerId],
+    enabled: !!customerId && open,
+  });
+  
+  if (!customerId) return null;
+  
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <User className="w-5 h-5" />
+            고객 상세 정보
+          </DialogTitle>
+        </DialogHeader>
+        
+        {isLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="w-6 h-6 animate-spin text-primary" />
+          </div>
+        ) : customer ? (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div>
+                <span className="text-muted-foreground">이름</span>
+                <p className="font-medium">{customer.name}</p>
+              </div>
+              <div>
+                <span className="text-muted-foreground">전화번호</span>
+                <p className="font-medium font-mono">{customer.phone}</p>
+              </div>
+            </div>
+            
+            {(customer.petName || customer.petBreed) && (
+              <div className="border-t pt-4">
+                <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+                  <PawPrint className="w-4 h-4 text-amber-500" />
+                  반려동물 정보
+                </h4>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">이름</span>
+                    <p className="font-medium">{customer.petName || '-'}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">품종</span>
+                    <p className="font-medium">{customer.petBreed || '-'}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">나이</span>
+                    <p className="font-medium">{customer.petAge ? `${customer.petAge}살` : '-'}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">몸무게</span>
+                    <p className="font-medium">{customer.petWeight ? `${customer.petWeight}kg` : '-'}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            <div className="border-t pt-4">
+              <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+                <Calendar className="w-4 h-4" />
+                방문 정보
+              </h4>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <span className="text-muted-foreground">첫 방문일</span>
+                  <p className="font-medium">{customer.firstVisitDate || '-'}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">마지막 방문</span>
+                  <p className="font-medium">{customer.lastVisit || '-'}</p>
+                </div>
+                <div className="col-span-2">
+                  <span className="text-muted-foreground">총 방문 횟수</span>
+                  <p className="font-medium">{customer.visitCount}회</p>
+                </div>
+              </div>
+            </div>
+            
+            {customer.memo && (
+              <div className="border-t pt-4">
+                <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+                  <FileText className="w-4 h-4" />
+                  메모
+                </h4>
+                <p className="text-sm text-muted-foreground whitespace-pre-wrap">{customer.memo}</p>
+              </div>
+            )}
+            
+            {customer.behaviorNotes && (
+              <div className="border-t pt-4">
+                <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+                  <PawPrint className="w-4 h-4" />
+                  행동 특성
+                </h4>
+                <p className="text-sm text-muted-foreground whitespace-pre-wrap">{customer.behaviorNotes}</p>
+              </div>
+            )}
+            
+            {customer.specialNotes && (
+              <div className="border-t pt-4">
+                <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+                  <FileText className="w-4 h-4" />
+                  특이사항
+                </h4>
+                <p className="text-sm text-muted-foreground whitespace-pre-wrap">{customer.specialNotes}</p>
+              </div>
+            )}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground text-center py-4">고객 정보를 찾을 수 없습니다.</p>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }

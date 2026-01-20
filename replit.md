@@ -102,9 +102,13 @@ shared/           # Shared between client/server
 
 ### Dashboard Features
 - **Tabs UI**: 승인 대기 (pending) / 확정된 예약 (confirmed)
-- **Real-time Updates**: 2-second polling for immediate reflection of changes
-- **Booking Actions (Pending)**: 예약금 링크, 바로 확정, 거절
-- **Booking Actions (Confirmed)**: 변경, 고객수정, 취소
+- **Real-time Updates**: 2-second polling for immediate reflection of changes (paused while dialogs are open)
+- **Visit Badges**: 첫 방문 (blue) / 재방문 (green) badges on booking cards
+- **Pet Information**: Displays petName and petBreed with PawPrint icon
+- **Customer Detail Modal**: Click "고객 정보" to view complete customer profile
+- **Reminder System**: Send/resend reminders, track sent status with timestamp
+- **Booking Actions (Pending)**: 고객 정보, 예약금 링크, 바로 확정, 거절
+- **Booking Actions (Confirmed)**: 고객 정보, 리마인드 전송, 변경, 고객수정, 취소
 - **Manual Booking**: Shop owners can add bookings directly
 
 ### Calendar Color Coding

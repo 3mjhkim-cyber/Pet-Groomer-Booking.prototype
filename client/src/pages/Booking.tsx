@@ -2,22 +2,27 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Calendar as CalendarIcon, Clock, Scissors, User, Phone, CheckCircle2, Loader2, MapPin, XCircle } from "lucide-react";
-import { useState, useEffect } from "react";
+import { Calendar as CalendarIcon, Clock, Scissors, User, Phone, CheckCircle2, Loader2, MapPin, XCircle, PawPrint, Info, FileText } from "lucide-react";
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useRoute } from "wouter";
 import { useToast } from "@/hooks/use-toast";
-import type { Shop, Service } from "@shared/schema";
+import type { Shop, Service, Customer } from "@shared/schema";
 import { formatKoreanPhone } from "@/lib/phone";
 import { useAvailableTimeSlots } from "@/hooks/use-shop";
 
 const bookingFormSchema = z.object({
-  customerName: z.string().min(2, "이름을 2글자 이상 입력해주세요"),
+  customerName: z.string().min(2, "보호자 이름을 2글자 이상 입력해주세요"),
   customerPhone: z.string().regex(/^01([0|1|6|7|8|9])-?([0-9]{3,4})-?([0-9]{4})$/, "올바른 휴대폰 번호를 입력해주세요"),
+  petName: z.string().min(1, "반려동물 이름을 입력해주세요"),
+  petBreed: z.string().min(1, "반려동물 종을 입력해주세요"),
+  petAge: z.string().optional(),
+  petWeight: z.string().optional(),
   serviceId: z.number({ required_error: "서비스를 선택해주세요" }),
   date: z.string({ required_error: "날짜를 선택해주세요" }),
   time: z.string({ required_error: "시간을 선택해주세요" }),
+  memo: z.string().max(500, "특이사항은 500자 이내로 입력해주세요").optional(),
 });
 
 type BookingForm = z.infer<typeof bookingFormSchema>;
@@ -47,6 +52,11 @@ export default function Booking() {
     enabled: !!shop,
   });
 
+  const [selectedService, setSelectedService] = useState<number | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string>('');
+  const [existingCustomer, setExistingCustomer] = useState<Customer | null>(null);
+  const [isCheckingCustomer, setIsCheckingCustomer] = useState(false);
+
   const createBookingMutation = useMutation({
     mutationFn: async (data: BookingForm & { shopId: number }) => {
       const res = await fetch('/api/bookings', {
@@ -67,6 +77,7 @@ export default function Booking() {
       });
       form.reset();
       setSelectedService(null);
+      setExistingCustomer(null);
     },
     onError: (error: Error) => {
       toast({
@@ -77,8 +88,34 @@ export default function Booking() {
     },
   });
 
-  const [selectedService, setSelectedService] = useState<number | null>(null);
-  const [selectedDate, setSelectedDate] = useState<string>('');
+  const checkExistingCustomer = async (phone: string) => {
+    if (!phone || phone.length < 10) return;
+    setIsCheckingCustomer(true);
+    try {
+      const res = await fetch(`/api/shops/${slug}/customers/check?phone=${encodeURIComponent(phone)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.exists && data.customer) {
+          setExistingCustomer(data.customer);
+          form.setValue("customerName", data.customer.name);
+          if (data.customer.petName) form.setValue("petName", data.customer.petName);
+          if (data.customer.petBreed) form.setValue("petBreed", data.customer.petBreed);
+          if (data.customer.petAge) form.setValue("petAge", data.customer.petAge);
+          if (data.customer.petWeight) form.setValue("petWeight", data.customer.petWeight);
+          toast({
+            title: "기존 고객 정보 확인",
+            description: `${data.customer.name}님, ${data.customer.visitCount}회 방문하신 고객입니다.`,
+          });
+        } else {
+          setExistingCustomer(null);
+        }
+      }
+    } catch (error) {
+      console.error("고객 확인 오류:", error);
+    } finally {
+      setIsCheckingCustomer(false);
+    }
+  };
 
   const form = useForm<BookingForm>({
     resolver: zodResolver(bookingFormSchema),
@@ -282,35 +319,138 @@ export default function Booking() {
               <h2 className="text-2xl font-bold">예약자 정보를 입력해주세요</h2>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white p-8 rounded-3xl border border-border shadow-sm">
-              <div className="space-y-2">
-                <label className="font-medium text-foreground/80 flex items-center gap-2">
-                  <User className="w-4 h-4" /> 예약자 성함
-                </label>
-                <input
-                  {...form.register("customerName")}
-                  placeholder="홍길동"
-                  className="w-full px-4 py-3 rounded-xl bg-background border-2 border-border focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all"
-                  data-testid="input-name"
-                />
-                {form.formState.errors.customerName && <p className="text-destructive text-sm">{form.formState.errors.customerName.message}</p>}
+            <div className="bg-white p-8 rounded-3xl border border-border shadow-sm space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="font-medium text-foreground/80 flex items-center gap-2">
+                    <User className="w-4 h-4" /> 보호자 이름 *
+                  </label>
+                  <input
+                    {...form.register("customerName")}
+                    placeholder="홍길동"
+                    className="w-full px-4 py-3 rounded-xl bg-background border-2 border-border focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all"
+                    data-testid="input-name"
+                  />
+                  {form.formState.errors.customerName && <p className="text-destructive text-sm">{form.formState.errors.customerName.message}</p>}
+                </div>
+
+                <div className="space-y-2">
+                  <label className="font-medium text-foreground/80 flex items-center gap-2">
+                    <Phone className="w-4 h-4" /> 전화번호 *
+                  </label>
+                  <div className="relative">
+                    <input
+                      value={form.watch("customerPhone") || ""}
+                      onChange={(e) => {
+                        const formatted = formatKoreanPhone(e.target.value);
+                        form.setValue("customerPhone", formatted, { shouldValidate: true });
+                      }}
+                      onBlur={(e) => checkExistingCustomer(e.target.value)}
+                      placeholder="010-1234-5678"
+                      className="w-full px-4 py-3 rounded-xl bg-background border-2 border-border focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all"
+                      data-testid="input-phone"
+                    />
+                    {isCheckingCustomer && (
+                      <Loader2 className="w-4 h-4 animate-spin absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    )}
+                  </div>
+                  {form.formState.errors.customerPhone && <p className="text-destructive text-sm">{form.formState.errors.customerPhone.message}</p>}
+                </div>
               </div>
 
-              <div className="space-y-2">
-                <label className="font-medium text-foreground/80 flex items-center gap-2">
-                  <Phone className="w-4 h-4" /> 연락처
-                </label>
-                <input
-                  value={form.watch("customerPhone") || ""}
-                  onChange={(e) => {
-                    const formatted = formatKoreanPhone(e.target.value);
-                    form.setValue("customerPhone", formatted, { shouldValidate: true });
-                  }}
-                  placeholder="010-1234-5678"
-                  className="w-full px-4 py-3 rounded-xl bg-background border-2 border-border focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all"
-                  data-testid="input-phone"
-                />
-                {form.formState.errors.customerPhone && <p className="text-destructive text-sm">{form.formState.errors.customerPhone.message}</p>}
+              {existingCustomer && (
+                <div className="p-4 bg-green-50 border border-green-200 rounded-xl flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-full bg-green-500 text-white flex items-center justify-center font-bold text-sm flex-shrink-0">
+                    {existingCustomer.visitCount}
+                  </div>
+                  <div>
+                    <p className="font-medium text-green-800">재방문 고객입니다!</p>
+                    <p className="text-sm text-green-700">
+                      {existingCustomer.name}님, 총 {existingCustomer.visitCount}회 방문
+                      {existingCustomer.petName && ` | 반려동물: ${existingCustomer.petName}`}
+                    </p>
+                    {existingCustomer.memo && (
+                      <p className="text-sm text-green-600 mt-1">이전 특이사항: {existingCustomer.memo.split('\n').slice(-1)[0]}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div className="border-t pt-6">
+                <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
+                  <PawPrint className="w-5 h-5 text-primary" /> 반려동물 정보
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="font-medium text-foreground/80">반려동물 이름 *</label>
+                    <input
+                      {...form.register("petName")}
+                      placeholder="예: 뭉치"
+                      className="w-full px-4 py-3 rounded-xl bg-background border-2 border-border focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all"
+                      data-testid="input-pet-name"
+                    />
+                    {form.formState.errors.petName && <p className="text-destructive text-sm">{form.formState.errors.petName.message}</p>}
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="font-medium text-foreground/80">반려동물 종 *</label>
+                    <input
+                      {...form.register("petBreed")}
+                      placeholder="예: 말티즈, 푸들, 시츄 등"
+                      className="w-full px-4 py-3 rounded-xl bg-background border-2 border-border focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all"
+                      data-testid="input-pet-breed"
+                    />
+                    {form.formState.errors.petBreed && <p className="text-destructive text-sm">{form.formState.errors.petBreed.message}</p>}
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="font-medium text-foreground/80">반려동물 나이 (선택)</label>
+                    <input
+                      {...form.register("petAge")}
+                      placeholder="예: 3살"
+                      className="w-full px-4 py-3 rounded-xl bg-background border-2 border-border focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all"
+                      data-testid="input-pet-age"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="font-medium text-foreground/80">반려동물 몸무게 (선택)</label>
+                    <input
+                      {...form.register("petWeight")}
+                      placeholder="예: 5kg"
+                      className="w-full px-4 py-3 rounded-xl bg-background border-2 border-border focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all"
+                      data-testid="input-pet-weight"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t pt-6">
+                <div className="space-y-2">
+                  <label className="font-medium text-foreground/80 flex items-center gap-2">
+                    <FileText className="w-4 h-4" /> 특이사항 (선택)
+                  </label>
+                  <textarea
+                    {...form.register("memo")}
+                    placeholder="예: 물을 무서워해요, 털이 많이 엉켜있어요, 예민한 성격이에요"
+                    rows={3}
+                    maxLength={500}
+                    className="w-full px-4 py-3 rounded-xl bg-background border-2 border-border focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all resize-none"
+                    data-testid="input-memo"
+                  />
+                  <p className="text-sm text-muted-foreground text-right">{(form.watch("memo") || "").length}/500</p>
+                  {form.formState.errors.memo && <p className="text-destructive text-sm">{form.formState.errors.memo.message}</p>}
+                </div>
+
+                <div className="mt-4 p-4 rounded-xl" style={{ backgroundColor: '#FFF9E6' }}>
+                  <div className="flex items-start gap-2">
+                    <Info className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                    <div className="text-sm" style={{ color: '#666666' }}>
+                      <p className="font-medium mb-1">안내사항</p>
+                      <p>털 엉킴, 과도한 짖음, 공격성 등 반려동물의 상태나 행동에 따라 추가 비용이 발생할 수 있습니다. 정확한 비용은 미용 전 상담을 통해 안내드립니다.</p>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </section>

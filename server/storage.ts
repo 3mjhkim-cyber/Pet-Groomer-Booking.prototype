@@ -25,11 +25,14 @@ export interface IStorage {
   deleteService(id: number): Promise<void>;
   
   getCustomers(shopId?: number | null): Promise<Customer[]>;
+  getCustomer(id: number): Promise<Customer | undefined>;
   getCustomerByPhone(phone: string, shopId?: number | null): Promise<Customer | undefined>;
   searchCustomers(query: string, shopId?: number | null): Promise<Customer[]>;
   getCustomerHistory(phone: string, shopId?: number | null): Promise<(Booking & { serviceName: string })[]>;
   createCustomer(customer: InsertCustomer): Promise<Customer>;
+  updateCustomer(id: number, data: Partial<Customer>): Promise<Customer | undefined>;
   incrementVisitCount(phone: string, shopId?: number | null): Promise<void>;
+  createOrUpdateCustomerFromBooking(data: { shopId: number | null; name: string; phone: string; petName?: string; petBreed?: string; petAge?: string; petWeight?: string; memo?: string }): Promise<{ customer: Customer; isFirstVisit: boolean }>;
   
   getBookings(shopId?: number | null): Promise<(Booking & { serviceName: string })[]>;
   getBooking(id: number): Promise<(Booking & { serviceName: string }) | undefined>;
@@ -38,8 +41,10 @@ export interface IStorage {
   updateBooking(id: number, data: { date?: string; time?: string; serviceId?: number }): Promise<Booking | undefined>;
   updateBookingCustomer(id: number, data: { customerName?: string; customerPhone?: string }): Promise<Booking | undefined>;
   updateBookingStatus(id: number, status: string): Promise<Booking | undefined>;
+  updateBookingRemind(id: number): Promise<Booking | undefined>;
   requestDeposit(id: number): Promise<Booking | undefined>;
   confirmDeposit(id: number): Promise<Booking | undefined>;
+  getTomorrowBookings(shopId: number): Promise<(Booking & { serviceName: string })[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -142,9 +147,14 @@ export class DatabaseStorage implements IStorage {
 
   async getCustomers(shopId?: number | null): Promise<Customer[]> {
     if (shopId) {
-      return await db.select().from(customers).where(eq(customers.shopId, shopId));
+      return await db.select().from(customers).where(eq(customers.shopId, shopId)).orderBy(desc(customers.lastVisit));
     }
-    return await db.select().from(customers);
+    return await db.select().from(customers).orderBy(desc(customers.lastVisit));
+  }
+
+  async getCustomer(id: number): Promise<Customer | undefined> {
+    const [customer] = await db.select().from(customers).where(eq(customers.id, id));
+    return customer;
   }
 
   async getCustomerByPhone(phone: string, shopId?: number | null): Promise<Customer | undefined> {
@@ -186,14 +196,23 @@ export class DatabaseStorage implements IStorage {
     let query = db.select({
       id: bookings.id,
       shopId: bookings.shopId,
+      customerId: bookings.customerId,
       date: bookings.date,
       time: bookings.time,
       customerName: bookings.customerName,
       customerPhone: bookings.customerPhone,
+      petName: bookings.petName,
+      petBreed: bookings.petBreed,
       status: bookings.status,
       serviceId: bookings.serviceId,
+      memo: bookings.memo,
       depositStatus: bookings.depositStatus,
       depositDeadline: bookings.depositDeadline,
+      isFirstVisit: bookings.isFirstVisit,
+      remindSent: bookings.remindSent,
+      remindSentAt: bookings.remindSentAt,
+      createdAt: bookings.createdAt,
+      updatedAt: bookings.updatedAt,
       serviceName: services.name,
     })
     .from(bookings)
@@ -216,8 +235,59 @@ export class DatabaseStorage implements IStorage {
     const customer = await this.getCustomerByPhone(phone, shopId);
     if (customer) {
       await db.update(customers)
-        .set({ visitCount: customer.visitCount + 1, lastVisit: new Date() })
+        .set({ visitCount: customer.visitCount + 1, lastVisit: new Date(), updatedAt: new Date() })
         .where(eq(customers.id, customer.id));
+    }
+  }
+
+  async updateCustomer(id: number, data: Partial<Customer>): Promise<Customer | undefined> {
+    const [customer] = await db.update(customers)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(customers.id, id))
+      .returning();
+    return customer;
+  }
+
+  async createOrUpdateCustomerFromBooking(data: { shopId: number | null; name: string; phone: string; petName?: string; petBreed?: string; petAge?: string; petWeight?: string; memo?: string }): Promise<{ customer: Customer; isFirstVisit: boolean }> {
+    const existingCustomer = await this.getCustomerByPhone(data.phone, data.shopId);
+    
+    if (existingCustomer) {
+      const updatedMemo = data.memo 
+        ? (existingCustomer.memo ? `${existingCustomer.memo}\n• ${data.memo} (${new Date().toISOString().split('T')[0]})` : `• ${data.memo} (${new Date().toISOString().split('T')[0]})`)
+        : existingCustomer.memo;
+      
+      const [customer] = await db.update(customers)
+        .set({
+          name: data.name,
+          petName: data.petName || existingCustomer.petName,
+          petBreed: data.petBreed || existingCustomer.petBreed,
+          petAge: data.petAge || existingCustomer.petAge,
+          petWeight: data.petWeight || existingCustomer.petWeight,
+          memo: updatedMemo,
+          visitCount: existingCustomer.visitCount + 1,
+          lastVisit: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(customers.id, existingCustomer.id))
+        .returning();
+      
+      return { customer, isFirstVisit: false };
+    } else {
+      const [customer] = await db.insert(customers).values({
+        shopId: data.shopId,
+        name: data.name,
+        phone: data.phone,
+        petName: data.petName,
+        petBreed: data.petBreed,
+        petAge: data.petAge,
+        petWeight: data.petWeight,
+        memo: data.memo ? `• ${data.memo} (${new Date().toISOString().split('T')[0]})` : null,
+        firstVisitDate: new Date(),
+        visitCount: 1,
+        lastVisit: new Date(),
+      }).returning();
+      
+      return { customer, isFirstVisit: true };
     }
   }
 
@@ -225,14 +295,23 @@ export class DatabaseStorage implements IStorage {
     const baseSelect = {
       id: bookings.id,
       shopId: bookings.shopId,
+      customerId: bookings.customerId,
       date: bookings.date,
       time: bookings.time,
       customerName: bookings.customerName,
       customerPhone: bookings.customerPhone,
+      petName: bookings.petName,
+      petBreed: bookings.petBreed,
       status: bookings.status,
       serviceId: bookings.serviceId,
+      memo: bookings.memo,
       depositStatus: bookings.depositStatus,
       depositDeadline: bookings.depositDeadline,
+      isFirstVisit: bookings.isFirstVisit,
+      remindSent: bookings.remindSent,
+      remindSentAt: bookings.remindSentAt,
+      createdAt: bookings.createdAt,
+      updatedAt: bookings.updatedAt,
       serviceName: services.name,
     };
 
@@ -252,14 +331,23 @@ export class DatabaseStorage implements IStorage {
     const [result] = await db.select({
       id: bookings.id,
       shopId: bookings.shopId,
+      customerId: bookings.customerId,
       date: bookings.date,
       time: bookings.time,
       customerName: bookings.customerName,
       customerPhone: bookings.customerPhone,
+      petName: bookings.petName,
+      petBreed: bookings.petBreed,
       status: bookings.status,
       serviceId: bookings.serviceId,
+      memo: bookings.memo,
       depositStatus: bookings.depositStatus,
       depositDeadline: bookings.depositDeadline,
+      isFirstVisit: bookings.isFirstVisit,
+      remindSent: bookings.remindSent,
+      remindSentAt: bookings.remindSentAt,
+      createdAt: bookings.createdAt,
+      updatedAt: bookings.updatedAt,
       serviceName: services.name,
     })
     .from(bookings)
@@ -288,16 +376,6 @@ export class DatabaseStorage implements IStorage {
 
   async createBooking(insertBooking: InsertBooking): Promise<Booking> {
     const [booking] = await db.insert(bookings).values(insertBooking).returning();
-    
-    const existingCustomer = await this.getCustomerByPhone(insertBooking.customerPhone, insertBooking.shopId);
-    if (!existingCustomer) {
-      await this.createCustomer({
-        shopId: insertBooking.shopId,
-        name: insertBooking.customerName,
-        phone: insertBooking.customerPhone,
-      });
-    }
-    
     return booking;
   }
 
@@ -345,6 +423,55 @@ export class DatabaseStorage implements IStorage {
       .where(eq(bookings.id, id))
       .returning();
     return booking;
+  }
+
+  async updateBookingRemind(id: number): Promise<Booking | undefined> {
+    const [booking] = await db.update(bookings)
+      .set({ remindSent: true, remindSentAt: new Date() })
+      .where(eq(bookings.id, id))
+      .returning();
+    return booking;
+  }
+
+  async getTomorrowBookings(shopId: number): Promise<(Booking & { serviceName: string })[]> {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = tomorrow.toISOString().split('T')[0];
+    
+    const baseSelect = {
+      id: bookings.id,
+      shopId: bookings.shopId,
+      customerId: bookings.customerId,
+      date: bookings.date,
+      time: bookings.time,
+      customerName: bookings.customerName,
+      customerPhone: bookings.customerPhone,
+      petName: bookings.petName,
+      petBreed: bookings.petBreed,
+      status: bookings.status,
+      serviceId: bookings.serviceId,
+      memo: bookings.memo,
+      depositStatus: bookings.depositStatus,
+      depositDeadline: bookings.depositDeadline,
+      isFirstVisit: bookings.isFirstVisit,
+      remindSent: bookings.remindSent,
+      remindSentAt: bookings.remindSentAt,
+      createdAt: bookings.createdAt,
+      updatedAt: bookings.updatedAt,
+      serviceName: services.name,
+    };
+
+    return await db.select(baseSelect)
+      .from(bookings)
+      .innerJoin(services, eq(bookings.serviceId, services.id))
+      .where(
+        and(
+          eq(bookings.shopId, shopId),
+          eq(bookings.date, tomorrowStr),
+          eq(bookings.status, 'confirmed')
+        )
+      )
+      .orderBy(bookings.time);
   }
 }
 

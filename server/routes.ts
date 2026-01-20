@@ -418,6 +418,45 @@ export async function registerRoutes(
     res.json({ customer, history });
   });
 
+  // 고객 상세 정보 조회 (ID로)
+  app.get('/api/customers/:id', requireAuth, async (req, res) => {
+    const customer = await storage.getCustomer(Number(req.params.id));
+    if (!customer) {
+      return res.status(404).json({ message: "고객을 찾을 수 없습니다." });
+    }
+    res.json(customer);
+  });
+
+  // 고객 정보 수정
+  app.patch('/api/customers/:id', requireAuth, async (req, res) => {
+    const { name, phone, petName, petBreed, petAge, petWeight, memo, behaviorNotes, specialNotes } = req.body;
+    const customer = await storage.updateCustomer(Number(req.params.id), {
+      name, phone, petName, petBreed, petAge, petWeight, memo, behaviorNotes, specialNotes
+    });
+    if (!customer) {
+      return res.status(404).json({ message: "고객을 찾을 수 없습니다." });
+    }
+    res.json(customer);
+  });
+
+  // 고객 전화번호로 기존 고객 조회 (공개 API)
+  app.get('/api/shops/:slug/customers/check', async (req, res) => {
+    const shop = await storage.getShopBySlug(req.params.slug);
+    if (!shop || !shop.isApproved) {
+      return res.status(404).json({ message: "가맹점을 찾을 수 없습니다." });
+    }
+    const phone = req.query.phone as string;
+    if (!phone) {
+      return res.status(400).json({ message: "전화번호를 입력해주세요." });
+    }
+    const customer = await storage.getCustomerByPhone(phone, shop.id);
+    if (customer) {
+      res.json({ exists: true, customer });
+    } else {
+      res.json({ exists: false });
+    }
+  });
+
   // Bookings (shop-scoped)
   app.get(api.bookings.list.path, requireAuth, async (req, res) => {
     const user = req.user as any;
@@ -435,7 +474,8 @@ export async function registerRoutes(
 
   app.post(api.bookings.create.path, async (req, res) => {
     try {
-      const input = api.bookings.create.input.parse(req.body);
+      const { petName, petBreed, petAge, petWeight, memo, ...rest } = req.body;
+      const input = api.bookings.create.input.parse(rest);
       
       // 시간대 중복 체크
       const bookedSlots = await storage.getBookedTimeSlots(input.shopId!, input.date);
@@ -455,7 +495,28 @@ export async function registerRoutes(
         }
       }
       
-      const booking = await storage.createBooking(input);
+      // 고객 생성 또는 업데이트
+      const { customer, isFirstVisit } = await storage.createOrUpdateCustomerFromBooking({
+        shopId: input.shopId ?? null,
+        name: input.customerName,
+        phone: input.customerPhone,
+        petName,
+        petBreed,
+        petAge,
+        petWeight,
+        memo,
+      });
+      
+      // 예약 생성
+      const booking = await storage.createBooking({
+        ...input,
+        customerId: customer.id,
+        petName,
+        petBreed,
+        memo,
+        isFirstVisit,
+      } as any);
+      
       res.status(201).json(booking);
     } catch (err) {
       if (err instanceof z.ZodError) {
@@ -507,6 +568,25 @@ export async function registerRoutes(
       return res.status(404).json({ message: "예약을 찾을 수 없습니다." });
     }
     res.json(booking);
+  });
+
+  // 리마인드 전송 표시
+  app.patch('/api/bookings/:id/remind', requireAuth, async (req, res) => {
+    const booking = await storage.updateBookingRemind(Number(req.params.id));
+    if (!booking) {
+      return res.status(404).json({ message: "예약을 찾을 수 없습니다." });
+    }
+    res.json(booking);
+  });
+
+  // 내일 예약 조회
+  app.get('/api/shop/bookings/tomorrow', requireAuth, async (req, res) => {
+    const user = req.user as any;
+    if (!user.shopId) {
+      return res.status(400).json({ message: "No shop associated" });
+    }
+    const bookings = await storage.getTomorrowBookings(user.shopId);
+    res.json(bookings);
   });
 
   // 예약 정보 수정 (날짜, 시간, 서비스)
