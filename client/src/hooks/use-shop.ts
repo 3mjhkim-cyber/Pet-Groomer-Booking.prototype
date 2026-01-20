@@ -192,3 +192,96 @@ export function useCustomerHistory(phone: string | null) {
     enabled: !!phone,
   });
 }
+
+// 예약 취소
+export function useCancelBooking() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (id: number) => {
+      const res = await fetch(`/api/bookings/${id}/cancel`, {
+        method: 'PATCH',
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error("예약 취소에 실패했습니다.");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.bookings.list.path] });
+      toast({ title: "예약 취소됨", description: "예약이 취소되었습니다." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "취소 실패", description: error.message, variant: "destructive" });
+    },
+  });
+}
+
+// 예약 정보 수정 (날짜, 시간, 서비스)
+export function useUpdateBooking() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: { date?: string; time?: string; serviceId?: number } }) => {
+      const res = await fetch(`/api/bookings/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "예약 수정에 실패했습니다.");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.bookings.list.path] });
+      toast({ title: "예약 수정됨", description: "예약 정보가 수정되었습니다." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "수정 실패", description: error.message, variant: "destructive" });
+    },
+  });
+}
+
+// 고객 정보 수정
+export function useUpdateBookingCustomer() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: { customerName?: string; customerPhone?: string } }) => {
+      const res = await fetch(`/api/bookings/${id}/customer`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error("고객 정보 수정에 실패했습니다.");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.bookings.list.path] });
+      toast({ title: "고객 정보 수정됨", description: "고객 정보가 수정되었습니다." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "수정 실패", description: error.message, variant: "destructive" });
+    },
+  });
+}
+
+// 예약 가능 시간 조회
+export function useAvailableTimeSlots(slug: string, date: string, duration: number = 60) {
+  return useQuery({
+    queryKey: ['/api/shops', slug, 'available-times', date, duration],
+    queryFn: async () => {
+      if (!slug || !date) return [];
+      const res = await fetch(`/api/shops/${slug}/available-times/${date}?duration=${duration}`);
+      if (!res.ok) throw new Error("Failed to fetch available times");
+      return res.json();
+    },
+    enabled: !!slug && !!date,
+  });
+}
