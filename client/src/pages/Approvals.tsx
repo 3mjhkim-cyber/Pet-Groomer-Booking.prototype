@@ -10,6 +10,7 @@ import { Loader2, Check, X, ArrowLeft, UserCheck, Clock, Store } from "lucide-re
 import { Link } from "wouter";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
+import { apiRequest } from "@/lib/queryClient";
 
 interface PendingUser {
   id: number;
@@ -51,10 +52,7 @@ export default function Approvals() {
   // 승인 처리
   const approveMutation = useMutation({
     mutationFn: async (userId: number) => {
-      const res = await fetch(`/api/admin/users/${userId}/approve`, {
-        method: 'PATCH',
-      });
-      if (!res.ok) throw new Error("승인 처리에 실패했습니다.");
+      const res = await apiRequest('PATCH', `/api/admin/users/${userId}/approve`);
       return res.json();
     },
     onSuccess: () => {
@@ -77,10 +75,7 @@ export default function Approvals() {
   // 거절 처리
   const rejectMutation = useMutation({
     mutationFn: async (userId: number) => {
-      const res = await fetch(`/api/admin/users/${userId}/reject`, {
-        method: 'PATCH',
-      });
-      if (!res.ok) throw new Error("거절 처리에 실패했습니다.");
+      const res = await apiRequest('PATCH', `/api/admin/users/${userId}/reject`);
       return res.json();
     },
     onSuccess: () => {

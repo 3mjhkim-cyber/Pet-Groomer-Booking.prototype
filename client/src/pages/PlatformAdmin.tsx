@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 import type { Shop } from "@shared/schema";
 
 export default function PlatformAdmin() {
@@ -21,25 +22,29 @@ export default function PlatformAdmin() {
 
   const approveMutation = useMutation({
     mutationFn: async (shopId: number) => {
-      const res = await fetch(`/api/admin/shops/${shopId}/approve`, { method: 'PATCH' });
-      if (!res.ok) throw new Error("Failed to approve shop");
+      const res = await apiRequest('PATCH', `/api/admin/shops/${shopId}/approve`);
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/shops'] });
       toast({ title: "승인 완료", description: "가맹점이 승인되었습니다." });
     },
+    onError: (error: Error) => {
+      toast({ title: "승인 실패", description: error.message, variant: "destructive" });
+    },
   });
 
   const rejectMutation = useMutation({
     mutationFn: async (shopId: number) => {
-      const res = await fetch(`/api/admin/shops/${shopId}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error("Failed to reject shop");
+      const res = await apiRequest('DELETE', `/api/admin/shops/${shopId}`);
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/shops'] });
       toast({ title: "거절 완료", description: "가맹점 승인이 취소되었습니다." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "거절 실패", description: error.message, variant: "destructive" });
     },
   });
 
