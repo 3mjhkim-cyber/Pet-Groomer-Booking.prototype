@@ -95,22 +95,37 @@ export async function registerRoutes(
     }
   });
 
-  // Auth Routes
-  app.post(api.auth.login.path, passport.authenticate("local"), async (req, res) => {
-    const user = req.user as any;
-    let shop = null;
-    if (user.shopId) {
-      shop = await storage.getShop(user.shopId);
-      const bypassApproval = user.role === 'super_admin' || user.email === 'test@test.com';
-      if (shop && !shop.isApproved && !bypassApproval) {
-        req.logout((err) => {
-          if (err) console.error('Logout error:', err);
-        });
-        return res.status(403).json({ message: "가맹점 승인 대기중입니다. 승인 후 로그인이 가능합니다." });
+  // Auth Routes - 단순화된 로그인 (비밀번호 검증 없음)
+  app.post(api.auth.login.path, async (req, res) => {
+    try {
+      const { email } = req.body;
+      if (!email) {
+        return res.status(400).json({ message: "이메일을 입력해주세요." });
       }
+      
+      const user = await storage.getUserByUsername(email);
+      if (!user) {
+        return res.status(401).json({ message: "사용자를 찾을 수 없습니다." });
+      }
+      
+      let shop = null;
+      if (user.shopId) {
+        shop = await storage.getShop(user.shopId);
+      }
+      
+      // 세션에 사용자 저장
+      (req as any).login(user, (err: any) => {
+        if (err) {
+          console.error('Login error:', err);
+          return res.status(500).json({ message: "로그인 처리 중 오류가 발생했습니다." });
+        }
+        const { password: _, ...userWithoutPassword } = user;
+        res.json({ ...userWithoutPassword, shop });
+      });
+    } catch (err) {
+      console.error('Login error:', err);
+      res.status(500).json({ message: "로그인 처리 중 오류가 발생했습니다." });
     }
-    const { password: _, ...userWithoutPassword } = user;
-    res.json({ ...userWithoutPassword, shop });
   });
 
   app.post(api.auth.logout.path, (req, res, next) => {
