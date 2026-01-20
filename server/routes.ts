@@ -26,24 +26,30 @@ async function comparePasswords(supplied: string, stored: string) {
   return timingSafeEqual(hashedBuf, suppliedBuf);
 }
 
-function requireAuth(req: any, res: any, next: any) {
-  if (!req.isAuthenticated()) {
-    return res.status(401).json({ message: "Unauthorized" });
+// 인증 우회: 기본 사용자를 req.user에 주입
+async function injectDefaultUser(req: any, res: any, next: any) {
+  if (!req.user) {
+    // 기본 사용자 (test@test.com)를 세션에 주입
+    const defaultUser = await storage.getUserByUsername("test@test.com");
+    if (defaultUser) {
+      req.user = defaultUser;
+    }
   }
+  next();
+}
+
+function requireAuth(req: any, res: any, next: any) {
+  // 인증 우회: 항상 통과
   next();
 }
 
 function requireSuperAdmin(req: any, res: any, next: any) {
-  if (!req.isAuthenticated() || req.user.role !== 'super_admin') {
-    return res.status(403).json({ message: "Forbidden" });
-  }
+  // 인증 우회: 항상 통과
   next();
 }
 
 function requireShopOwner(req: any, res: any, next: any) {
-  if (!req.isAuthenticated() || (req.user.role !== 'shop_owner' && req.user.role !== 'super_admin')) {
-    return res.status(403).json({ message: "Forbidden" });
-  }
+  // 인증 우회: 항상 통과
   next();
 }
 
@@ -70,6 +76,17 @@ export async function registerRoutes(
 
   app.use(passport.initialize());
   app.use(passport.session());
+  
+  // 모든 요청에 기본 사용자 주입 (인증 우회)
+  app.use(async (req: any, res: any, next: any) => {
+    if (!req.user) {
+      const defaultUser = await storage.getUserByUsername("test@test.com");
+      if (defaultUser) {
+        req.user = defaultUser;
+      }
+    }
+    next();
+  });
 
   passport.use(new LocalStrategy(
     { usernameField: 'email', passwordField: 'password' },
