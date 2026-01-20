@@ -53,12 +53,18 @@ export async function registerRoutes(
 ): Promise<Server> {
   const SessionStore = MemoryStore(session);
   
+  // 프록시 뒤에서 HTTPS 감지를 위해 필요
+  app.set("trust proxy", 1);
+  
   app.use(session({
     secret: process.env.SESSION_SECRET || "secret",
     resave: false,
     saveUninitialized: false,
     store: new SessionStore({ checkPeriod: 86400000 }),
-    cookie: { secure: process.env.NODE_ENV === "production" }
+    cookie: { 
+      secure: "auto" as any,
+      sameSite: "lax"
+    }
   }));
 
   app.use(passport.initialize());
