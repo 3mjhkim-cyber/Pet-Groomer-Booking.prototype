@@ -1,5 +1,5 @@
 import { useAuth } from "@/hooks/use-auth";
-import { useBookings, useServices, useApproveBooking, useRejectBooking, useRequestDeposit, useCreateBooking, useSearchCustomers, useCustomerHistory, useCancelBooking, useUpdateBooking, useUpdateBookingCustomer } from "@/hooks/use-shop";
+import { useBookings, useServices, useApproveBooking, useRejectBooking, useRequestDeposit, useAdminCreateBooking, useSearchCustomers, useCustomerHistory, useCancelBooking, useUpdateBooking, useUpdateBookingCustomer } from "@/hooks/use-shop";
 import { useLocation } from "wouter";
 import { Loader2, Calendar, Clock, User, Phone, Scissors, Check, X, Banknote, Plus, Link, Copy, History, Edit, XCircle, UserCog } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -20,7 +20,7 @@ export default function Dashboard() {
   const { mutate: approveBooking } = useApproveBooking();
   const { mutate: rejectBooking } = useRejectBooking();
   const { mutate: requestDeposit } = useRequestDeposit();
-  const { mutate: createBooking, isPending: isCreating } = useCreateBooking();
+  const { mutate: createBooking, isPending: isCreating } = useAdminCreateBooking();
   const { mutate: cancelBooking, isPending: isCancelling } = useCancelBooking();
   const { mutate: updateBooking, isPending: isUpdating } = useUpdateBooking();
   const { mutate: updateBookingCustomer, isPending: isUpdatingCustomer } = useUpdateBookingCustomer();

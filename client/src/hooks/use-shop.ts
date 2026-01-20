@@ -91,6 +91,46 @@ export function useCreateBooking() {
   });
 }
 
+// 관리자 수동 예약 추가 (리다이렉트 없음)
+export function useAdminCreateBooking() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (data: CreateBookingInput) => {
+      const validated = api.bookings.create.input.parse(data);
+      
+      const res = await fetch(api.bookings.create.path, {
+        method: api.bookings.create.method,
+        headers: { "Content-Type": "application/json" },
+        credentials: 'include',
+        body: JSON.stringify(validated),
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "예약 생성 실패");
+      }
+
+      return api.bookings.create.responses[201].parse(await res.json());
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.bookings.list.path] });
+      toast({
+        title: "예약 추가 완료",
+        description: "수동 예약이 추가되었습니다.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "예약 추가 실패",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+}
+
 export function useApproveBooking() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
