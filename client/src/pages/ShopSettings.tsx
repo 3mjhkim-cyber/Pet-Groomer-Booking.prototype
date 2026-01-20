@@ -10,6 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import type { Shop, Service } from "@shared/schema";
+import { formatKoreanPhone } from "@/lib/phone";
 
 export default function ShopSettings() {
   const { user, isLoading: isAuthLoading } = useAuth();
@@ -32,11 +33,11 @@ export default function ShopSettings() {
     phone: '',
     address: '',
     businessHours: '',
-    depositAmount: 10000,
+    depositAmount: '' as string | number,
     depositRequired: true,
   });
 
-  const [newService, setNewService] = useState({ name: '', duration: 60, price: 30000 });
+  const [newService, setNewService] = useState({ name: '', duration: '' as string | number, price: '' as string | number });
 
   useEffect(() => {
     if (shop) {
@@ -45,11 +46,18 @@ export default function ShopSettings() {
         phone: shop.phone,
         address: shop.address,
         businessHours: shop.businessHours,
-        depositAmount: shop.depositAmount,
+        depositAmount: shop.depositAmount || '',
         depositRequired: shop.depositRequired,
       });
     }
   }, [shop]);
+
+  const handleNumberInput = (value: string): string | number => {
+    if (value === '') return '';
+    const num = parseInt(value, 10);
+    if (isNaN(num) || num < 0) return '';
+    return num;
+  };
 
   const updateShopMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
@@ -157,8 +165,10 @@ export default function ShopSettings() {
                   <Label htmlFor="phone">전화번호</Label>
                   <Input 
                     id="phone" 
+                    type="tel"
                     value={formData.phone}
-                    onChange={e => setFormData(f => ({...f, phone: e.target.value}))}
+                    onChange={e => setFormData(f => ({...f, phone: formatKoreanPhone(e.target.value)}))}
+                    placeholder="010-0000-0000"
                     data-testid="input-shop-phone"
                   />
                 </div>
@@ -214,9 +224,11 @@ export default function ShopSettings() {
                   <Input 
                     id="depositAmount"
                     type="number"
+                    min="0"
                     value={formData.depositAmount}
-                    onChange={e => setFormData(f => ({...f, depositAmount: Number(e.target.value)}))}
+                    onChange={e => setFormData(f => ({...f, depositAmount: handleNumberInput(e.target.value)}))}
                     className="w-32"
+                    placeholder="금액 입력"
                     data-testid="input-deposit-amount"
                   />
                   <span className="text-muted-foreground">원</span>
@@ -246,17 +258,19 @@ export default function ShopSettings() {
               />
               <Input 
                 type="number"
+                min="0"
                 placeholder="시간(분)"
                 value={newService.duration}
-                onChange={e => setNewService(s => ({...s, duration: Number(e.target.value)}))}
+                onChange={e => setNewService(s => ({...s, duration: handleNumberInput(e.target.value)}))}
                 className="w-24"
                 data-testid="input-new-service-duration"
               />
               <Input 
                 type="number"
+                min="0"
                 placeholder="가격"
                 value={newService.price}
-                onChange={e => setNewService(s => ({...s, price: Number(e.target.value)}))}
+                onChange={e => setNewService(s => ({...s, price: handleNumberInput(e.target.value)}))}
                 className="w-28"
                 data-testid="input-new-service-price"
               />

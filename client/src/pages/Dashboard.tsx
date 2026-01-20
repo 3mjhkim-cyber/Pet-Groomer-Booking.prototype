@@ -7,6 +7,7 @@ import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import type { Customer } from "@shared/schema";
+import { formatKoreanPhone } from "@/lib/phone";
 
 export default function Dashboard() {
   const { user, isLoading: isAuthLoading } = useAuth();
@@ -182,8 +183,9 @@ export default function Dashboard() {
                   <input
                     type="tel"
                     value={manualForm.customerPhone}
-                    onChange={e => setManualForm(f => ({...f, customerPhone: e.target.value}))}
+                    onChange={e => setManualForm(f => ({...f, customerPhone: formatKoreanPhone(e.target.value)}))}
                     className="w-full px-3 py-2 border rounded-lg mt-1"
+                    placeholder="010-0000-0000"
                     required
                     data-testid="input-manual-phone"
                   />
