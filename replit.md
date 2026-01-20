@@ -74,11 +74,24 @@ shared/           # Shared between client/server
   routes.ts       # API contract definitions
 ```
 
+## Security Features
+
+### Approval Workflow
+- New shop registrations require super admin approval
+- Unapproved shops cannot log in (returns 403 with Korean message: "가맹점 승인 대기중입니다. 승인 후 로그인이 가능합니다.")
+- Super admin approves shops via Platform Admin dashboard
+
+### Data Isolation
+- Bookings filtered by shopId in dashboard
+- Services scoped to individual shops
+- Customer records isolated per shop
+
 ## Test Accounts
 
 - **Super Admin**: admin@jeongrihagae.com / admin1234
 - **Shop Owner**: test@test.com / 1234
 - **Demo Shop**: 정리하개 강남점 (slug: gangnam)
+- **Unapproved Shop**: unapproved@test.com / Test1234!@ (for testing login blocking)
 
 ## Key Pages & Routes
 
