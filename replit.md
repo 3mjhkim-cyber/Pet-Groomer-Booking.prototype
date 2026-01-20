@@ -88,10 +88,33 @@ shared/           # Shared between client/server
 
 ## Test Accounts
 
-- **Super Admin**: admin@jeongrihagae.com / admin1234
-- **Shop Owner**: test@test.com / 1234
+- **Super Admin**: admin@admin.com / admin1234
+- **Shop Owner**: test@shop.com / test1234
 - **Demo Shop**: 정리하개 강남점 (slug: gangnam)
 - **Unapproved Shop**: unapproved@test.com / Test1234!@ (for testing login blocking)
+
+## Booking Management Features
+
+### Time Slot Conflict Prevention
+- Server-side validation using `getBookedTimeSlots` API
+- Considers service duration when checking for overlaps
+- Both booking creation and updates are validated
+
+### Dashboard Features
+- **Tabs UI**: 승인 대기 (pending) / 확정된 예약 (confirmed)
+- **Real-time Updates**: 2-second polling for immediate reflection of changes
+- **Booking Actions (Pending)**: 예약금 링크, 바로 확정, 거절
+- **Booking Actions (Confirmed)**: 변경, 고객수정, 취소
+- **Manual Booking**: Shop owners can add bookings directly
+
+### Calendar Color Coding
+- **Orange**: Pending bookings
+- **Green**: Confirmed bookings
+- **Hidden**: Cancelled and rejected bookings
+
+### Public Booking Page
+- Dynamic time slot availability based on selected date and service duration
+- Unavailable times shown as disabled with strikethrough
 
 ## Key Pages & Routes
 
