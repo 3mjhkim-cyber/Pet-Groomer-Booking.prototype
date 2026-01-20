@@ -87,7 +87,7 @@ export default function ShopSettings() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/shop/services'] });
-      setNewService({ name: '', duration: 60, price: 30000 });
+      setNewService({ name: '', duration: '', price: '' });
       toast({ title: "추가 완료", description: "서비스가 추가되었습니다." });
     },
   });
@@ -121,7 +121,13 @@ export default function ShopSettings() {
   const handleAddService = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newService.name) return;
-    addServiceMutation.mutate(newService);
+    const duration = typeof newService.duration === 'string' ? parseInt(newService.duration, 10) || 0 : newService.duration;
+    const price = typeof newService.price === 'string' ? parseInt(newService.price, 10) || 0 : newService.price;
+    if (duration <= 0 || price <= 0) {
+      toast({ title: "입력 오류", description: "시간과 가격을 올바르게 입력해주세요.", variant: "destructive" });
+      return;
+    }
+    addServiceMutation.mutate({ name: newService.name, duration, price });
   };
 
   return (
