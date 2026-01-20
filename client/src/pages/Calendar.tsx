@@ -36,20 +36,23 @@ export default function Calendar() {
     return null;
   }
 
-  const events: BookingEvent[] = bookings?.map(booking => ({
-    id: String(booking.id),
-    title: `${booking.time} ${booking.customerName}`,
-    start: `${booking.date}T${booking.time}`,
-    backgroundColor: booking.status === 'confirmed' ? '#22c55e' : booking.status === 'pending' ? '#f97316' : '#ef4444',
-    borderColor: booking.status === 'confirmed' ? '#16a34a' : booking.status === 'pending' ? '#ea580c' : '#dc2626',
-    extendedProps: {
-      customerName: booking.customerName,
-      customerPhone: booking.customerPhone,
-      serviceName: booking.serviceName,
-      status: booking.status,
-      time: booking.time,
-    },
-  })) || [];
+  // cancelled, rejected 예약은 캘린더에서 숨김 (pending, confirmed만 표시)
+  const events: BookingEvent[] = bookings
+    ?.filter(booking => booking.status === 'pending' || booking.status === 'confirmed')
+    .map(booking => ({
+      id: String(booking.id),
+      title: `${booking.time} ${booking.customerName}`,
+      start: `${booking.date}T${booking.time}`,
+      backgroundColor: booking.status === 'confirmed' ? '#22c55e' : '#f97316',
+      borderColor: booking.status === 'confirmed' ? '#16a34a' : '#ea580c',
+      extendedProps: {
+        customerName: booking.customerName,
+        customerPhone: booking.customerPhone,
+        serviceName: booking.serviceName,
+        status: booking.status,
+        time: booking.time,
+      },
+    })) || [];
 
   const handleEventClick = (info: any) => {
     setSelectedEvent(info.event as unknown as BookingEvent);

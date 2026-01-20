@@ -2,14 +2,15 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Calendar as CalendarIcon, Clock, Scissors, User, Phone, CheckCircle2, Loader2, MapPin } from "lucide-react";
-import { useState } from "react";
+import { Calendar as CalendarIcon, Clock, Scissors, User, Phone, CheckCircle2, Loader2, MapPin, XCircle } from "lucide-react";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useRoute } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import type { Shop, Service } from "@shared/schema";
 import { formatKoreanPhone } from "@/lib/phone";
+import { useAvailableTimeSlots } from "@/hooks/use-shop";
 
 const bookingFormSchema = z.object({
   customerName: z.string().min(2, "이름을 2글자 이상 입력해주세요"),
@@ -77,20 +78,27 @@ export default function Booking() {
   });
 
   const [selectedService, setSelectedService] = useState<number | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string>('');
 
   const form = useForm<BookingForm>({
     resolver: zodResolver(bookingFormSchema),
   });
 
+  // 선택한 서비스의 소요시간 가져오기
+  const selectedServiceData = services?.find(s => s.id === selectedService);
+  const serviceDuration = selectedServiceData?.duration || 60;
+
+  // 예약 가능 시간대 조회
+  const { data: availableSlots, isLoading: isLoadingSlots } = useAvailableTimeSlots(
+    slug,
+    selectedDate,
+    serviceDuration
+  );
+
   const onSubmit = (data: BookingForm) => {
     if (!shop) return;
     createBookingMutation.mutate({ ...data, shopId: shop.id });
   };
-
-  const timeSlots = Array.from({ length: 9 }, (_, i) => {
-    const hour = i + 10;
-    return `${hour}:00`;
-  });
 
   if (isLoadingShop || isLoadingServices) {
     return (
@@ -208,6 +216,11 @@ export default function Booking() {
                   type="date"
                   min={new Date().toISOString().split('T')[0]}
                   {...form.register("date")}
+                  onChange={(e) => {
+                    form.setValue("date", e.target.value, { shouldValidate: true });
+                    setSelectedDate(e.target.value);
+                    form.setValue("time", ""); // 날짜 변경 시 시간 초기화
+                  }}
                   className="w-full px-4 py-3 rounded-xl border-2 border-border focus:border-primary focus:outline-none transition-colors"
                   data-testid="input-date"
                 />
@@ -217,23 +230,47 @@ export default function Booking() {
               <div className="space-y-4">
                 <label className="block font-medium text-foreground/80 mb-2 flex items-center gap-2">
                   <Clock className="w-4 h-4" /> 시간 선택
+                  {!selectedDate && <span className="text-sm text-muted-foreground">(날짜를 먼저 선택해주세요)</span>}
                 </label>
-                <div className="grid grid-cols-3 gap-3">
-                  {timeSlots.map((time) => (
-                    <label key={time} className="cursor-pointer">
-                      <input
-                        type="radio"
-                        value={time}
-                        {...form.register("time")}
-                        className="peer sr-only"
-                        data-testid={`time-${time}`}
-                      />
-                      <div className="text-center py-2 rounded-lg border border-border peer-checked:bg-primary peer-checked:text-white peer-checked:border-primary peer-hover:bg-secondary/20 transition-all">
-                        {time}
-                      </div>
-                    </label>
-                  ))}
-                </div>
+                {isLoadingSlots && selectedDate && (
+                  <div className="flex items-center justify-center py-4">
+                    <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                  </div>
+                )}
+                {selectedDate && !isLoadingSlots && (
+                  <div className="grid grid-cols-3 gap-3">
+                    {availableSlots?.map((slot: { time: string; available: boolean; reason?: string }) => (
+                      <label key={slot.time} className={cn(
+                        slot.available ? "cursor-pointer" : "cursor-not-allowed"
+                      )}>
+                        <input
+                          type="radio"
+                          value={slot.time}
+                          {...form.register("time")}
+                          disabled={!slot.available}
+                          className="peer sr-only"
+                          data-testid={`time-${slot.time}`}
+                        />
+                        <div className={cn(
+                          "text-center py-2 rounded-lg border transition-all relative",
+                          slot.available 
+                            ? "border-border peer-checked:bg-primary peer-checked:text-white peer-checked:border-primary hover:bg-secondary/20" 
+                            : "bg-muted/50 text-muted-foreground border-muted line-through"
+                        )}>
+                          {slot.time}
+                          {!slot.available && (
+                            <XCircle className="w-3 h-3 absolute top-1 right-1 text-muted-foreground" />
+                          )}
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                )}
+                {!selectedDate && (
+                  <div className="text-center py-4 text-muted-foreground bg-muted/30 rounded-lg">
+                    날짜를 선택하면 예약 가능한 시간이 표시됩니다
+                  </div>
+                )}
                 {form.formState.errors.time && <p className="text-destructive text-sm">{form.formState.errors.time.message}</p>}
               </div>
             </div>
