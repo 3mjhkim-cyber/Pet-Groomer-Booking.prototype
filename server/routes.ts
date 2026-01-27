@@ -271,12 +271,26 @@ export async function registerRoutes(
     res.json(shop);
   });
 
-  app.delete('/api/admin/shops/:id', requireSuperAdmin, async (req, res) => {
-    const shop = await storage.updateShop(Number(req.params.id), { isApproved: false });
+  // 슈퍼관리자용 가맹점 정보 수정
+  app.patch('/api/admin/shops/:id', requireSuperAdmin, async (req, res) => {
+    const { name, phone, address, businessHours, depositAmount, depositRequired, isApproved } = req.body;
+    const shop = await storage.updateShop(Number(req.params.id), {
+      name, phone, address, businessHours, depositAmount, depositRequired, isApproved
+    });
     if (!shop) {
-      return res.status(404).json({ message: "Shop not found" });
+      return res.status(404).json({ message: "가맹점을 찾을 수 없습니다." });
     }
     res.json(shop);
+  });
+
+  // 슈퍼관리자용 가맹점 완전 삭제
+  app.delete('/api/admin/shops/:id', requireSuperAdmin, async (req, res) => {
+    const shop = await storage.getShop(Number(req.params.id));
+    if (!shop) {
+      return res.status(404).json({ message: "가맹점을 찾을 수 없습니다." });
+    }
+    await storage.deleteShop(Number(req.params.id));
+    res.json({ message: "가맹점이 삭제되었습니다.", shop });
   });
 
   // 계정 승인 관리 API (Super Admin 전용)
