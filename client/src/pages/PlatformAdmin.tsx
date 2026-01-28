@@ -55,12 +55,12 @@ export default function PlatformAdmin() {
 
   const rejectMutation = useMutation({
     mutationFn: async (shopId: number) => {
-      const res = await apiRequest('PATCH', `/api/admin/shops/${shopId}`, { isApproved: false });
+      const res = await apiRequest('DELETE', `/api/admin/shops/${shopId}`);
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/shops'] });
-      toast({ title: "거절 완료", description: "가맹점 승인이 취소되었습니다." });
+      toast({ title: "거절 완료", description: "가맹점이 삭제되었습니다." });
     },
     onError: (error: Error) => {
       toast({ title: "거절 실패", description: error.message, variant: "destructive" });
