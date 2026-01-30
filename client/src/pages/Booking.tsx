@@ -2,7 +2,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Calendar as CalendarIcon, Clock, Scissors, User, Phone, CheckCircle2, Loader2, MapPin, XCircle, PawPrint, Info, FileText, CalendarX } from "lucide-react";
+import { Calendar as CalendarIcon, Clock, Scissors, User, Phone, CheckCircle2, Loader2, MapPin, XCircle, PawPrint, Info, FileText } from "lucide-react";
 import { useState, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -137,13 +137,6 @@ export default function Booking() {
       shopData.businessDays
     );
   }, [shop]);
-
-  // 선택한 날짜가 휴무일인지 확인
-  const selectedDateClosedStatus = useMemo(() => {
-    if (!selectedDate || !shop) return { isClosed: false, reason: '' };
-    const shopData = shop as Shop & { closedDates?: string | null; businessDays?: string | null };
-    return checkClosedStatus(selectedDate, shopData.closedDates, shopData.businessDays);
-  }, [selectedDate, shop]);
 
   // 영업요일 포맷팅
   const formattedBusinessDays = useMemo(() => {
@@ -313,30 +306,36 @@ export default function Booking() {
                   min={new Date().toISOString().split('T')[0]}
                   {...form.register("date")}
                   onChange={(e) => {
-                    form.setValue("date", e.target.value, { shouldValidate: true });
-                    setSelectedDate(e.target.value);
+                    const newDate = e.target.value;
+                    if (!newDate) {
+                      setSelectedDate('');
+                      form.setValue("date", '', { shouldValidate: true });
+                      return;
+                    }
+                    
+                    // 휴무일 체크
+                    const shopData = shop as Shop & { closedDates?: string | null; businessDays?: string | null };
+                    const closedCheck = checkClosedStatus(newDate, shopData?.closedDates, shopData?.businessDays);
+                    
+                    if (closedCheck.isClosed) {
+                      // 휴무일 선택 시 경고 토스트 표시하고 선택 초기화
+                      toast({
+                        title: "휴무일입니다",
+                        description: `${closedCheck.reason} - 다른 날짜를 선택해주세요.`,
+                        variant: "destructive",
+                      });
+                      e.target.value = selectedDate || ''; // 이전 값으로 되돌림
+                      return;
+                    }
+                    
+                    form.setValue("date", newDate, { shouldValidate: true });
+                    setSelectedDate(newDate);
                     form.setValue("time", ""); // 날짜 변경 시 시간 초기화
                   }}
-                  className={cn(
-                    "w-full px-4 py-3 rounded-xl border-2 focus:outline-none transition-colors",
-                    selectedDateClosedStatus.isClosed
-                      ? "border-amber-400 bg-amber-50"
-                      : "border-border focus:border-primary"
-                  )}
+                  className="w-full px-4 py-3 rounded-xl border-2 border-border focus:border-primary focus:outline-none transition-colors"
                   data-testid="input-date"
                 />
                 {form.formState.errors.date && <p className="text-destructive text-sm">{form.formState.errors.date.message}</p>}
-                
-                {/* 휴무일 경고 메시지 */}
-                {selectedDateClosedStatus.isClosed && (
-                  <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800">
-                    <CalendarX className="w-5 h-5 text-amber-500 flex-shrink-0" />
-                    <div>
-                      <p className="font-medium">휴무일입니다</p>
-                      <p className="text-sm text-amber-600">{selectedDateClosedStatus.reason} - 다른 날짜를 선택해주세요</p>
-                    </div>
-                  </div>
-                )}
                 
                 {/* 휴무일 안내 */}
                 {closedDatesList.length > 0 && (
