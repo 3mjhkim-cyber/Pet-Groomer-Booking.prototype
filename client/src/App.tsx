@@ -15,6 +15,7 @@ import Deposit from "@/pages/Deposit";
 import PlatformAdmin from "@/pages/PlatformAdmin";
 import ShopSettings from "@/pages/ShopSettings";
 import Approvals from "@/pages/Approvals";
+import Revenue from "@/pages/Revenue";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -31,6 +32,7 @@ function Router() {
           <Route path="/admin/customers" component={Customers} />
           <Route path="/admin/calendar" component={Calendar} />
           <Route path="/admin/settings" component={ShopSettings} />
+          <Route path="/admin/revenue" component={Revenue} />
           <Route path="/admin/platform" component={PlatformAdmin} />
           <Route path="/admin/approvals" component={Approvals} />
           <Route path="/deposit/:id" component={Deposit} />

@@ -1,6 +1,6 @@
 import { users, services, bookings, customers, shops, type User, type InsertUser, type Service, type InsertService, type Booking, type InsertBooking, type Customer, type InsertCustomer, type Shop, type InsertShop } from "@shared/schema";
 import { db } from "./db";
-import { eq, ilike, or, desc, and, count } from "drizzle-orm";
+import { eq, ilike, or, desc, and, count, gte, lte, sql } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
@@ -46,6 +46,16 @@ export interface IStorage {
   requestDeposit(id: number): Promise<Booking | undefined>;
   confirmDeposit(id: number): Promise<Booking | undefined>;
   getTomorrowBookings(shopId: number): Promise<(Booking & { serviceName: string })[]>;
+
+  // Revenue stats
+  getRevenueStats(shopId: number, startDate: string, endDate: string): Promise<{
+    totalRevenue: number;
+    bookingCount: number;
+    byService: { serviceName: string; revenue: number; count: number }[];
+    byDate: { date: string; revenue: number; count: number }[];
+    byHour: { hour: number; revenue: number; count: number }[];
+    byDayOfWeek: { dayOfWeek: number; revenue: number; count: number }[];
+  }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -482,6 +492,101 @@ export class DatabaseStorage implements IStorage {
         )
       )
       .orderBy(bookings.time);
+  }
+
+  async getRevenueStats(shopId: number, startDate: string, endDate: string): Promise<{
+    totalRevenue: number;
+    bookingCount: number;
+    byService: { serviceName: string; revenue: number; count: number }[];
+    byDate: { date: string; revenue: number; count: number }[];
+    byHour: { hour: number; revenue: number; count: number }[];
+    byDayOfWeek: { dayOfWeek: number; revenue: number; count: number }[];
+  }> {
+    // 확정된 예약만 조회 (confirmed 상태)
+    const confirmedBookings = await db.select({
+      date: bookings.date,
+      time: bookings.time,
+      serviceName: services.name,
+      price: services.price,
+    })
+    .from(bookings)
+    .innerJoin(services, eq(bookings.serviceId, services.id))
+    .where(
+      and(
+        eq(bookings.shopId, shopId),
+        eq(bookings.status, 'confirmed'),
+        gte(bookings.date, startDate),
+        lte(bookings.date, endDate)
+      )
+    );
+
+    // 총 매출 및 예약 수
+    const totalRevenue = confirmedBookings.reduce((sum, b) => sum + (b.price || 0), 0);
+    const bookingCount = confirmedBookings.length;
+
+    // 서비스별 매출
+    const serviceMap = new Map<string, { revenue: number; count: number }>();
+    confirmedBookings.forEach(b => {
+      const current = serviceMap.get(b.serviceName) || { revenue: 0, count: 0 };
+      serviceMap.set(b.serviceName, {
+        revenue: current.revenue + (b.price || 0),
+        count: current.count + 1,
+      });
+    });
+    const byService = Array.from(serviceMap.entries()).map(([serviceName, data]) => ({
+      serviceName,
+      ...data,
+    }));
+
+    // 날짜별 매출
+    const dateMap = new Map<string, { revenue: number; count: number }>();
+    confirmedBookings.forEach(b => {
+      const current = dateMap.get(b.date) || { revenue: 0, count: 0 };
+      dateMap.set(b.date, {
+        revenue: current.revenue + (b.price || 0),
+        count: current.count + 1,
+      });
+    });
+    const byDate = Array.from(dateMap.entries())
+      .map(([date, data]) => ({ date, ...data }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    // 시간대별 매출
+    const hourMap = new Map<number, { revenue: number; count: number }>();
+    confirmedBookings.forEach(b => {
+      const hour = parseInt(b.time.split(':')[0]);
+      const current = hourMap.get(hour) || { revenue: 0, count: 0 };
+      hourMap.set(hour, {
+        revenue: current.revenue + (b.price || 0),
+        count: current.count + 1,
+      });
+    });
+    const byHour = Array.from(hourMap.entries())
+      .map(([hour, data]) => ({ hour, ...data }))
+      .sort((a, b) => a.hour - b.hour);
+
+    // 요일별 매출 (0: 일요일, 6: 토요일)
+    const dayMap = new Map<number, { revenue: number; count: number }>();
+    confirmedBookings.forEach(b => {
+      const dayOfWeek = new Date(b.date).getDay();
+      const current = dayMap.get(dayOfWeek) || { revenue: 0, count: 0 };
+      dayMap.set(dayOfWeek, {
+        revenue: current.revenue + (b.price || 0),
+        count: current.count + 1,
+      });
+    });
+    const byDayOfWeek = Array.from(dayMap.entries())
+      .map(([dayOfWeek, data]) => ({ dayOfWeek, ...data }))
+      .sort((a, b) => a.dayOfWeek - b.dayOfWeek);
+
+    return {
+      totalRevenue,
+      bookingCount,
+      byService,
+      byDate,
+      byHour,
+      byDayOfWeek,
+    };
   }
 }
 

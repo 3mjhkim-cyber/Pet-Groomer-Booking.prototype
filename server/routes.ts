@@ -719,6 +719,28 @@ export async function registerRoutes(
     res.json(availableSlots);
   });
 
+  // Revenue Stats API (Shop Owner only)
+  app.get('/api/revenue/stats', requireShopOwner, async (req, res) => {
+    const user = req.user as any;
+    if (!user.shopId) {
+      return res.status(400).json({ message: "No shop associated" });
+    }
+
+    const { startDate, endDate } = req.query;
+
+    if (!startDate || !endDate) {
+      return res.status(400).json({ message: "startDate and endDate are required" });
+    }
+
+    const stats = await storage.getRevenueStats(
+      user.shopId,
+      startDate as string,
+      endDate as string
+    );
+
+    res.json(stats);
+  });
+
   // Seed Data - Super Admin
   if (await storage.getUserByUsername("admin@admin.com") === undefined) {
     const hashedPassword = await hashPassword("admin1234");
