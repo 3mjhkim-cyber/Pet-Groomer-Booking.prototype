@@ -9,6 +9,12 @@ export const shops = pgTable("shops", {
   phone: text("phone").notNull(),
   address: text("address").notNull(),
   businessHours: text("business_hours").default("09:00-18:00").notNull(),
+  // 요일별 영업시간 (JSON): {"mon": {"open": "09:00", "close": "18:00", "closed": false}, ...}
+  businessDays: text("business_days"),
+  // 임시 휴무일 (JSON 배열): ["2025-01-01", "2025-01-27", ...]
+  closedDates: text("closed_dates"),
+  // 가게 소개/메모 (주차 안내, 공지사항 등)
+  shopMemo: text("shop_memo"),
   depositAmount: integer("deposit_amount").default(10000).notNull(),
   depositRequired: boolean("deposit_required").default(true).notNull(),
   isApproved: boolean("is_approved").default(false).notNull(),

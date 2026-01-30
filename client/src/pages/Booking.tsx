@@ -193,8 +193,21 @@ export default function Booking() {
       </div>
 
       <div className="container mx-auto px-4 max-w-4xl py-8">
+        {/* 가게 안내 메모 */}
+        {(shop as any).shopMemo && (
+          <div className="mb-8 p-4 bg-blue-50 border border-blue-200 rounded-2xl">
+            <div className="flex items-start gap-2">
+              <Info className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="font-medium text-blue-800 mb-1">가게 안내</p>
+                <p className="text-sm text-blue-700 whitespace-pre-line">{(shop as any).shopMemo}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-12">
-          
+
           <section>
             <div className="flex items-center gap-3 mb-6">
               <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-xl">1</div>
@@ -274,7 +287,14 @@ export default function Booking() {
                     <Loader2 className="w-6 h-6 animate-spin text-primary" />
                   </div>
                 )}
-                {selectedDate && !isLoadingSlots && (
+                {selectedDate && !isLoadingSlots && availableSlots?.[0]?.closed ? (
+                  <div className="text-center py-6 bg-amber-50 border border-amber-200 rounded-lg">
+                    <XCircle className="w-8 h-8 text-amber-500 mx-auto mb-2" />
+                    <p className="font-medium text-amber-800">휴무일입니다</p>
+                    <p className="text-sm text-amber-600 mt-1">{availableSlots[0].reason}</p>
+                    <p className="text-sm text-muted-foreground mt-2">다른 날짜를 선택해주세요</p>
+                  </div>
+                ) : selectedDate && !isLoadingSlots && (
                   <div className="grid grid-cols-3 gap-3">
                     {availableSlots?.map((slot: { time: string; available: boolean; reason?: string }) => (
                       <label key={slot.time} className={cn(
@@ -290,8 +310,8 @@ export default function Booking() {
                         />
                         <div className={cn(
                           "text-center py-2 rounded-lg border transition-all relative",
-                          slot.available 
-                            ? "border-border peer-checked:bg-primary peer-checked:text-white peer-checked:border-primary hover:bg-secondary/20" 
+                          slot.available
+                            ? "border-border peer-checked:bg-primary peer-checked:text-white peer-checked:border-primary hover:bg-secondary/20"
                             : "bg-muted/50 text-muted-foreground border-muted line-through"
                         )}>
                           {slot.time}

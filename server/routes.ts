@@ -325,9 +325,9 @@ export async function registerRoutes(
     if (!user.shopId) {
       return res.status(400).json({ message: "No shop associated" });
     }
-    const { name, phone, address, businessHours, depositAmount, depositRequired } = req.body;
+    const { name, phone, address, businessHours, depositAmount, depositRequired, businessDays, closedDates, shopMemo } = req.body;
     const shop = await storage.updateShop(user.shopId, {
-      name, phone, address, businessHours, depositAmount, depositRequired
+      name, phone, address, businessHours, depositAmount, depositRequired, businessDays, closedDates, shopMemo
     });
     res.json(shop);
   });
@@ -345,6 +345,9 @@ export async function registerRoutes(
       phone: shop.phone,
       address: shop.address,
       businessHours: shop.businessHours,
+      businessDays: shop.businessDays,
+      closedDates: shop.closedDates,
+      shopMemo: shop.shopMemo,
       depositAmount: shop.depositAmount,
       depositRequired: shop.depositRequired,
     });
@@ -675,50 +678,92 @@ export async function registerRoutes(
     if (!shop || !shop.isApproved) {
       return res.status(404).json({ message: "가맹점을 찾을 수 없습니다." });
     }
-    
+
     const { date } = req.params;
     const serviceDuration = parseInt(req.query.duration as string) || 60;
-    
-    // 영업시간 파싱 (예: "09:00-18:00")
-    const [startTime, endTime] = shop.businessHours.split('-');
-    const startHour = parseInt(startTime.split(':')[0]);
-    const endHour = parseInt(endTime.split(':')[0]);
-    
+
+    // 임시 휴무일 체크
+    if (shop.closedDates) {
+      try {
+        const closedDates = JSON.parse(shop.closedDates);
+        if (Array.isArray(closedDates) && closedDates.includes(date)) {
+          return res.json([{ time: '휴무일', available: false, reason: '임시 휴무일입니다', closed: true }]);
+        }
+      } catch {}
+    }
+
+    // 요일별 영업시간 확인
+    const dayOfWeek = new Date(date).getDay();
+    const dayKeys = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+    const dayKey = dayKeys[dayOfWeek];
+
+    let startHour = 9;
+    let startMinute = 0;
+    let endHour = 18;
+    let endMinute = 0;
+
+    // 요일별 영업시간이 설정되어 있으면 사용
+    if (shop.businessDays) {
+      try {
+        const businessDays = JSON.parse(shop.businessDays);
+        const daySchedule = businessDays[dayKey];
+        if (daySchedule) {
+          if (daySchedule.closed) {
+            return res.json([{ time: '휴무일', available: false, reason: '정기 휴무일입니다', closed: true }]);
+          }
+          const [openHour, openMin] = daySchedule.open.split(':').map(Number);
+          const [closeHour, closeMin] = daySchedule.close.split(':').map(Number);
+          startHour = openHour;
+          startMinute = openMin || 0;
+          endHour = closeHour;
+          endMinute = closeMin || 0;
+        }
+      } catch {}
+    } else {
+      // 기본 영업시간 파싱 (예: "09:00-18:00")
+      const [startTime, endTime] = shop.businessHours.split('-');
+      startHour = parseInt(startTime.split(':')[0]);
+      endHour = parseInt(endTime.split(':')[0]);
+    }
+
     // 30분 단위로 시간대 생성
     const allSlots: string[] = [];
-    for (let hour = startHour; hour < endHour; hour++) {
-      allSlots.push(`${hour.toString().padStart(2, '0')}:00`);
-      allSlots.push(`${hour.toString().padStart(2, '0')}:30`);
+    const startMinutes = startHour * 60 + startMinute;
+    const endMinutes = endHour * 60 + endMinute;
+
+    for (let minutes = startMinutes; minutes < endMinutes; minutes += 30) {
+      const hour = Math.floor(minutes / 60);
+      const min = minutes % 60;
+      allSlots.push(`${hour.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}`);
     }
-    
+
     // 해당 날짜의 예약된 시간대 조회
     const bookedSlots = await storage.getBookedTimeSlots(shop.id, date);
-    
+
     // 각 시간대에 대해 가능 여부 확인
     const availableSlots = allSlots.map(slot => {
       const slotMinutes = parseInt(slot.split(':')[0]) * 60 + parseInt(slot.split(':')[1]);
       const slotEndMinutes = slotMinutes + serviceDuration;
-      
+
       // 영업종료 시간 이후면 불가
-      const endMinutes = endHour * 60;
       if (slotEndMinutes > endMinutes) {
         return { time: slot, available: false, reason: '영업시간 초과' };
       }
-      
+
       // 예약된 시간대와 충돌 여부 확인
       for (const booked of bookedSlots) {
         const bookedMinutes = parseInt(booked.time.split(':')[0]) * 60 + parseInt(booked.time.split(':')[1]);
         const bookedEndMinutes = bookedMinutes + booked.duration;
-        
+
         // 시간대가 겹치는지 확인
         if (slotMinutes < bookedEndMinutes && slotEndMinutes > bookedMinutes) {
           return { time: slot, available: false, reason: '예약 불가' };
         }
       }
-      
+
       return { time: slot, available: true };
     });
-    
+
     res.json(availableSlots);
   });
 
