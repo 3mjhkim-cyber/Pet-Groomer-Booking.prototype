@@ -8,6 +8,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import type { Customer, Booking } from "@shared/schema";
 import { formatKoreanPhone } from "@/lib/phone";
 import { useQueryClient, useMutation, useQuery } from "@tanstack/react-query";
@@ -58,6 +60,7 @@ export default function Dashboard() {
 
   // 확정 예약 날짜 필터 상태
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
 
   const { data: searchResults } = useSearchCustomers(searchQuery);
   const { data: customerHistoryData } = useCustomerHistory(selectedCustomerPhone);
@@ -79,7 +82,7 @@ export default function Dashboard() {
   });
 
   // 다이얼로그가 열려있는지 확인
-  const isAnyDialogOpen = isHistoryDialogOpen || isCustomerDetailOpen || !!remindBooking || !!editBooking || !!editCustomerBooking || !!cancelConfirmBooking || isManualDialogOpen;
+  const isAnyDialogOpen = isHistoryDialogOpen || isCustomerDetailOpen || !!remindBooking || !!editBooking || !!editCustomerBooking || !!cancelConfirmBooking || isManualDialogOpen || isCalendarOpen;
   
   // 실시간 업데이트: 2초마다 예약 데이터 갱신 (다이얼로그가 열려있으면 일시 중지)
   useEffect(() => {
@@ -666,15 +669,50 @@ export default function Dashboard() {
                 >
                   <ChevronLeft className="w-5 h-5" />
                 </Button>
-                <div className="flex items-center gap-2 min-w-[180px] justify-center">
-                  <Calendar className="w-5 h-5 text-primary" />
-                  <span className="text-lg font-semibold">
-                    {format(selectedDate, 'yyyy-MM-dd (EEE)', { locale: ko })}
-                  </span>
-                  {isSameDay(selectedDate, new Date()) && (
-                    <Badge variant="secondary" className="text-xs">오늘</Badge>
-                  )}
-                </div>
+
+                <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+                  <PopoverTrigger asChild>
+                    <button
+                      className="flex items-center gap-2 min-w-[180px] justify-center px-3 py-2 rounded-lg hover:bg-secondary/50 transition-colors cursor-pointer"
+                      data-testid="button-open-calendar"
+                    >
+                      <Calendar className="w-5 h-5 text-primary" />
+                      <span className="text-lg font-semibold">
+                        {format(selectedDate, 'yyyy-MM-dd (EEE)', { locale: ko })}
+                      </span>
+                      {isSameDay(selectedDate, new Date()) && (
+                        <Badge variant="secondary" className="text-xs">오늘</Badge>
+                      )}
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="center">
+                    <CalendarPicker
+                      mode="single"
+                      selected={selectedDate}
+                      onSelect={(date) => {
+                        if (date) {
+                          setSelectedDate(date);
+                          setIsCalendarOpen(false);
+                        }
+                      }}
+                      locale={ko}
+                      initialFocus
+                    />
+                    <div className="p-2 border-t flex justify-center">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedDate(new Date());
+                          setIsCalendarOpen(false);
+                        }}
+                      >
+                        오늘로 이동
+                      </Button>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+
                 <Button
                   variant="ghost"
                   size="icon"
