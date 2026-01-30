@@ -1,7 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery } from "@tanstack/react-query";
-import { Scissors, User, LogOut, LayoutDashboard, Users, CalendarDays, Bell, Settings, Shield } from "lucide-react";
+import { Scissors, User, LogOut, LayoutDashboard, Users, CalendarDays, Bell, Settings, Shield, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 
@@ -93,12 +93,23 @@ export function Navbar() {
                   <Link href="/admin/calendar">
                     <button className={cn(
                       "flex items-center gap-2 px-3 py-2 rounded-full font-medium transition-all",
-                      location === "/admin/calendar" 
-                        ? "bg-secondary text-secondary-foreground" 
+                      location === "/admin/calendar"
+                        ? "bg-secondary text-secondary-foreground"
                         : "text-foreground/70 hover:bg-secondary/30"
                     )} data-testid="link-calendar">
                       <CalendarDays className="h-4 w-4" />
                       <span className="hidden sm:inline">캘린더</span>
+                    </button>
+                  </Link>
+                  <Link href="/admin/revenue">
+                    <button className={cn(
+                      "flex items-center gap-2 px-3 py-2 rounded-full font-medium transition-all",
+                      location === "/admin/revenue"
+                        ? "bg-secondary text-secondary-foreground"
+                        : "text-foreground/70 hover:bg-secondary/30"
+                    )} data-testid="link-revenue">
+                      <TrendingUp className="h-4 w-4" />
+                      <span className="hidden sm:inline">매출</span>
                     </button>
                   </Link>
                   <Link href="/admin/settings">
