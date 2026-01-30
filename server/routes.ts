@@ -460,6 +460,8 @@ export async function registerRoutes(
   // Bookings (shop-scoped)
   app.get(api.bookings.list.path, requireAuth, async (req, res) => {
     const user = req.user as any;
+    // 지난 예약들 자동으로 방문 완료 처리 (방문 횟수 증가)
+    await storage.processCompletedBookings(user.shopId);
     const bookings = await storage.getBookings(user.shopId);
     res.json(bookings);
   });

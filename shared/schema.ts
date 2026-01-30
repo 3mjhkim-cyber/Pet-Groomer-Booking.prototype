@@ -75,6 +75,7 @@ export const bookings = pgTable("bookings", {
   isFirstVisit: boolean("is_first_visit").default(false).notNull(),
   remindSent: boolean("remind_sent").default(false).notNull(),
   remindSentAt: timestamp("remind_sent_at"),
+  visitCompleted: boolean("visit_completed").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -83,7 +84,7 @@ export const insertShopSchema = createInsertSchema(shops).omit({ id: true, creat
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
 export const insertCustomerSchema = createInsertSchema(customers).omit({ id: true, visitCount: true, lastVisit: true, firstVisitDate: true, createdAt: true, updatedAt: true });
 export const insertServiceSchema = createInsertSchema(services).omit({ id: true, isActive: true });
-export const insertBookingSchema = createInsertSchema(bookings).omit({ id: true, status: true, depositStatus: true, depositDeadline: true, isFirstVisit: true, remindSent: true, remindSentAt: true, createdAt: true, updatedAt: true });
+export const insertBookingSchema = createInsertSchema(bookings).omit({ id: true, status: true, depositStatus: true, depositDeadline: true, isFirstVisit: true, remindSent: true, remindSentAt: true, visitCompleted: true, createdAt: true, updatedAt: true });
 
 export type Shop = typeof shops.$inferSelect;
 export type InsertShop = z.infer<typeof insertShopSchema>;
