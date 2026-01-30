@@ -46,6 +46,8 @@ export interface IStorage {
   requestDeposit(id: number): Promise<Booking | undefined>;
   confirmDeposit(id: number): Promise<Booking | undefined>;
   getTomorrowBookings(shopId: number): Promise<(Booking & { serviceName: string })[]>;
+  completeBookingVisit(bookingId: number): Promise<Booking | undefined>;
+  processCompletedBookings(shopId?: number | null): Promise<number>;
 
   // Revenue stats
   getRevenueStats(shopId: number, startDate: string, endDate: string): Promise<{
@@ -231,13 +233,14 @@ export class DatabaseStorage implements IStorage {
       isFirstVisit: bookings.isFirstVisit,
       remindSent: bookings.remindSent,
       remindSentAt: bookings.remindSentAt,
+      visitCompleted: bookings.visitCompleted,
       createdAt: bookings.createdAt,
       updatedAt: bookings.updatedAt,
       serviceName: services.name,
     })
     .from(bookings)
     .innerJoin(services, eq(bookings.serviceId, services.id))
-    .where(shopId 
+    .where(shopId
       ? and(eq(bookings.customerPhone, phone), eq(bookings.shopId, shopId))
       : eq(bookings.customerPhone, phone)
     )
@@ -270,12 +273,13 @@ export class DatabaseStorage implements IStorage {
 
   async createOrUpdateCustomerFromBooking(data: { shopId: number | null; name: string; phone: string; petName?: string; petBreed?: string; petAge?: string; petWeight?: string; memo?: string }): Promise<{ customer: Customer; isFirstVisit: boolean }> {
     const existingCustomer = await this.getCustomerByPhone(data.phone, data.shopId);
-    
+
     if (existingCustomer) {
-      const updatedMemo = data.memo 
+      const updatedMemo = data.memo
         ? (existingCustomer.memo ? `${existingCustomer.memo}\n• ${data.memo} (${new Date().toISOString().split('T')[0]})` : `• ${data.memo} (${new Date().toISOString().split('T')[0]})`)
         : existingCustomer.memo;
-      
+
+      // 예약 생성 시에는 visitCount를 증가시키지 않음 - 예약 시간이 지난 후에만 증가
       const [customer] = await db.update(customers)
         .set({
           name: data.name,
@@ -284,15 +288,14 @@ export class DatabaseStorage implements IStorage {
           petAge: data.petAge || existingCustomer.petAge,
           petWeight: data.petWeight || existingCustomer.petWeight,
           memo: updatedMemo,
-          visitCount: existingCustomer.visitCount + 1,
-          lastVisit: new Date(),
           updatedAt: new Date(),
         })
         .where(eq(customers.id, existingCustomer.id))
         .returning();
-      
+
       return { customer, isFirstVisit: false };
     } else {
+      // 새 고객 생성 - visitCount는 0으로 시작 (예약 시간이 지난 후에 증가)
       const [customer] = await db.insert(customers).values({
         shopId: data.shopId,
         name: data.name,
@@ -303,12 +306,77 @@ export class DatabaseStorage implements IStorage {
         petWeight: data.petWeight,
         memo: data.memo ? `• ${data.memo} (${new Date().toISOString().split('T')[0]})` : null,
         firstVisitDate: new Date(),
-        visitCount: 1,
-        lastVisit: new Date(),
+        visitCount: 0,
       }).returning();
-      
+
       return { customer, isFirstVisit: true };
     }
+  }
+
+  // 예약 시간이 지난 후 방문 완료 처리
+  async completeBookingVisit(bookingId: number): Promise<Booking | undefined> {
+    const booking = await this.getBooking(bookingId);
+    if (!booking || booking.visitCompleted || booking.status !== 'confirmed') {
+      return undefined;
+    }
+
+    // 고객 방문 횟수 증가
+    if (booking.customerId) {
+      const customer = await this.getCustomer(booking.customerId);
+      if (customer) {
+        await db.update(customers)
+          .set({
+            visitCount: customer.visitCount + 1,
+            lastVisit: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(eq(customers.id, customer.id));
+      }
+    }
+
+    // 예약에 방문 완료 표시
+    const [updated] = await db.update(bookings)
+      .set({ visitCompleted: true, updatedAt: new Date() })
+      .where(eq(bookings.id, bookingId))
+      .returning();
+
+    return updated;
+  }
+
+  // 지난 예약들 자동 방문 완료 처리
+  async processCompletedBookings(shopId?: number | null): Promise<number> {
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+    const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+
+    // 확정된 예약 중 시간이 지났고 아직 방문 완료 처리 안된 것들
+    const conditions = [
+      eq(bookings.status, 'confirmed'),
+      eq(bookings.visitCompleted, false),
+    ];
+
+    if (shopId) {
+      conditions.push(eq(bookings.shopId, shopId));
+    }
+
+    const pendingBookings = await db.select()
+      .from(bookings)
+      .where(and(...conditions));
+
+    let completedCount = 0;
+
+    for (const booking of pendingBookings) {
+      // 날짜가 오늘 이전이거나, 오늘인데 시간이 지난 경우
+      const isPast = booking.date < todayStr ||
+        (booking.date === todayStr && booking.time < currentTime);
+
+      if (isPast) {
+        await this.completeBookingVisit(booking.id);
+        completedCount++;
+      }
+    }
+
+    return completedCount;
   }
 
   async getBookings(shopId?: number | null): Promise<(Booking & { serviceName: string })[]> {
@@ -330,6 +398,7 @@ export class DatabaseStorage implements IStorage {
       isFirstVisit: bookings.isFirstVisit,
       remindSent: bookings.remindSent,
       remindSentAt: bookings.remindSentAt,
+      visitCompleted: bookings.visitCompleted,
       createdAt: bookings.createdAt,
       updatedAt: bookings.updatedAt,
       serviceName: services.name,
@@ -366,6 +435,7 @@ export class DatabaseStorage implements IStorage {
       isFirstVisit: bookings.isFirstVisit,
       remindSent: bookings.remindSent,
       remindSentAt: bookings.remindSentAt,
+      visitCompleted: bookings.visitCompleted,
       createdAt: bookings.createdAt,
       updatedAt: bookings.updatedAt,
       serviceName: services.name,
@@ -373,7 +443,7 @@ export class DatabaseStorage implements IStorage {
     .from(bookings)
     .innerJoin(services, eq(bookings.serviceId, services.id))
     .where(eq(bookings.id, id));
-    
+
     return result;
   }
 
@@ -400,8 +470,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateBooking(id: number, data: { date?: string; time?: string; serviceId?: number }): Promise<Booking | undefined> {
+    // 날짜나 시간이 변경되면 visitCompleted를 false로 리셋 (새 시간에 맞춰 다시 처리)
+    const updateData: any = { ...data };
+    if (data.date || data.time) {
+      updateData.visitCompleted = false;
+    }
     const [booking] = await db.update(bookings)
-      .set(data)
+      .set(updateData)
       .where(eq(bookings.id, id))
       .returning();
     return booking;
@@ -420,11 +495,7 @@ export class DatabaseStorage implements IStorage {
       .set({ status })
       .where(eq(bookings.id, id))
       .returning();
-    
-    if (booking && status === 'confirmed') {
-      await this.incrementVisitCount(booking.customerPhone, booking.shopId);
-    }
-    
+    // 방문 횟수는 예약 시간이 지난 후에만 증가 (processCompletedBookings에서 처리)
     return booking;
   }
 
@@ -457,7 +528,7 @@ export class DatabaseStorage implements IStorage {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     const tomorrowStr = tomorrow.toISOString().split('T')[0];
-    
+
     const baseSelect = {
       id: bookings.id,
       shopId: bookings.shopId,
@@ -476,6 +547,7 @@ export class DatabaseStorage implements IStorage {
       isFirstVisit: bookings.isFirstVisit,
       remindSent: bookings.remindSent,
       remindSentAt: bookings.remindSentAt,
+      visitCompleted: bookings.visitCompleted,
       createdAt: bookings.createdAt,
       updatedAt: bookings.updatedAt,
       serviceName: services.name,

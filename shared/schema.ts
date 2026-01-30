@@ -9,6 +9,12 @@ export const shops = pgTable("shops", {
   phone: text("phone").notNull(),
   address: text("address").notNull(),
   businessHours: text("business_hours").default("09:00-18:00").notNull(),
+  // 요일별 영업시간 (JSON): {"mon": {"open": "09:00", "close": "18:00", "closed": false}, ...}
+  businessDays: text("business_days"),
+  // 임시 휴무일 (JSON 배열): ["2025-01-01", "2025-01-27", ...]
+  closedDates: text("closed_dates"),
+  // 가게 소개/메모 (주차 안내, 공지사항 등)
+  shopMemo: text("shop_memo"),
   depositAmount: integer("deposit_amount").default(10000).notNull(),
   depositRequired: boolean("deposit_required").default(true).notNull(),
   isApproved: boolean("is_approved").default(false).notNull(),
@@ -75,6 +81,7 @@ export const bookings = pgTable("bookings", {
   isFirstVisit: boolean("is_first_visit").default(false).notNull(),
   remindSent: boolean("remind_sent").default(false).notNull(),
   remindSentAt: timestamp("remind_sent_at"),
+  visitCompleted: boolean("visit_completed").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -83,7 +90,7 @@ export const insertShopSchema = createInsertSchema(shops).omit({ id: true, creat
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
 export const insertCustomerSchema = createInsertSchema(customers).omit({ id: true, visitCount: true, lastVisit: true, firstVisitDate: true, createdAt: true, updatedAt: true });
 export const insertServiceSchema = createInsertSchema(services).omit({ id: true, isActive: true });
-export const insertBookingSchema = createInsertSchema(bookings).omit({ id: true, status: true, depositStatus: true, depositDeadline: true, isFirstVisit: true, remindSent: true, remindSentAt: true, createdAt: true, updatedAt: true });
+export const insertBookingSchema = createInsertSchema(bookings).omit({ id: true, status: true, depositStatus: true, depositDeadline: true, isFirstVisit: true, remindSent: true, remindSentAt: true, visitCompleted: true, createdAt: true, updatedAt: true });
 
 export type Shop = typeof shops.$inferSelect;
 export type InsertShop = z.infer<typeof insertShopSchema>;
