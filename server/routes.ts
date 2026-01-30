@@ -561,6 +561,21 @@ export async function registerRoutes(
     res.json(booking);
   });
 
+  // 관리자용 입금확인 (depositStatus=paid, status=confirmed)
+  app.patch('/api/bookings/:id/admin-confirm-deposit', requireAuth, async (req, res) => {
+    const bookingId = Number(req.params.id);
+
+    // depositStatus를 paid로, status를 confirmed로 변경
+    const booking = await storage.updateBookingStatus(bookingId, 'confirmed');
+    if (!booking) {
+      return res.status(404).json({ message: "Booking not found" });
+    }
+
+    // depositStatus도 paid로 업데이트
+    const updatedBooking = await storage.confirmDeposit(bookingId);
+    res.json(updatedBooking);
+  });
+
   // 예약 취소 (cancelled 상태로 변경, 시간대 해제)
   app.patch('/api/bookings/:id/cancel', requireAuth, async (req, res) => {
     const booking = await storage.updateBookingStatus(Number(req.params.id), 'cancelled');

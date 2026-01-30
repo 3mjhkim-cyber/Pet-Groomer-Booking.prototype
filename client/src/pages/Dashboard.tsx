@@ -1,5 +1,5 @@
 import { useAuth } from "@/hooks/use-auth";
-import { useBookings, useServices, useApproveBooking, useRejectBooking, useRequestDeposit, useAdminCreateBooking, useSearchCustomers, useCustomerHistory, useCancelBooking, useUpdateBooking, useUpdateBookingCustomer } from "@/hooks/use-shop";
+import { useBookings, useServices, useApproveBooking, useRejectBooking, useRequestDeposit, useAdminCreateBooking, useSearchCustomers, useCustomerHistory, useCancelBooking, useUpdateBooking, useUpdateBookingCustomer, useAdminConfirmDeposit } from "@/hooks/use-shop";
 import { useLocation } from "wouter";
 import { Loader2, Calendar, Clock, User, Phone, Scissors, Check, X, Banknote, Plus, Link, Copy, History, Edit, XCircle, UserCog, PawPrint, FileText, Bell, MessageCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -25,6 +25,7 @@ export default function Dashboard() {
   const { mutate: cancelBooking, isPending: isCancelling } = useCancelBooking();
   const { mutate: updateBooking, isPending: isUpdating } = useUpdateBooking();
   const { mutate: updateBookingCustomer, isPending: isUpdatingCustomer } = useUpdateBookingCustomer();
+  const { mutate: adminConfirmDeposit, isPending: isConfirmingDeposit } = useAdminConfirmDeposit();
   const [_, setLocation] = useLocation();
   const [isManualDialogOpen, setIsManualDialogOpen] = useState(false);
   const { toast } = useToast();
@@ -174,7 +175,12 @@ export default function Dashboard() {
   }
 
   // pending, confirmed만 표시 (cancelled, rejected는 숨김)
-  const pendingBookings = bookings?.filter(b => b.status === 'pending') || [];
+  // 순수 승인 대기: status === 'pending' && depositStatus !== 'waiting'
+  const pendingApprovalBookings = bookings?.filter(b => b.status === 'pending' && b.depositStatus !== 'waiting') || [];
+  // 예약금 대기: depositStatus === 'waiting' && status === 'pending'
+  const depositWaitingBookings = bookings?.filter(b => b.status === 'pending' && b.depositStatus === 'waiting') || [];
+  // 총 대기 중 예약 수 (탭 배지용)
+  const totalPendingCount = pendingApprovalBookings.length + depositWaitingBookings.length;
   const confirmedBookings = bookings?.filter(b => b.status === 'confirmed') || [];
 
   const handleManualSubmit = (e: React.FormEvent) => {
@@ -350,9 +356,9 @@ export default function Dashboard() {
             <TabsList className="grid w-full grid-cols-2 mb-6">
               <TabsTrigger value="pending" className="gap-2" data-testid="tab-pending">
                 <Clock className="w-4 h-4" />
-                승인 대기
-                {pendingBookings.length > 0 && (
-                  <Badge variant="destructive" className="ml-1">{pendingBookings.length}</Badge>
+                대기 중
+                {totalPendingCount > 0 && (
+                  <Badge variant="destructive" className="ml-1">{totalPendingCount}</Badge>
                 )}
               </TabsTrigger>
               <TabsTrigger value="confirmed" className="gap-2" data-testid="tab-confirmed">
@@ -364,114 +370,258 @@ export default function Dashboard() {
               </TabsTrigger>
             </TabsList>
 
-            {/* 승인 대기 탭 */}
-            <TabsContent value="pending">
-              {pendingBookings.length === 0 ? (
+            {/* 대기 중 탭 (승인 대기 + 예약금 대기) */}
+            <TabsContent value="pending" className="space-y-8">
+              {/* 섹션 1: 승인 대기 */}
+              <div>
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  📋 승인 대기 중
+                  {pendingApprovalBookings.length > 0 && (
+                    <Badge variant="destructive">{pendingApprovalBookings.length}건</Badge>
+                  )}
+                </h3>
+                {pendingApprovalBookings.length === 0 ? (
+                  <div className="text-center py-8 bg-white rounded-2xl border border-dashed border-border">
+                    <Clock className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
+                    <p className="text-muted-foreground">승인 대기 중인 예약이 없습니다</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {pendingApprovalBookings.map(booking => (
+                      <div key={booking.id} className="bg-white rounded-2xl p-5 border-2 border-orange-300 shadow-sm" data-testid={`card-pending-${booking.id}`}>
+                        <div className="flex justify-between items-start mb-3">
+                          <div className="flex items-center gap-2">
+                            {booking.isFirstVisit ? (
+                              <Badge className="bg-blue-500 hover:bg-blue-600 text-white">첫 방문</Badge>
+                            ) : (
+                              <Badge className="bg-green-500 hover:bg-green-600 text-white">재방문</Badge>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 text-orange-600 font-bold bg-orange-50 px-3 py-1 rounded-lg">
+                            <Clock className="w-4 h-4" />
+                            {booking.time}
+                          </div>
+                        </div>
+                        <div className="text-sm text-muted-foreground mb-2">{booking.date}</div>
+
+                        <div className="space-y-2 mb-4">
+                          <div className="flex items-center gap-2">
+                            <User className="w-4 h-4 text-muted-foreground" />
+                            <button
+                              onClick={() => openCustomerHistory(booking.customerPhone)}
+                              className="font-medium text-primary hover:underline flex items-center gap-1"
+                              data-testid={`button-customer-history-${booking.id}`}
+                            >
+                              {booking.customerName}
+                              <History className="w-3 h-3" />
+                            </button>
+                            <span className="text-sm font-mono text-muted-foreground">{booking.customerPhone}</span>
+                          </div>
+
+                          {(booking.petName || booking.petBreed) && (
+                            <div className="flex items-center gap-2 text-sm">
+                              <PawPrint className="w-4 h-4 text-amber-500" />
+                              <span className="font-medium">{booking.petName}</span>
+                              {booking.petBreed && <span className="text-muted-foreground">({booking.petBreed})</span>}
+                            </div>
+                          )}
+
+                          <div className="flex items-center gap-2">
+                            <Scissors className="w-4 h-4 text-muted-foreground" />
+                            <span className="text-sm">{booking.serviceName}</span>
+                          </div>
+
+                          {booking.memo && (
+                            <div className="p-2 bg-muted/50 rounded-lg text-sm">
+                              <div className="flex items-start gap-2">
+                                <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                                <span className="text-muted-foreground">{booking.memo}</span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="space-y-2">
+                          <div className="flex gap-2">
+                            {booking.customerId && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="gap-1"
+                                onClick={() => {
+                                  setCustomerDetailId(booking.customerId);
+                                  setIsCustomerDetailOpen(true);
+                                }}
+                                data-testid={`button-customer-info-${booking.id}`}
+                              >
+                                <User className="w-4 h-4" />
+                                고객 정보
+                              </Button>
+                            )}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="flex-1 gap-1"
+                              onClick={() => {
+                                requestDeposit(booking.id);
+                                copyDepositLink(booking.id);
+                              }}
+                              data-testid={`button-deposit-link-${booking.id}`}
+                            >
+                              <Banknote className="w-4 h-4" />
+                              예약금 링크
+                            </Button>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button size="sm" className="flex-1 gap-1" onClick={() => approveBooking(booking.id)} data-testid={`button-approve-${booking.id}`}>
+                              <Check className="w-4 h-4" />
+                              바로 확정
+                            </Button>
+                            <Button size="sm" variant="destructive" className="flex-1 gap-1" onClick={() => rejectBooking(booking.id)} data-testid={`button-reject-${booking.id}`}>
+                              <X className="w-4 h-4" />
+                              거절
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* 섹션 2: 예약금 대기 중 */}
+              <div>
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  📌 예약금 대기 중
+                  {depositWaitingBookings.length > 0 && (
+                    <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-300">{depositWaitingBookings.length}건</Badge>
+                  )}
+                </h3>
+                {depositWaitingBookings.length === 0 ? (
+                  <div className="text-center py-8 bg-white rounded-2xl border border-dashed border-border">
+                    <Banknote className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
+                    <p className="text-muted-foreground">예약금 대기 중인 예약이 없습니다</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {depositWaitingBookings.map(booking => (
+                      <div key={booking.id} className="bg-white rounded-2xl p-5 border-2 border-yellow-300 shadow-sm" data-testid={`card-deposit-waiting-${booking.id}`}>
+                        <div className="flex justify-between items-start mb-3">
+                          <div className="flex items-center gap-2">
+                            {booking.isFirstVisit ? (
+                              <Badge className="bg-blue-500 hover:bg-blue-600 text-white">첫 방문</Badge>
+                            ) : (
+                              <Badge className="bg-green-500 hover:bg-green-600 text-white">재방문</Badge>
+                            )}
+                            <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-300">
+                              예약금 대기
+                            </Badge>
+                          </div>
+                          <div className="flex items-center gap-2 text-yellow-700 font-bold bg-yellow-50 px-3 py-1 rounded-lg">
+                            <Clock className="w-4 h-4" />
+                            {booking.time}
+                          </div>
+                        </div>
+                        <div className="text-sm text-muted-foreground mb-2">{booking.date}</div>
+
+                        <div className="space-y-2 mb-4">
+                          <div className="flex items-center gap-2">
+                            <User className="w-4 h-4 text-muted-foreground" />
+                            <button
+                              onClick={() => openCustomerHistory(booking.customerPhone)}
+                              className="font-medium text-primary hover:underline flex items-center gap-1"
+                              data-testid={`button-customer-history-deposit-${booking.id}`}
+                            >
+                              {booking.customerName}
+                              <History className="w-3 h-3" />
+                            </button>
+                            <span className="text-sm font-mono text-muted-foreground">{booking.customerPhone}</span>
+                          </div>
+
+                          {(booking.petName || booking.petBreed) && (
+                            <div className="flex items-center gap-2 text-sm">
+                              <PawPrint className="w-4 h-4 text-amber-500" />
+                              <span className="font-medium">{booking.petName}</span>
+                              {booking.petBreed && <span className="text-muted-foreground">({booking.petBreed})</span>}
+                            </div>
+                          )}
+
+                          <div className="flex items-center gap-2">
+                            <Scissors className="w-4 h-4 text-muted-foreground" />
+                            <span className="text-sm">{booking.serviceName}</span>
+                          </div>
+
+                          {booking.memo && (
+                            <div className="p-2 bg-muted/50 rounded-lg text-sm">
+                              <div className="flex items-start gap-2">
+                                <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                                <span className="text-muted-foreground">{booking.memo}</span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="space-y-2">
+                          <div className="flex gap-2">
+                            {booking.customerId && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="gap-1"
+                                onClick={() => {
+                                  setCustomerDetailId(booking.customerId);
+                                  setIsCustomerDetailOpen(true);
+                                }}
+                                data-testid={`button-customer-info-deposit-${booking.id}`}
+                              >
+                                <User className="w-4 h-4" />
+                                고객 정보
+                              </Button>
+                            )}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="flex-1 gap-1"
+                              onClick={() => copyDepositLink(booking.id)}
+                              data-testid={`button-copy-deposit-link-${booking.id}`}
+                            >
+                              <Copy className="w-4 h-4" />
+                              링크 복사
+                            </Button>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              className="flex-1 gap-1 bg-green-600 hover:bg-green-700"
+                              onClick={() => adminConfirmDeposit(booking.id)}
+                              disabled={isConfirmingDeposit}
+                              data-testid={`button-confirm-deposit-${booking.id}`}
+                            >
+                              {isConfirmingDeposit ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Check className="w-4 h-4" />
+                              )}
+                              입금확인
+                            </Button>
+                            <Button size="sm" variant="destructive" className="flex-1 gap-1" onClick={() => rejectBooking(booking.id)} data-testid={`button-reject-deposit-${booking.id}`}>
+                              <X className="w-4 h-4" />
+                              거절
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* 전체 대기 예약이 없는 경우 */}
+              {totalPendingCount === 0 && (
                 <div className="text-center py-10 bg-white rounded-2xl border border-dashed border-border">
                   <Clock className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                   <p className="text-muted-foreground">대기 중인 예약이 없습니다</p>
                   <p className="text-sm text-muted-foreground mt-1">새 예약이 들어오면 자동으로 표시됩니다</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {pendingBookings.map(booking => (
-                    <div key={booking.id} className="bg-white rounded-2xl p-5 border-2 border-orange-300 shadow-sm" data-testid={`card-pending-${booking.id}`}>
-                      <div className="flex justify-between items-start mb-3">
-                        <div className="flex items-center gap-2">
-                          {booking.isFirstVisit ? (
-                            <Badge className="bg-blue-500 hover:bg-blue-600 text-white">첫 방문</Badge>
-                          ) : (
-                            <Badge className="bg-green-500 hover:bg-green-600 text-white">재방문</Badge>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2 text-orange-600 font-bold bg-orange-50 px-3 py-1 rounded-lg">
-                          <Clock className="w-4 h-4" />
-                          {booking.time}
-                        </div>
-                      </div>
-                      <div className="text-sm text-muted-foreground mb-2">{booking.date}</div>
-                      
-                      <div className="space-y-2 mb-4">
-                        <div className="flex items-center gap-2">
-                          <User className="w-4 h-4 text-muted-foreground" />
-                          <button 
-                            onClick={() => openCustomerHistory(booking.customerPhone)}
-                            className="font-medium text-primary hover:underline flex items-center gap-1"
-                            data-testid={`button-customer-history-${booking.id}`}
-                          >
-                            {booking.customerName}
-                            <History className="w-3 h-3" />
-                          </button>
-                          <span className="text-sm font-mono text-muted-foreground">{booking.customerPhone}</span>
-                        </div>
-                        
-                        {(booking.petName || booking.petBreed) && (
-                          <div className="flex items-center gap-2 text-sm">
-                            <PawPrint className="w-4 h-4 text-amber-500" />
-                            <span className="font-medium">{booking.petName}</span>
-                            {booking.petBreed && <span className="text-muted-foreground">({booking.petBreed})</span>}
-                          </div>
-                        )}
-                        
-                        <div className="flex items-center gap-2">
-                          <Scissors className="w-4 h-4 text-muted-foreground" />
-                          <span className="text-sm">{booking.serviceName}</span>
-                        </div>
-                        
-                        {booking.memo && (
-                          <div className="p-2 bg-muted/50 rounded-lg text-sm">
-                            <div className="flex items-start gap-2">
-                              <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
-                              <span className="text-muted-foreground">{booking.memo}</span>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <div className="flex gap-2">
-                          {booking.customerId && (
-                            <Button 
-                              size="sm" 
-                              variant="outline" 
-                              className="gap-1" 
-                              onClick={() => {
-                                setCustomerDetailId(booking.customerId);
-                                setIsCustomerDetailOpen(true);
-                              }}
-                              data-testid={`button-customer-info-${booking.id}`}
-                            >
-                              <User className="w-4 h-4" />
-                              고객 정보
-                            </Button>
-                          )}
-                          <Button 
-                            size="sm" 
-                            variant="outline" 
-                            className="flex-1 gap-1" 
-                            onClick={() => {
-                              requestDeposit(booking.id);
-                              copyDepositLink(booking.id);
-                            }} 
-                            data-testid={`button-deposit-link-${booking.id}`}
-                          >
-                            <Banknote className="w-4 h-4" />
-                            예약금 링크
-                          </Button>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button size="sm" className="flex-1 gap-1" onClick={() => approveBooking(booking.id)} data-testid={`button-approve-${booking.id}`}>
-                            <Check className="w-4 h-4" />
-                            바로 확정
-                          </Button>
-                          <Button size="sm" variant="destructive" className="flex-1 gap-1" onClick={() => rejectBooking(booking.id)} data-testid={`button-reject-${booking.id}`}>
-                            <X className="w-4 h-4" />
-                            거절
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
                 </div>
               )}
             </TabsContent>
@@ -596,24 +746,16 @@ export default function Dashboard() {
                           </Button>
                         )}
                         {booking.depositStatus === 'waiting' && (
-                          <div className="flex gap-2">
-                            <Button 
-                              size="sm" 
-                              variant="outline" 
-                              className="flex-1 gap-1" 
-                              onClick={() => copyDepositLink(booking.id)}
-                              data-testid={`button-copy-link-${booking.id}`}
-                            >
-                              <Copy className="w-4 h-4" />
-                              링크 복사
-                            </Button>
-                            <a href={`/deposit/${booking.id}`} target="_blank" rel="noopener noreferrer" className="flex-1">
-                              <Button size="sm" variant="secondary" className="w-full gap-1">
-                                <Link className="w-4 h-4" />
-                                페이지 보기
-                              </Button>
-                            </a>
-                          </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="w-full gap-1"
+                            onClick={() => copyDepositLink(booking.id)}
+                            data-testid={`button-copy-link-${booking.id}`}
+                          >
+                            <Copy className="w-4 h-4" />
+                            입금 링크 복사
+                          </Button>
                         )}
                         <div className="flex gap-2">
                           <Button 

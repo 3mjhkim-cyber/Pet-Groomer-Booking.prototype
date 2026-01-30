@@ -207,6 +207,30 @@ export function useConfirmDeposit() {
   });
 }
 
+// 관리자용 입금 확인 (status도 confirmed로 변경)
+export function useAdminConfirmDeposit() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (id: number) => {
+      const res = await fetch(`/api/bookings/${id}/admin-confirm-deposit`, {
+        method: 'PATCH',
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error("입금 확인에 실패했습니다.");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.bookings.list.path] });
+      toast({ title: "입금 확인 완료", description: "예약금 입금이 확인되고 예약이 확정되었습니다." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "입금 확인 실패", description: error.message, variant: "destructive" });
+    },
+  });
+}
+
 export function useSearchCustomers(query: string) {
   return useQuery({
     queryKey: ['/api/customers/search', query],
