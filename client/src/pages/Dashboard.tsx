@@ -1,9 +1,9 @@
 import { useAuth } from "@/hooks/use-auth";
 import { useBookings, useServices, useApproveBooking, useRejectBooking, useRequestDeposit, useAdminCreateBooking, useSearchCustomers, useCustomerHistory, useCancelBooking, useUpdateBooking, useUpdateBookingCustomer, useAdminConfirmDeposit } from "@/hooks/use-shop";
 import { useLocation } from "wouter";
-import { Loader2, Calendar, Clock, User, Phone, Scissors, Check, X, Banknote, Plus, Link, Copy, History, Edit, XCircle, UserCog, PawPrint, FileText, Bell, MessageCircle } from "lucide-react";
+import { Loader2, Calendar, Clock, User, Phone, Scissors, Check, X, Banknote, Plus, Link, Copy, History, Edit, XCircle, UserCog, PawPrint, FileText, Bell, MessageCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -13,6 +13,8 @@ import { formatKoreanPhone } from "@/lib/phone";
 import { useQueryClient, useMutation, useQuery } from "@tanstack/react-query";
 import { api } from "@shared/routes";
 import { apiRequest } from "@/lib/queryClient";
+import { format, addDays, subDays, isAfter, parse, isSameDay } from "date-fns";
+import { ko } from "date-fns/locale";
 
 export default function Dashboard() {
   const { user, isLoading: isAuthLoading } = useAuth();
@@ -53,7 +55,10 @@ export default function Dashboard() {
   
   // 리마인드 모달 상태
   const [remindBooking, setRemindBooking] = useState<(Booking & { serviceName: string }) | null>(null);
-  
+
+  // 확정 예약 날짜 필터 상태
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+
   const { data: searchResults } = useSearchCustomers(searchQuery);
   const { data: customerHistoryData } = useCustomerHistory(selectedCustomerPhone);
   
@@ -181,7 +186,30 @@ export default function Dashboard() {
   const depositWaitingBookings = bookings?.filter(b => b.status === 'pending' && b.depositStatus === 'waiting') || [];
   // 총 대기 중 예약 수 (탭 배지용)
   const totalPendingCount = pendingApprovalBookings.length + depositWaitingBookings.length;
-  const confirmedBookings = bookings?.filter(b => b.status === 'confirmed') || [];
+
+  // 확정 예약: 선택한 날짜 필터링 + 시간순 정렬
+  const selectedDateStr = format(selectedDate, 'yyyy-MM-dd');
+  const confirmedBookings = useMemo(() => {
+    const filtered = bookings?.filter(b =>
+      b.status === 'confirmed' && b.date === selectedDateStr
+    ) || [];
+    // 시간순 정렬 (오름차순)
+    return filtered.sort((a, b) => a.time.localeCompare(b.time));
+  }, [bookings, selectedDateStr]);
+
+  // 지난 시간대인지 확인하는 함수
+  const isPastTime = (bookingDate: string, bookingTime: string): boolean => {
+    const now = new Date();
+    const bookingDateTime = parse(
+      `${bookingDate} ${bookingTime}`,
+      'yyyy-MM-dd HH:mm',
+      new Date()
+    );
+    return isAfter(now, bookingDateTime);
+  };
+
+  // 전체 확정 예약 수 (배지용)
+  const totalConfirmedCount = bookings?.filter(b => b.status === 'confirmed').length || 0;
 
   const handleManualSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -364,8 +392,8 @@ export default function Dashboard() {
               <TabsTrigger value="confirmed" className="gap-2" data-testid="tab-confirmed">
                 <Check className="w-4 h-4" />
                 확정된 예약
-                {confirmedBookings.length > 0 && (
-                  <Badge variant="secondary" className="ml-1">{confirmedBookings.length}</Badge>
+                {totalConfirmedCount > 0 && (
+                  <Badge variant="secondary" className="ml-1">{totalConfirmedCount}</Badge>
                 )}
               </TabsTrigger>
             </TabsList>
@@ -628,169 +656,219 @@ export default function Dashboard() {
 
             {/* 확정된 예약 탭 */}
             <TabsContent value="confirmed">
+              {/* 날짜 선택기 */}
+              <div className="flex items-center justify-center gap-4 mb-6 bg-white rounded-xl p-4 border border-border">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setSelectedDate(subDays(selectedDate, 1))}
+                  data-testid="button-prev-date"
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                </Button>
+                <div className="flex items-center gap-2 min-w-[180px] justify-center">
+                  <Calendar className="w-5 h-5 text-primary" />
+                  <span className="text-lg font-semibold">
+                    {format(selectedDate, 'yyyy-MM-dd (EEE)', { locale: ko })}
+                  </span>
+                  {isSameDay(selectedDate, new Date()) && (
+                    <Badge variant="secondary" className="text-xs">오늘</Badge>
+                  )}
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setSelectedDate(addDays(selectedDate, 1))}
+                  data-testid="button-next-date"
+                >
+                  <ChevronRight className="w-5 h-5" />
+                </Button>
+              </div>
+
               {confirmedBookings.length === 0 ? (
                 <div className="text-center py-10 bg-white rounded-2xl border border-dashed border-border">
                   <Calendar className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-muted-foreground">확정된 예약이 없습니다</p>
+                  <p className="text-muted-foreground">
+                    {format(selectedDate, 'M월 d일', { locale: ko })}에 확정된 예약이 없습니다
+                  </p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {confirmedBookings.map(booking => (
-                    <div key={booking.id} className="bg-white rounded-2xl p-5 border-2 border-green-300 shadow-sm" data-testid={`card-confirmed-${booking.id}`}>
-                      <div className="flex justify-between items-start mb-3">
-                        <div className="flex items-center gap-2">
-                          {booking.isFirstVisit ? (
-                            <Badge className="bg-blue-500 hover:bg-blue-600 text-white">첫 방문</Badge>
-                          ) : (
-                            <Badge className="bg-green-500 hover:bg-green-600 text-white">재방문</Badge>
+                  {confirmedBookings.map(booking => {
+                    const past = isPastTime(booking.date, booking.time);
+                    return (
+                      <div
+                        key={booking.id}
+                        className={`rounded-2xl p-5 border-2 shadow-sm transition-all ${
+                          past
+                            ? 'bg-gray-50 border-gray-200 opacity-60'
+                            : 'bg-white border-green-300'
+                        }`}
+                        data-testid={`card-confirmed-${booking.id}`}
+                      >
+                        <div className="flex justify-between items-start mb-3">
+                          <div className="flex items-center gap-2">
+                            {past && (
+                              <Badge variant="outline" className="bg-gray-100 text-gray-500 border-gray-300">완료</Badge>
+                            )}
+                            {booking.isFirstVisit ? (
+                              <Badge className={past ? "bg-blue-400 text-white" : "bg-blue-500 hover:bg-blue-600 text-white"}>첫 방문</Badge>
+                            ) : (
+                              <Badge className={past ? "bg-green-400 text-white" : "bg-green-500 hover:bg-green-600 text-white"}>재방문</Badge>
+                            )}
+                          </div>
+                          <div className={`flex items-center gap-2 font-bold px-3 py-1 rounded-lg ${
+                            past
+                              ? 'text-gray-500 bg-gray-100'
+                              : 'text-green-600 bg-green-50'
+                          }`}>
+                            {past ? <Check className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
+                            {booking.time}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 mb-2 text-sm text-muted-foreground">
+                          {booking.depositStatus === 'paid' && (
+                            <Badge variant="outline" className={past ? "bg-gray-100 text-gray-500 border-gray-200" : "bg-green-50 text-green-700 border-green-200"}>입금완료</Badge>
+                          )}
+                          {booking.depositStatus === 'waiting' && (
+                            <Badge variant="outline" className={past ? "bg-gray-100 text-gray-500 border-gray-200" : "bg-yellow-50 text-yellow-700 border-yellow-200"}>입금대기</Badge>
                           )}
                         </div>
-                        <div className="flex items-center gap-2 text-green-600 font-bold bg-green-50 px-3 py-1 rounded-lg">
-                          <Check className="w-4 h-4" />
-                          {booking.time}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 mb-2 text-sm text-muted-foreground">
-                        <span>{booking.date}</span>
-                        {booking.depositStatus === 'paid' && (
-                          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">입금완료</Badge>
-                        )}
-                        {booking.depositStatus === 'waiting' && (
-                          <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">입금대기</Badge>
-                        )}
-                      </div>
-                      
-                      <div className="space-y-2 mb-4">
-                        <div className="flex items-center gap-2">
-                          <User className="w-4 h-4 text-muted-foreground" />
-                          <button 
-                            onClick={() => openCustomerHistory(booking.customerPhone)}
-                            className="font-medium text-primary hover:underline flex items-center gap-1"
-                            data-testid={`button-customer-history-confirmed-${booking.id}`}
-                          >
-                            {booking.customerName}
-                            <History className="w-3 h-3" />
-                          </button>
-                          <span className="text-sm font-mono text-muted-foreground">{booking.customerPhone}</span>
-                        </div>
-                        
-                        {(booking.petName || booking.petBreed) && (
-                          <div className="flex items-center gap-2 text-sm">
-                            <PawPrint className="w-4 h-4 text-amber-500" />
-                            <span className="font-medium">{booking.petName}</span>
-                            {booking.petBreed && <span className="text-muted-foreground">({booking.petBreed})</span>}
-                          </div>
-                        )}
-                        
-                        <div className="flex items-center gap-2">
-                          <Scissors className="w-4 h-4 text-muted-foreground" />
-                          <span className="text-sm">{booking.serviceName}</span>
-                        </div>
-                        
-                        {booking.memo && (
-                          <div className="p-2 bg-muted/50 rounded-lg text-sm">
-                            <div className="flex items-start gap-2">
-                              <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
-                              <span className="text-muted-foreground">{booking.memo}</span>
-                            </div>
-                          </div>
-                        )}
-                        
-                        <div className="flex items-center gap-2 text-sm">
-                          <Bell className="w-4 h-4 text-muted-foreground" />
-                          {booking.remindSent ? (
-                            <span className="text-green-600 flex items-center gap-1">
-                              <Check className="w-3 h-3" />
-                              전송됨 {booking.remindSentAt && `(${new Date(booking.remindSentAt).toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })})`}
-                            </span>
-                          ) : (
-                            <span className="text-muted-foreground">리마인드 미전송</span>
-                          )}
-                        </div>
-                      </div>
-                      
-                      {/* 확정된 예약 액션 버튼 */}
-                      <div className="space-y-2">
-                        <div className="flex gap-2">
-                          {booking.customerId && (
-                            <Button 
-                              size="sm" 
-                              variant="outline" 
-                              className="gap-1" 
-                              onClick={() => {
-                                setCustomerDetailId(booking.customerId);
-                                setIsCustomerDetailOpen(true);
-                              }}
-                              data-testid={`button-customer-info-confirmed-${booking.id}`}
+
+                        <div className="space-y-2 mb-4">
+                          <div className="flex items-center gap-2">
+                            <User className="w-4 h-4 text-muted-foreground" />
+                            <button
+                              onClick={() => openCustomerHistory(booking.customerPhone)}
+                              className={`font-medium hover:underline flex items-center gap-1 ${past ? 'text-muted-foreground' : 'text-primary'}`}
+                              data-testid={`button-customer-history-confirmed-${booking.id}`}
                             >
-                              <User className="w-4 h-4" />
-                              고객 정보
+                              {booking.customerName}
+                              <History className="w-3 h-3" />
+                            </button>
+                            <span className="text-sm font-mono text-muted-foreground">{booking.customerPhone}</span>
+                          </div>
+
+                          {(booking.petName || booking.petBreed) && (
+                            <div className="flex items-center gap-2 text-sm">
+                              <PawPrint className={`w-4 h-4 ${past ? 'text-gray-400' : 'text-amber-500'}`} />
+                              <span className="font-medium">{booking.petName}</span>
+                              {booking.petBreed && <span className="text-muted-foreground">({booking.petBreed})</span>}
+                            </div>
+                          )}
+
+                          <div className="flex items-center gap-2">
+                            <Scissors className="w-4 h-4 text-muted-foreground" />
+                            <span className="text-sm">{booking.serviceName}</span>
+                          </div>
+
+                          {booking.memo && (
+                            <div className="p-2 bg-muted/50 rounded-lg text-sm">
+                              <div className="flex items-start gap-2">
+                                <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                                <span className="text-muted-foreground">{booking.memo}</span>
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="flex items-center gap-2 text-sm">
+                            <Bell className="w-4 h-4 text-muted-foreground" />
+                            {booking.remindSent ? (
+                              <span className={`flex items-center gap-1 ${past ? 'text-gray-500' : 'text-green-600'}`}>
+                                <Check className="w-3 h-3" />
+                                전송됨 {booking.remindSentAt && `(${new Date(booking.remindSentAt).toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })})`}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">리마인드 미전송</span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* 확정된 예약 액션 버튼 */}
+                        <div className="space-y-2">
+                          <div className="flex gap-2">
+                            {booking.customerId && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="gap-1"
+                                onClick={() => {
+                                  setCustomerDetailId(booking.customerId);
+                                  setIsCustomerDetailOpen(true);
+                                }}
+                                data-testid={`button-customer-info-confirmed-${booking.id}`}
+                              >
+                                <User className="w-4 h-4" />
+                                고객 정보
+                              </Button>
+                            )}
+                            {!past && (
+                              <Button
+                                size="sm"
+                                variant={booking.remindSent ? "ghost" : "outline"}
+                                className="flex-1 gap-1"
+                                onClick={() => setRemindBooking(booking)}
+                                data-testid={`button-remind-${booking.id}`}
+                              >
+                                <MessageCircle className="w-4 h-4" />
+                                {booking.remindSent ? '재전송' : '리마인드 전송'}
+                              </Button>
+                            )}
+                          </div>
+
+                          {!past && booking.depositStatus === 'none' && (
+                            <Button size="sm" variant="outline" className="w-full gap-1" onClick={() => requestDeposit(booking.id)} data-testid={`button-deposit-${booking.id}`}>
+                              <Banknote className="w-4 h-4" />
+                              예약금 요청
                             </Button>
                           )}
-                          <Button 
-                            size="sm" 
-                            variant={booking.remindSent ? "ghost" : "outline"}
-                            className="flex-1 gap-1" 
-                            onClick={() => setRemindBooking(booking)}
-                            data-testid={`button-remind-${booking.id}`}
-                          >
-                            <MessageCircle className="w-4 h-4" />
-                            {booking.remindSent ? '재전송' : '리마인드 전송'}
-                          </Button>
-                        </div>
-                        
-                        {booking.depositStatus === 'none' && (
-                          <Button size="sm" variant="outline" className="w-full gap-1" onClick={() => requestDeposit(booking.id)} data-testid={`button-deposit-${booking.id}`}>
-                            <Banknote className="w-4 h-4" />
-                            예약금 요청
-                          </Button>
-                        )}
-                        {booking.depositStatus === 'waiting' && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="w-full gap-1"
-                            onClick={() => copyDepositLink(booking.id)}
-                            data-testid={`button-copy-link-${booking.id}`}
-                          >
-                            <Copy className="w-4 h-4" />
-                            입금 링크 복사
-                          </Button>
-                        )}
-                        <div className="flex gap-2">
-                          <Button 
-                            size="sm" 
-                            variant="outline" 
-                            className="flex-1 gap-1"
-                            onClick={() => openEditDialog(booking)}
-                            data-testid={`button-edit-${booking.id}`}
-                          >
-                            <Edit className="w-4 h-4" />
-                            변경
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            variant="outline" 
-                            className="flex-1 gap-1"
-                            onClick={() => openEditCustomerDialog(booking)}
-                            data-testid={`button-edit-customer-${booking.id}`}
-                          >
-                            <UserCog className="w-4 h-4" />
-                            고객수정
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            variant="destructive" 
-                            className="gap-1"
-                            onClick={() => setCancelConfirmBooking(booking)}
-                            data-testid={`button-cancel-${booking.id}`}
-                          >
-                            <XCircle className="w-4 h-4" />
-                          </Button>
+                          {!past && booking.depositStatus === 'waiting' && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="w-full gap-1"
+                              onClick={() => copyDepositLink(booking.id)}
+                              data-testid={`button-copy-link-${booking.id}`}
+                            >
+                              <Copy className="w-4 h-4" />
+                              입금 링크 복사
+                            </Button>
+                          )}
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="flex-1 gap-1"
+                              onClick={() => openEditDialog(booking)}
+                              data-testid={`button-edit-${booking.id}`}
+                            >
+                              <Edit className="w-4 h-4" />
+                              변경
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="flex-1 gap-1"
+                              onClick={() => openEditCustomerDialog(booking)}
+                              data-testid={`button-edit-customer-${booking.id}`}
+                            >
+                              <UserCog className="w-4 h-4" />
+                              고객수정
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              className="gap-1"
+                              onClick={() => setCancelConfirmBooking(booking)}
+                              data-testid={`button-cancel-${booking.id}`}
+                            >
+                              <XCircle className="w-4 h-4" />
+                            </Button>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </TabsContent>
