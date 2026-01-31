@@ -117,8 +117,18 @@ shared/           # Shared between client/server
 - **Hidden**: Cancelled and rejected bookings
 
 ### Public Booking Page
+- **Shop Info Section**: Displays business hours/days and shop memo (주차 안내, 공지사항 등)
+- **Holiday Restriction**: Closed dates cannot be selected; toast warning shown if attempted
+- **Upcoming Holidays**: Shows next 3 closed dates below date picker for user awareness
 - Dynamic time slot availability based on selected date and service duration
 - Unavailable times shown as disabled with strikethrough
+
+### Date Utilities (client/src/lib/date-utils.ts)
+- `isClosedDate`: Checks if date is in temporary closed dates list
+- `isRegularClosedDay`: Checks if date falls on regular weekly closed day
+- `checkClosedStatus`: Combined check returning { isClosed, reason }
+- `formatBusinessDays`: Formats business days for display
+- `getClosedDatesInRange`: Generates list of closed dates for next N days
 
 ## Key Pages & Routes
 

@@ -16,6 +16,7 @@ export interface IStorage {
   createShop(shop: InsertShop): Promise<Shop>;
   updateShop(id: number, data: Partial<Shop>): Promise<Shop | undefined>;
   approveShop(id: number): Promise<Shop | undefined>;
+  deleteShop(id: number): Promise<void>;
   
   getServices(shopId?: number | null): Promise<Service[]>;
   getService(id: number): Promise<Service | undefined>;
@@ -123,6 +124,15 @@ export class DatabaseStorage implements IStorage {
   async approveShop(id: number): Promise<Shop | undefined> {
     const [shop] = await db.update(shops).set({ isApproved: true }).where(eq(shops.id, id)).returning();
     return shop;
+  }
+
+  async deleteShop(id: number): Promise<void> {
+    // 관련 데이터 삭제 (예약, 고객, 서비스, 사용자)
+    await db.delete(bookings).where(eq(bookings.shopId, id));
+    await db.delete(customers).where(eq(customers.shopId, id));
+    await db.delete(services).where(eq(services.shopId, id));
+    await db.delete(users).where(eq(users.shopId, id));
+    await db.delete(shops).where(eq(shops.id, id));
   }
 
   async getServices(shopId?: number | null): Promise<Service[]> {

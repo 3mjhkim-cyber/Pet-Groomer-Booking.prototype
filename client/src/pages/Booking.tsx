@@ -3,11 +3,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Calendar as CalendarIcon, Clock, Scissors, User, Phone, CheckCircle2, Loader2, MapPin, XCircle, PawPrint, Info, FileText } from "lucide-react";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { format, getDay, parseISO } from "date-fns";
-import { ko } from "date-fns/locale";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useRoute } from "wouter";
@@ -15,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { Shop, Service, Customer } from "@shared/schema";
 import { formatKoreanPhone } from "@/lib/phone";
 import { useAvailableTimeSlots } from "@/hooks/use-shop";
+import { checkClosedStatus, formatBusinessDays, getClosedDatesInRange } from "@/lib/date-utils";
 
 const bookingFormSchema = z.object({
   customerName: z.string().min(2, "보호자 이름을 2글자 이상 입력해주세요"),
@@ -209,6 +206,25 @@ export default function Booking() {
   const selectedServiceData = services?.find(s => s.id === selectedService);
   const serviceDuration = selectedServiceData?.duration || 60;
 
+  // 휴무일 목록 계산 (90일 범위)
+  const closedDatesList = useMemo(() => {
+    if (!shop) return [];
+    const shopData = shop as Shop & { closedDates?: string | null; businessDays?: string | null };
+    return getClosedDatesInRange(
+      new Date(),
+      90,
+      shopData.closedDates,
+      shopData.businessDays
+    );
+  }, [shop]);
+
+  // 영업요일 포맷팅
+  const formattedBusinessDays = useMemo(() => {
+    if (!shop) return '';
+    const shopData = shop as Shop & { businessDays?: string | null };
+    return formatBusinessDays(shopData.businessDays);
+  }, [shop]);
+
   // 예약 가능 시간대 조회
   const { data: availableSlots, isLoading: isLoadingSlots } = useAvailableTimeSlots(
     slug,
@@ -280,14 +296,33 @@ export default function Booking() {
       </div>
 
       <div className="container mx-auto px-4 max-w-4xl py-8">
-        {/* 가게 안내 메모 */}
-        {(shop as any).shopMemo && (
+        {/* 가게 안내 섹션 (메모 + 영업요일) */}
+        {((shop as any).shopMemo || formattedBusinessDays) && (
           <div className="mb-8 p-4 bg-blue-50 border border-blue-200 rounded-2xl">
             <div className="flex items-start gap-2">
               <Info className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
-              <div>
-                <p className="font-medium text-blue-800 mb-1">가게 안내</p>
-                <p className="text-sm text-blue-700 whitespace-pre-line">{(shop as any).shopMemo}</p>
+              <div className="space-y-3 flex-1">
+                <p className="font-medium text-blue-800">가게 안내</p>
+                
+                {/* 영업요일/시간 */}
+                {formattedBusinessDays && (
+                  <div className="text-sm text-blue-700">
+                    <p className="font-medium mb-1 flex items-center gap-1">
+                      <CalendarIcon className="w-4 h-4" /> 영업시간
+                    </p>
+                    <p className="whitespace-pre-line">{formattedBusinessDays}</p>
+                  </div>
+                )}
+                
+                {/* 가게 메모 */}
+                {(shop as any).shopMemo && (
+                  <div className="text-sm text-blue-700">
+                    <p className="font-medium mb-1 flex items-center gap-1">
+                      <FileText className="w-4 h-4" /> 안내사항
+                    </p>
+                    <p className="whitespace-pre-line">{(shop as any).shopMemo}</p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -349,49 +384,55 @@ export default function Booking() {
                 <label className="block font-medium text-foreground/80 mb-2 flex items-center gap-2">
                   <CalendarIcon className="w-4 h-4" /> 날짜 선택
                 </label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "w-full px-4 py-3 h-auto justify-start text-left font-normal rounded-xl border-2 border-border hover:border-primary",
-                        !selectedDate && "text-muted-foreground"
-                      )}
-                      data-testid="input-date"
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {selectedDate ? format(parseISO(selectedDate), "yyyy년 M월 d일 (EEE)", { locale: ko }) : "날짜를 선택하세요"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={selectedDate ? parseISO(selectedDate) : undefined}
-                      onSelect={(date) => {
-                        if (date) {
-                          const dateStr = format(date, 'yyyy-MM-dd');
-                          form.setValue("date", dateStr, { shouldValidate: true });
-                          setSelectedDate(dateStr);
-                          form.setValue("time", ""); // 날짜 변경 시 시간 초기화
-                        }
-                      }}
-                      disabled={(date) => {
-                        // 오늘 이전 날짜 비활성화
-                        const today = new Date();
-                        today.setHours(0, 0, 0, 0);
-                        if (date < today) return true;
-
-                        // 휴무일 비활성화
-                        const businessDays = (shop as any).businessDays ? JSON.parse((shop as any).businessDays) : null;
-                        const closedDates = (shop as any).closedDates ? JSON.parse((shop as any).closedDates) : null;
-                        return isDateClosed(date, businessDays, closedDates);
-                      }}
-                      locale={ko}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
+                <input
+                  type="date"
+                  min={new Date().toISOString().split('T')[0]}
+                  {...form.register("date")}
+                  onChange={(e) => {
+                    const newDate = e.target.value;
+                    if (!newDate) {
+                      setSelectedDate('');
+                      form.setValue("date", '', { shouldValidate: true });
+                      return;
+                    }
+                    
+                    // 휴무일 체크
+                    const shopData = shop as Shop & { closedDates?: string | null; businessDays?: string | null };
+                    const closedCheck = checkClosedStatus(newDate, shopData?.closedDates, shopData?.businessDays);
+                    
+                    if (closedCheck.isClosed) {
+                      // 휴무일 선택 시 경고 토스트 표시하고 선택 초기화
+                      toast({
+                        title: "휴무일입니다",
+                        description: `${closedCheck.reason} - 다른 날짜를 선택해주세요.`,
+                        variant: "destructive",
+                      });
+                      e.target.value = selectedDate || ''; // 이전 값으로 되돌림
+                      return;
+                    }
+                    
+                    form.setValue("date", newDate, { shouldValidate: true });
+                    setSelectedDate(newDate);
+                    form.setValue("time", ""); // 날짜 변경 시 시간 초기화
+                  }}
+                  className="w-full px-4 py-3 rounded-xl border-2 border-border focus:border-primary focus:outline-none transition-colors"
+                  data-testid="input-date"
+                />
                 {form.formState.errors.date && <p className="text-destructive text-sm">{form.formState.errors.date.message}</p>}
+                
+                {/* 휴무일 안내 */}
+                {closedDatesList.length > 0 && (
+                  <div className="text-xs text-muted-foreground flex items-start gap-1 mt-2">
+                    <Info className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                    <span>
+                      가까운 휴무일: {closedDatesList.slice(0, 3).map(d => {
+                        const date = new Date(d);
+                        return `${date.getMonth() + 1}/${date.getDate()}`;
+                      }).join(', ')}
+                      {closedDatesList.length > 3 && ' 등'}
+                    </span>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-4">
