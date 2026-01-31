@@ -312,16 +312,6 @@ export default function ShopSettings() {
                   data-testid="input-shop-address"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="hours">영업시간</Label>
-                <Input 
-                  id="hours" 
-                  value={formData.businessHours}
-                  onChange={e => setFormData(f => ({...f, businessHours: e.target.value}))}
-                  placeholder="예: 09:00-18:00"
-                  data-testid="input-shop-hours"
-                />
-              </div>
               <Button type="submit" disabled={updateShopMutation.isPending} data-testid="button-save-shop">
                 <Save className="w-4 h-4 mr-2" />
                 저장
