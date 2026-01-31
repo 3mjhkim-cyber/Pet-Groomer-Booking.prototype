@@ -3,6 +3,10 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Calendar as CalendarIcon, Clock, Scissors, User, Phone, CheckCircle2, Loader2, MapPin, XCircle, PawPrint, Info, FileText } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { format, getDay, parseISO } from "date-fns";
+import { ko } from "date-fns/locale";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -26,6 +30,86 @@ const bookingFormSchema = z.object({
 });
 
 type BookingForm = z.infer<typeof bookingFormSchema>;
+
+// 요일별 영업시간 타입
+type DaySchedule = {
+  open: string;
+  close: string;
+  closed: boolean;
+};
+
+type BusinessDays = {
+  [key: string]: DaySchedule;
+};
+
+const DAY_NAMES: { [key: string]: string } = {
+  mon: '월', tue: '화', wed: '수', thu: '목', fri: '금', sat: '토', sun: '일'
+};
+
+const DAY_ORDER = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+
+// 영업시간을 그룹화하여 간결하게 표시
+function formatBusinessHoursCompact(businessDays: BusinessDays | null, defaultHours: string): string {
+  if (!businessDays) return defaultHours;
+
+  // 영업 요일과 휴무 요일 분리
+  const openDays: string[] = [];
+  const closedDays: string[] = [];
+  const hourGroups: { [hours: string]: string[] } = {};
+
+  DAY_ORDER.forEach(day => {
+    const schedule = businessDays[day];
+    if (schedule?.closed) {
+      closedDays.push(DAY_NAMES[day]);
+    } else if (schedule) {
+      openDays.push(day);
+      const hours = `${schedule.open}-${schedule.close}`;
+      if (!hourGroups[hours]) hourGroups[hours] = [];
+      hourGroups[hours].push(DAY_NAMES[day]);
+    }
+  });
+
+  // 시간대별로 요일 그룹화하여 표시
+  const parts: string[] = [];
+  Object.entries(hourGroups).forEach(([hours, days]) => {
+    if (days.length === 7) {
+      parts.push(`매일 ${hours}`);
+    } else if (days.length >= 5 && closedDays.length <= 2) {
+      parts.push(`${days.join('')} ${hours}`);
+    } else {
+      parts.push(`${days.join('')} ${hours}`);
+    }
+  });
+
+  if (closedDays.length > 0 && closedDays.length <= 2) {
+    parts.push(`${closedDays.join('')} 휴무`);
+  }
+
+  return parts.join(' | ') || defaultHours;
+}
+
+// 특정 날짜가 휴무일인지 확인
+function isDateClosed(date: Date, businessDays: BusinessDays | null, closedDates: string[] | null): boolean {
+  const dateStr = format(date, 'yyyy-MM-dd');
+
+  // 임시 휴무일 체크
+  if (closedDates?.includes(dateStr)) {
+    return true;
+  }
+
+  // 요일별 영업일 체크
+  if (businessDays) {
+    const dayIndex = getDay(date); // 0 = 일요일
+    const dayMap = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+    const dayKey = dayMap[dayIndex];
+    const daySchedule = businessDays[dayKey];
+    if (daySchedule?.closed) {
+      return true;
+    }
+  }
+
+  return false;
+}
 
 export default function Booking() {
   const [, params] = useRoute('/book/:slug');
@@ -172,7 +256,10 @@ export default function Booking() {
             </div>
             <div className="flex items-center gap-2">
               <Clock className="w-4 h-4" />
-              <span>영업시간: {shop.businessHours}</span>
+              <span>영업시간: {formatBusinessHoursCompact(
+                (shop as any).businessDays ? JSON.parse((shop as any).businessDays) : null,
+                shop.businessHours
+              )}</span>
             </div>
           </div>
           <div className="flex gap-3 mt-4">
@@ -262,18 +349,48 @@ export default function Booking() {
                 <label className="block font-medium text-foreground/80 mb-2 flex items-center gap-2">
                   <CalendarIcon className="w-4 h-4" /> 날짜 선택
                 </label>
-                <input
-                  type="date"
-                  min={new Date().toISOString().split('T')[0]}
-                  {...form.register("date")}
-                  onChange={(e) => {
-                    form.setValue("date", e.target.value, { shouldValidate: true });
-                    setSelectedDate(e.target.value);
-                    form.setValue("time", ""); // 날짜 변경 시 시간 초기화
-                  }}
-                  className="w-full px-4 py-3 rounded-xl border-2 border-border focus:border-primary focus:outline-none transition-colors"
-                  data-testid="input-date"
-                />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full px-4 py-3 h-auto justify-start text-left font-normal rounded-xl border-2 border-border hover:border-primary",
+                        !selectedDate && "text-muted-foreground"
+                      )}
+                      data-testid="input-date"
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {selectedDate ? format(parseISO(selectedDate), "yyyy년 M월 d일 (EEE)", { locale: ko }) : "날짜를 선택하세요"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={selectedDate ? parseISO(selectedDate) : undefined}
+                      onSelect={(date) => {
+                        if (date) {
+                          const dateStr = format(date, 'yyyy-MM-dd');
+                          form.setValue("date", dateStr, { shouldValidate: true });
+                          setSelectedDate(dateStr);
+                          form.setValue("time", ""); // 날짜 변경 시 시간 초기화
+                        }
+                      }}
+                      disabled={(date) => {
+                        // 오늘 이전 날짜 비활성화
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+                        if (date < today) return true;
+
+                        // 휴무일 비활성화
+                        const businessDays = (shop as any).businessDays ? JSON.parse((shop as any).businessDays) : null;
+                        const closedDates = (shop as any).closedDates ? JSON.parse((shop as any).closedDates) : null;
+                        return isDateClosed(date, businessDays, closedDates);
+                      }}
+                      locale={ko}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
                 {form.formState.errors.date && <p className="text-destructive text-sm">{form.formState.errors.date.message}</p>}
               </div>
 
