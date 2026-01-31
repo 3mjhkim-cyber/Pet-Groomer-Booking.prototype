@@ -28,6 +28,86 @@ const bookingFormSchema = z.object({
 
 type BookingForm = z.infer<typeof bookingFormSchema>;
 
+// 요일별 영업시간 타입
+type DaySchedule = {
+  open: string;
+  close: string;
+  closed: boolean;
+};
+
+type BusinessDays = {
+  [key: string]: DaySchedule;
+};
+
+const DAY_NAMES: { [key: string]: string } = {
+  mon: '월', tue: '화', wed: '수', thu: '목', fri: '금', sat: '토', sun: '일'
+};
+
+const DAY_ORDER = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+
+// 영업시간을 그룹화하여 간결하게 표시
+function formatBusinessHoursCompact(businessDays: BusinessDays | null, defaultHours: string): string {
+  if (!businessDays) return defaultHours;
+
+  // 영업 요일과 휴무 요일 분리
+  const openDays: string[] = [];
+  const closedDays: string[] = [];
+  const hourGroups: { [hours: string]: string[] } = {};
+
+  DAY_ORDER.forEach(day => {
+    const schedule = businessDays[day];
+    if (schedule?.closed) {
+      closedDays.push(DAY_NAMES[day]);
+    } else if (schedule) {
+      openDays.push(day);
+      const hours = `${schedule.open}-${schedule.close}`;
+      if (!hourGroups[hours]) hourGroups[hours] = [];
+      hourGroups[hours].push(DAY_NAMES[day]);
+    }
+  });
+
+  // 시간대별로 요일 그룹화하여 표시
+  const parts: string[] = [];
+  Object.entries(hourGroups).forEach(([hours, days]) => {
+    if (days.length === 7) {
+      parts.push(`매일 ${hours}`);
+    } else if (days.length >= 5 && closedDays.length <= 2) {
+      parts.push(`${days.join('')} ${hours}`);
+    } else {
+      parts.push(`${days.join('')} ${hours}`);
+    }
+  });
+
+  if (closedDays.length > 0 && closedDays.length <= 2) {
+    parts.push(`${closedDays.join('')} 휴무`);
+  }
+
+  return parts.join(' | ') || defaultHours;
+}
+
+// 특정 날짜가 휴무일인지 확인
+function isDateClosed(date: Date, businessDays: BusinessDays | null, closedDates: string[] | null): boolean {
+  const dateStr = format(date, 'yyyy-MM-dd');
+
+  // 임시 휴무일 체크
+  if (closedDates?.includes(dateStr)) {
+    return true;
+  }
+
+  // 요일별 영업일 체크
+  if (businessDays) {
+    const dayIndex = getDay(date); // 0 = 일요일
+    const dayMap = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+    const dayKey = dayMap[dayIndex];
+    const daySchedule = businessDays[dayKey];
+    if (daySchedule?.closed) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 export default function Booking() {
   const [, params] = useRoute('/book/:slug');
   const slug = params?.slug || 'gangnam';
@@ -192,7 +272,10 @@ export default function Booking() {
             </div>
             <div className="flex items-center gap-2">
               <Clock className="w-4 h-4" />
-              <span>영업시간: {shop.businessHours}</span>
+              <span>영업시간: {formatBusinessHoursCompact(
+                (shop as any).businessDays ? JSON.parse((shop as any).businessDays) : null,
+                shop.businessHours
+              )}</span>
             </div>
           </div>
           <div className="flex gap-3 mt-4">
