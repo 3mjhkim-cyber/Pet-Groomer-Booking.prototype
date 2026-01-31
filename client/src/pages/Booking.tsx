@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { Shop, Service, Customer } from "@shared/schema";
 import { formatKoreanPhone } from "@/lib/phone";
 import { useAvailableTimeSlots } from "@/hooks/use-shop";
-import { checkClosedStatus, formatBusinessDays, getClosedDatesInRange } from "@/lib/date-utils";
+import { checkClosedStatus, getClosedDatesInRange } from "@/lib/date-utils";
 
 const bookingFormSchema = z.object({
   customerName: z.string().min(2, "보호자 이름을 2글자 이상 입력해주세요"),
@@ -218,13 +218,6 @@ export default function Booking() {
     );
   }, [shop]);
 
-  // 영업요일 포맷팅
-  const formattedBusinessDays = useMemo(() => {
-    if (!shop) return '';
-    const shopData = shop as Shop & { businessDays?: string | null };
-    return formatBusinessDays(shopData.businessDays);
-  }, [shop]);
-
   // 예약 가능 시간대 조회
   const { data: availableSlots, isLoading: isLoadingSlots } = useAvailableTimeSlots(
     slug,
@@ -258,76 +251,55 @@ export default function Booking() {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <div className="bg-primary text-white py-8 px-4">
+      <div className="bg-primary text-white py-4 px-4">
         <div className="container mx-auto max-w-4xl">
-          <h1 className="text-3xl font-bold mb-2">{shop.name}</h1>
-          <div className="space-y-2 text-white/90">
-            <div className="flex items-center gap-2">
-              <Phone className="w-4 h-4" />
-              <span>{shop.phone}</span>
+          {/* 상단: 가게명 + 액션 버튼 */}
+          <div className="flex items-center justify-between mb-3">
+            <h1 className="text-2xl font-bold">{shop.name}</h1>
+            <div className="flex gap-2">
+              <a href={`tel:${shop.phone}`}>
+                <Button variant="secondary" size="sm" className="gap-1.5 h-8 px-3" data-testid="button-call">
+                  <Phone className="w-3.5 h-3.5" />
+                  전화
+                </Button>
+              </a>
+              <a href={`https://map.naver.com/v5/search/${encodeURIComponent(shop.address)}`} target="_blank" rel="noopener noreferrer">
+                <Button variant="secondary" size="sm" className="gap-1.5 h-8 px-3" data-testid="button-map">
+                  <MapPin className="w-3.5 h-3.5" />
+                  지도
+                </Button>
+              </a>
             </div>
-            <div className="flex items-center gap-2">
-              <MapPin className="w-4 h-4" />
-              <span>{shop.address}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Clock className="w-4 h-4" />
-              <span>영업시간: {formatBusinessHoursCompact(
+          </div>
+
+          {/* 중단: 핵심 정보 한 줄 */}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-white/90">
+            <span className="flex items-center gap-1.5">
+              <Clock className="w-3.5 h-3.5" />
+              {formatBusinessHoursCompact(
                 (shop as any).businessDays ? JSON.parse((shop as any).businessDays) : null,
                 shop.businessHours
-              )}</span>
+              )}
+            </span>
+            <span className="flex items-center gap-1.5">
+              <MapPin className="w-3.5 h-3.5" />
+              {shop.address}
+            </span>
+          </div>
+
+          {/* 하단: 안내사항 (있을 경우만) */}
+          {(shop as any).shopMemo && (
+            <div className="mt-3 pt-3 border-t border-white/20">
+              <p className="text-sm text-white/90 flex items-start gap-1.5">
+                <Info className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                <span>{(shop as any).shopMemo}</span>
+              </p>
             </div>
-          </div>
-          <div className="flex gap-3 mt-4">
-            <a href={`tel:${shop.phone}`}>
-              <Button variant="secondary" size="sm" className="gap-2" data-testid="button-call">
-                <Phone className="w-4 h-4" />
-                전화걸기
-              </Button>
-            </a>
-            <a href={`https://map.naver.com/v5/search/${encodeURIComponent(shop.address)}`} target="_blank" rel="noopener noreferrer">
-              <Button variant="secondary" size="sm" className="gap-2" data-testid="button-map">
-                <MapPin className="w-4 h-4" />
-                지도보기
-              </Button>
-            </a>
-          </div>
+          )}
         </div>
       </div>
 
       <div className="container mx-auto px-4 max-w-4xl py-8">
-        {/* 가게 안내 섹션 (메모 + 영업요일) */}
-        {((shop as any).shopMemo || formattedBusinessDays) && (
-          <div className="mb-8 p-4 bg-blue-50 border border-blue-200 rounded-2xl">
-            <div className="flex items-start gap-2">
-              <Info className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
-              <div className="space-y-3 flex-1">
-                <p className="font-medium text-blue-800">가게 안내</p>
-                
-                {/* 영업요일/시간 */}
-                {formattedBusinessDays && (
-                  <div className="text-sm text-blue-700">
-                    <p className="font-medium mb-1 flex items-center gap-1">
-                      <CalendarIcon className="w-4 h-4" /> 영업시간
-                    </p>
-                    <p className="whitespace-pre-line">{formattedBusinessDays}</p>
-                  </div>
-                )}
-                
-                {/* 가게 메모 */}
-                {(shop as any).shopMemo && (
-                  <div className="text-sm text-blue-700">
-                    <p className="font-medium mb-1 flex items-center gap-1">
-                      <FileText className="w-4 h-4" /> 안내사항
-                    </p>
-                    <p className="whitespace-pre-line">{(shop as any).shopMemo}</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-12">
 
           <section>
