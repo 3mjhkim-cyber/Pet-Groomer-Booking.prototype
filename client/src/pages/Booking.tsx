@@ -254,36 +254,36 @@ export default function Booking() {
       <div className="bg-primary text-white py-4 px-4">
         <div className="container mx-auto max-w-4xl">
           {/* 상단: 가게명 + 액션 버튼 */}
-          <div className="flex items-center justify-between mb-3">
-            <h1 className="text-2xl font-bold">{shop.name}</h1>
-            <div className="flex gap-2">
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <h1 className="text-xl sm:text-2xl font-bold truncate">{shop.name}</h1>
+            <div className="flex gap-1.5 sm:gap-2 flex-shrink-0">
               <a href={`tel:${shop.phone}`}>
-                <Button variant="secondary" size="sm" className="gap-1.5 h-8 px-3" data-testid="button-call">
+                <Button variant="secondary" size="sm" className="gap-1 sm:gap-1.5 h-8 px-2 sm:px-3 text-xs sm:text-sm" data-testid="button-call">
                   <Phone className="w-3.5 h-3.5" />
-                  전화
+                  <span className="hidden xs:inline">전화</span>
                 </Button>
               </a>
               <a href={`https://map.naver.com/v5/search/${encodeURIComponent(shop.address)}`} target="_blank" rel="noopener noreferrer">
-                <Button variant="secondary" size="sm" className="gap-1.5 h-8 px-3" data-testid="button-map">
+                <Button variant="secondary" size="sm" className="gap-1 sm:gap-1.5 h-8 px-2 sm:px-3 text-xs sm:text-sm" data-testid="button-map">
                   <MapPin className="w-3.5 h-3.5" />
-                  지도
+                  <span className="hidden xs:inline">지도</span>
                 </Button>
               </a>
             </div>
           </div>
 
-          {/* 중단: 핵심 정보 한 줄 */}
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-white/90">
+          {/* 중단: 핵심 정보 */}
+          <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-1 sm:gap-x-4 sm:gap-y-1 text-xs sm:text-sm text-white/90">
             <span className="flex items-center gap-1.5">
-              <Clock className="w-3.5 h-3.5" />
-              {formatBusinessHoursCompact(
+              <Clock className="w-3.5 h-3.5 flex-shrink-0" />
+              <span className="truncate">{formatBusinessHoursCompact(
                 (shop as any).businessDays ? JSON.parse((shop as any).businessDays) : null,
                 shop.businessHours
-              )}
+              )}</span>
             </span>
             <span className="flex items-center gap-1.5">
-              <MapPin className="w-3.5 h-3.5" />
-              {shop.address}
+              <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
+              <span className="truncate">{shop.address}</span>
             </span>
           </div>
 
@@ -299,13 +299,13 @@ export default function Booking() {
         </div>
       </div>
 
-      <div className="container mx-auto px-4 max-w-4xl py-8">
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-12">
+      <div className="container mx-auto px-3 sm:px-4 max-w-4xl py-6 sm:py-8">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8 sm:space-y-12">
 
           <section>
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-xl">1</div>
-              <h2 className="text-2xl font-bold">어떤 서비스가 필요하신가요?</h2>
+            <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-lg sm:text-xl flex-shrink-0">1</div>
+              <h2 className="text-lg sm:text-2xl font-bold">어떤 서비스가 필요하신가요?</h2>
             </div>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
@@ -346,12 +346,12 @@ export default function Booking() {
           </section>
 
           <section>
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-xl">2</div>
-              <h2 className="text-2xl font-bold">언제 방문하실 건가요?</h2>
+            <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-lg sm:text-xl flex-shrink-0">2</div>
+              <h2 className="text-lg sm:text-2xl font-bold">언제 방문하실 건가요?</h2>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-white p-8 rounded-3xl border border-border shadow-sm">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-8 bg-white p-4 sm:p-8 rounded-2xl sm:rounded-3xl border border-border shadow-sm">
               <div className="space-y-4">
                 <label className="block font-medium text-foreground/80 mb-2 flex items-center gap-2">
                   <CalendarIcon className="w-4 h-4" /> 날짜 선택
@@ -425,7 +425,7 @@ export default function Booking() {
                     <p className="text-sm text-muted-foreground mt-2">다른 날짜를 선택해주세요</p>
                   </div>
                 ) : selectedDate && !isLoadingSlots && (
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-3 gap-2 sm:gap-3">
                     {availableSlots?.map((slot: { time: string; available: boolean; reason?: string }) => (
                       <label key={slot.time} className={cn(
                         slot.available ? "cursor-pointer" : "cursor-not-allowed"
@@ -464,12 +464,12 @@ export default function Booking() {
           </section>
 
           <section>
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-xl">3</div>
-              <h2 className="text-2xl font-bold">예약자 정보를 입력해주세요</h2>
+            <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-lg sm:text-xl flex-shrink-0">3</div>
+              <h2 className="text-lg sm:text-2xl font-bold">예약자 정보를 입력해주세요</h2>
             </div>
 
-            <div className="bg-white p-8 rounded-3xl border border-border shadow-sm space-y-6">
+            <div className="bg-white p-4 sm:p-8 rounded-2xl sm:rounded-3xl border border-border shadow-sm space-y-4 sm:space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <label className="font-medium text-foreground/80 flex items-center gap-2">
@@ -526,11 +526,11 @@ export default function Booking() {
                 </div>
               )}
 
-              <div className="border-t pt-6">
-                <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
-                  <PawPrint className="w-5 h-5 text-primary" /> 반려동물 정보
+              <div className="border-t pt-4 sm:pt-6">
+                <h3 className="font-bold text-base sm:text-lg mb-3 sm:mb-4 flex items-center gap-2">
+                  <PawPrint className="w-4 h-4 sm:w-5 sm:h-5 text-primary" /> 반려동물 정보
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                   <div className="space-y-2">
                     <label className="font-medium text-foreground/80">반려동물 이름 *</label>
                     <input
@@ -575,9 +575,9 @@ export default function Booking() {
                 </div>
               </div>
 
-              <div className="border-t pt-6">
+              <div className="border-t pt-4 sm:pt-6">
                 <div className="space-y-2">
-                  <label className="font-medium text-foreground/80 flex items-center gap-2">
+                  <label className="font-medium text-foreground/80 flex items-center gap-2 text-sm sm:text-base">
                     <FileText className="w-4 h-4" /> 특이사항 (선택)
                   </label>
                   <textarea
@@ -606,8 +606,8 @@ export default function Booking() {
           </section>
 
           {shop.depositRequired && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 text-center">
-              <p className="text-yellow-800">
+            <div className="bg-yellow-50 border border-yellow-200 rounded-xl sm:rounded-2xl p-3 sm:p-4 text-center">
+              <p className="text-yellow-800 text-sm sm:text-base">
                 예약 확정 시 예약금 <strong>{shop.depositAmount.toLocaleString()}원</strong>이 필요합니다.
               </p>
             </div>
@@ -616,7 +616,7 @@ export default function Booking() {
           <button
             type="submit"
             disabled={createBookingMutation.isPending}
-            className="w-full py-5 rounded-2xl font-bold text-xl text-white bg-primary hover:bg-primary/90 shadow-lg shadow-primary/25 hover:shadow-xl hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-3"
+            className="w-full py-4 sm:py-5 rounded-xl sm:rounded-2xl font-bold text-lg sm:text-xl text-white bg-primary hover:bg-primary/90 shadow-lg shadow-primary/25 hover:shadow-xl hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 sm:gap-3"
             data-testid="button-submit-booking"
           >
             {createBookingMutation.isPending ? (
