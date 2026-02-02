@@ -491,11 +491,28 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateBookingStatus(id: number, status: string): Promise<Booking | undefined> {
+    // 먼저 현재 예약 상태 확인
+    const [currentBooking] = await db.select().from(bookings).where(eq(bookings.id, id));
+
+    if (!currentBooking) return undefined;
+
+    // 취소/거절 시: 이미 방문 완료 처리된 예약이면 고객 방문 횟수 감소
+    if ((status === 'cancelled' || status === 'rejected') && currentBooking.visitCompleted && currentBooking.customerId) {
+      const customer = await this.getCustomer(currentBooking.customerId);
+      if (customer && customer.visitCount > 0) {
+        await db.update(customers)
+          .set({
+            visitCount: customer.visitCount - 1,
+            updatedAt: new Date(),
+          })
+          .where(eq(customers.id, customer.id));
+      }
+    }
+
     const [booking] = await db.update(bookings)
-      .set({ status })
+      .set({ status, visitCompleted: false }) // 취소/거절 시 visitCompleted도 리셋
       .where(eq(bookings.id, id))
       .returning();
-    // 방문 횟수는 예약 시간이 지난 후에만 증가 (processCompletedBookings에서 처리)
     return booking;
   }
 
