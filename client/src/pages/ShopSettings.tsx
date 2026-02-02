@@ -378,22 +378,25 @@ export default function ShopSettings() {
           </CardHeader>
           <CardContent className="space-y-4">
             {(Object.keys(DAY_LABELS) as Array<keyof BusinessDays>).map(day => (
-              <div key={day} className="flex items-center gap-4 p-3 rounded-lg bg-secondary/30">
-                <div className="w-16 font-medium">{DAY_LABELS[day]}</div>
-                <Switch
-                  checked={!businessDays[day].closed}
-                  onCheckedChange={(checked) => updateDaySchedule(day, 'closed', !checked)}
-                  data-testid={`switch-${day}`}
-                />
-                {businessDays[day].closed ? (
-                  <Badge variant="secondary" className="text-muted-foreground">휴무</Badge>
-                ) : (
-                  <div className="flex items-center gap-2">
+              <div key={day} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 p-3 rounded-lg bg-secondary/30">
+                <div className="flex items-center gap-3 sm:gap-4">
+                  <div className="w-12 sm:w-16 font-medium">{DAY_LABELS[day]}</div>
+                  <Switch
+                    checked={!businessDays[day].closed}
+                    onCheckedChange={(checked) => updateDaySchedule(day, 'closed', !checked)}
+                    data-testid={`switch-${day}`}
+                  />
+                  {businessDays[day].closed && (
+                    <Badge variant="secondary" className="text-muted-foreground">휴무</Badge>
+                  )}
+                </div>
+                {!businessDays[day].closed && (
+                  <div className="flex items-center gap-2 ml-0 sm:ml-0">
                     <Input
                       type="time"
                       value={businessDays[day].open}
                       onChange={(e) => updateDaySchedule(day, 'open', e.target.value)}
-                      className="w-32"
+                      className="w-[120px] sm:w-32"
                       data-testid={`input-${day}-open`}
                     />
                     <span className="text-muted-foreground">~</span>
@@ -401,7 +404,7 @@ export default function ShopSettings() {
                       type="time"
                       value={businessDays[day].close}
                       onChange={(e) => updateDaySchedule(day, 'close', e.target.value)}
-                      className="w-32"
+                      className="w-[120px] sm:w-32"
                       data-testid={`input-${day}-close`}
                     />
                   </div>
@@ -425,18 +428,18 @@ export default function ShopSettings() {
             <CardDescription>명절, 휴가 등 특정 날짜에 가게를 쉬는 경우 등록하세요</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Input
                 type="date"
                 value={newClosedDate}
                 onChange={(e) => setNewClosedDate(e.target.value)}
                 min={new Date().toISOString().split('T')[0]}
-                className="w-48"
+                className="w-auto min-w-[150px] flex-shrink-0"
                 data-testid="input-new-closed-date"
               />
               <Button onClick={addClosedDate} disabled={!newClosedDate || updateShopMutation.isPending} data-testid="button-add-closed-date">
                 <Plus className="w-4 h-4 mr-1" />
-                휴무일 추가
+                추가
               </Button>
             </div>
 
@@ -504,12 +507,12 @@ export default function ShopSettings() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleAddService} className="space-y-3 mb-6 p-4 bg-secondary/20 rounded-lg">
-              <div className="flex gap-2 flex-wrap">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 <Input
                   placeholder="서비스명"
                   value={newService.name}
                   onChange={e => setNewService(s => ({...s, name: e.target.value}))}
-                  className="w-40"
+                  className="col-span-2 sm:col-span-1"
                   data-testid="input-new-service-name"
                 />
                 <Input
@@ -518,7 +521,6 @@ export default function ShopSettings() {
                   placeholder="시간(분)"
                   value={newService.duration}
                   onChange={e => setNewService(s => ({...s, duration: handleNumberInput(e.target.value)}))}
-                  className="w-24"
                   data-testid="input-new-service-duration"
                 />
                 <Input
@@ -527,7 +529,6 @@ export default function ShopSettings() {
                   placeholder="가격"
                   value={newService.price}
                   onChange={e => setNewService(s => ({...s, price: handleNumberInput(e.target.value)}))}
-                  className="w-28"
                   data-testid="input-new-service-price"
                 />
               </div>

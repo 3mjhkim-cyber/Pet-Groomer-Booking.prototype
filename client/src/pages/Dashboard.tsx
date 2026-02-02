@@ -232,12 +232,12 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-secondary/10 pb-20">
       <div className="bg-white border-b border-border shadow-sm sticky top-16 z-10">
-        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold">{user.shopName}</h1>
+        <div className="container mx-auto px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="text-xl font-bold truncate">{user.shopName}</h1>
             <p className="text-sm text-muted-foreground">관리자 대시보드</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               variant="ghost"
               size="icon"
@@ -263,10 +263,11 @@ export default function Dashboard() {
                 data-testid="button-copy-booking-link"
               >
                 <Link className="w-4 h-4" />
-                예약 링크 복사
+                <span className="hidden sm:inline">예약 링크 복사</span>
+                <span className="sm:hidden">링크</span>
               </Button>
             ) : (
-              <span className="text-sm text-muted-foreground bg-yellow-100 px-3 py-1.5 rounded-lg">
+              <span className="text-sm text-muted-foreground bg-yellow-100 px-3 py-1.5 rounded-lg whitespace-nowrap">
                 승인 대기중
               </span>
             )}
@@ -274,7 +275,8 @@ export default function Dashboard() {
             <DialogTrigger asChild>
               <Button className="gap-2" data-testid="button-manual-booking">
                 <Plus className="w-4 h-4" />
-                수동 예약 추가
+                <span className="hidden sm:inline">수동 예약 추가</span>
+                <span className="sm:hidden">예약</span>
               </Button>
             </DialogTrigger>
             <DialogContent>
