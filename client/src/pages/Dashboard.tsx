@@ -211,8 +211,9 @@ export default function Dashboard() {
     return isAfter(now, bookingDateTime);
   };
 
-  // 전체 확정 예약 수 (배지용)
-  const totalConfirmedCount = bookings?.filter(b => b.status === 'confirmed').length || 0;
+  // 오늘 확정 예약 수 (배지용)
+  const todayStr = format(new Date(), 'yyyy-MM-dd');
+  const todayConfirmedCount = bookings?.filter(b => b.status === 'confirmed' && b.date === todayStr).length || 0;
 
   const handleManualSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -395,8 +396,8 @@ export default function Dashboard() {
               <TabsTrigger value="confirmed" className="gap-2" data-testid="tab-confirmed">
                 <Check className="w-4 h-4" />
                 확정된 예약
-                {totalConfirmedCount > 0 && (
-                  <Badge variant="secondary" className="ml-1">{totalConfirmedCount}</Badge>
+                {todayConfirmedCount > 0 && (
+                  <Badge variant="secondary" className="ml-1">{todayConfirmedCount}</Badge>
                 )}
               </TabsTrigger>
             </TabsList>

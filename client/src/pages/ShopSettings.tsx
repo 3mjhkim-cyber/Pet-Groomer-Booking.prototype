@@ -100,7 +100,7 @@ export default function ShopSettings() {
   // 가게 메모 상태
   const [shopMemo, setShopMemo] = useState('');
 
-  const [newService, setNewService] = useState({ name: '', duration: '' as string | number, price: '' as string | number });
+  const [newService, setNewService] = useState({ name: '', description: '', duration: '' as string | number, price: '' as string | number });
 
   useEffect(() => {
     if (shop) {
@@ -251,7 +251,12 @@ export default function ShopSettings() {
       toast({ title: "입력 오류", description: "시간과 가격을 올바르게 입력해주세요.", variant: "destructive" });
       return;
     }
-    addServiceMutation.mutate({ name: newService.name, duration, price });
+    addServiceMutation.mutate({
+      name: newService.name,
+      description: newService.description || undefined,
+      duration,
+      price
+    });
   };
 
   return (
@@ -498,31 +503,40 @@ export default function ShopSettings() {
             <CardDescription>제공하는 미용 서비스를 관리합니다</CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleAddService} className="flex gap-2 mb-4 flex-wrap">
-              <Input 
-                placeholder="서비스명"
-                value={newService.name}
-                onChange={e => setNewService(s => ({...s, name: e.target.value}))}
-                className="w-40"
-                data-testid="input-new-service-name"
-              />
-              <Input 
-                type="number"
-                min="0"
-                placeholder="시간(분)"
-                value={newService.duration}
-                onChange={e => setNewService(s => ({...s, duration: handleNumberInput(e.target.value)}))}
-                className="w-24"
-                data-testid="input-new-service-duration"
-              />
-              <Input 
-                type="number"
-                min="0"
-                placeholder="가격"
-                value={newService.price}
-                onChange={e => setNewService(s => ({...s, price: handleNumberInput(e.target.value)}))}
-                className="w-28"
-                data-testid="input-new-service-price"
+            <form onSubmit={handleAddService} className="space-y-3 mb-6 p-4 bg-secondary/20 rounded-lg">
+              <div className="flex gap-2 flex-wrap">
+                <Input
+                  placeholder="서비스명"
+                  value={newService.name}
+                  onChange={e => setNewService(s => ({...s, name: e.target.value}))}
+                  className="w-40"
+                  data-testid="input-new-service-name"
+                />
+                <Input
+                  type="number"
+                  min="0"
+                  placeholder="시간(분)"
+                  value={newService.duration}
+                  onChange={e => setNewService(s => ({...s, duration: handleNumberInput(e.target.value)}))}
+                  className="w-24"
+                  data-testid="input-new-service-duration"
+                />
+                <Input
+                  type="number"
+                  min="0"
+                  placeholder="가격"
+                  value={newService.price}
+                  onChange={e => setNewService(s => ({...s, price: handleNumberInput(e.target.value)}))}
+                  className="w-28"
+                  data-testid="input-new-service-price"
+                />
+              </div>
+              <Input
+                placeholder="서비스 설명 (선택사항)"
+                value={newService.description}
+                onChange={e => setNewService(s => ({...s, description: e.target.value}))}
+                className="w-full"
+                data-testid="input-new-service-description"
               />
               <Button type="submit" disabled={addServiceMutation.isPending} data-testid="button-add-service">
                 <Plus className="w-4 h-4 mr-1" />
@@ -537,22 +551,27 @@ export default function ShopSettings() {
             ) : services && services.length > 0 ? (
               <div className="space-y-2">
                 {services.filter(s => s.isActive).map(service => (
-                  <div key={service.id} className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg" data-testid={`service-item-${service.id}`}>
-                    <div>
-                      <span className="font-medium">{service.name}</span>
-                      <span className="text-sm text-muted-foreground ml-2">
-                        {service.duration}분 / {service.price.toLocaleString()}원
-                      </span>
+                  <div key={service.id} className="p-3 bg-secondary/30 rounded-lg" data-testid={`service-item-${service.id}`}>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="font-medium">{service.name}</span>
+                        <span className="text-sm text-muted-foreground ml-2">
+                          {service.duration}분 / {service.price.toLocaleString()}원
+                        </span>
+                      </div>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => deleteServiceMutation.mutate(service.id)}
+                        disabled={deleteServiceMutation.isPending}
+                        data-testid={`button-delete-service-${service.id}`}
+                      >
+                        <Trash2 className="w-4 h-4 text-destructive" />
+                      </Button>
                     </div>
-                    <Button 
-                      size="icon" 
-                      variant="ghost"
-                      onClick={() => deleteServiceMutation.mutate(service.id)}
-                      disabled={deleteServiceMutation.isPending}
-                      data-testid={`button-delete-service-${service.id}`}
-                    >
-                      <Trash2 className="w-4 h-4 text-destructive" />
-                    </Button>
+                    {service.description && (
+                      <p className="text-sm text-muted-foreground mt-1">{service.description}</p>
+                    )}
                   </div>
                 ))}
               </div>

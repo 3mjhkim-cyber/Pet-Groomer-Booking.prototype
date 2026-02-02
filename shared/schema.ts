@@ -58,6 +58,7 @@ export const services = pgTable("services", {
   id: serial("id").primaryKey(),
   shopId: integer("shop_id").references(() => shops.id),
   name: text("name").notNull(),
+  description: text("description"),
   duration: integer("duration").notNull(),
   price: integer("price").notNull(),
   isActive: boolean("is_active").default(true).notNull(),
