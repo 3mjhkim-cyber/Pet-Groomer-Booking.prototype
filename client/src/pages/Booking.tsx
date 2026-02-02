@@ -351,10 +351,11 @@ export default function Booking() {
               <h2 className="text-lg sm:text-2xl font-bold">언제 방문하실 건가요?</h2>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-8 bg-white p-4 sm:p-8 rounded-2xl sm:rounded-3xl border border-border shadow-sm">
-              <div className="space-y-4">
-                <label className="block font-medium text-foreground/80 mb-2 flex items-center gap-2">
-                  <CalendarIcon className="w-4 h-4" /> 날짜 선택
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 bg-white p-4 sm:p-6 rounded-2xl border border-border shadow-sm">
+              <div className="space-y-3">
+                <label className="flex items-center gap-2 font-medium text-foreground/80 text-sm sm:text-base">
+                  <CalendarIcon className="w-4 h-4 flex-shrink-0" />
+                  <span>날짜 선택</span>
                 </label>
                 <input
                   type="date"
@@ -367,11 +368,11 @@ export default function Booking() {
                       form.setValue("date", '', { shouldValidate: true });
                       return;
                     }
-                    
+
                     // 휴무일 체크
                     const shopData = shop as Shop & { closedDates?: string | null; businessDays?: string | null };
                     const closedCheck = checkClosedStatus(newDate, shopData?.closedDates, shopData?.businessDays);
-                    
+
                     if (closedCheck.isClosed) {
                       // 휴무일 선택 시 경고 토스트 표시하고 선택 초기화
                       toast({
@@ -382,19 +383,19 @@ export default function Booking() {
                       e.target.value = selectedDate || ''; // 이전 값으로 되돌림
                       return;
                     }
-                    
+
                     form.setValue("date", newDate, { shouldValidate: true });
                     setSelectedDate(newDate);
                     form.setValue("time", ""); // 날짜 변경 시 시간 초기화
                   }}
-                  className="w-full px-4 py-3 rounded-xl border-2 border-border focus:border-primary focus:outline-none transition-colors"
+                  className="w-full h-12 px-4 rounded-xl border-2 border-border focus:border-primary focus:outline-none transition-colors text-base"
                   data-testid="input-date"
                 />
                 {form.formState.errors.date && <p className="text-destructive text-sm">{form.formState.errors.date.message}</p>}
-                
+
                 {/* 휴무일 안내 */}
                 {closedDatesList.length > 0 && (
-                  <div className="text-xs text-muted-foreground flex items-start gap-1 mt-2">
+                  <div className="text-xs text-muted-foreground flex items-start gap-1.5">
                     <Info className="w-3 h-3 mt-0.5 flex-shrink-0" />
                     <span>
                       가까운 휴무일: {closedDatesList.slice(0, 3).map(d => {
@@ -407,10 +408,11 @@ export default function Booking() {
                 )}
               </div>
 
-              <div className="space-y-4">
-                <label className="block font-medium text-foreground/80 mb-2 flex items-center gap-2">
-                  <Clock className="w-4 h-4" /> 시간 선택
-                  {!selectedDate && <span className="text-sm text-muted-foreground">(날짜를 먼저 선택해주세요)</span>}
+              <div className="space-y-3">
+                <label className="flex items-center gap-2 font-medium text-foreground/80 text-sm sm:text-base">
+                  <Clock className="w-4 h-4 flex-shrink-0" />
+                  <span>시간 선택</span>
+                  {!selectedDate && <span className="text-xs text-muted-foreground ml-1">(날짜 먼저 선택)</span>}
                 </label>
                 {isLoadingSlots && selectedDate && (
                   <div className="flex items-center justify-center py-4">
@@ -469,11 +471,11 @@ export default function Booking() {
               <h2 className="text-lg sm:text-2xl font-bold">예약자 정보를 입력해주세요</h2>
             </div>
 
-            <div className="bg-white p-4 sm:p-8 rounded-2xl sm:rounded-3xl border border-border shadow-sm space-y-4 sm:space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="bg-white p-4 sm:p-6 rounded-2xl border border-border shadow-sm space-y-4 sm:space-y-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                 <div className="space-y-2">
-                  <label className="font-medium text-foreground/80 flex items-center gap-2">
-                    <User className="w-4 h-4" /> 보호자 이름 *
+                  <label className="flex items-center gap-2 font-medium text-foreground/80 text-sm sm:text-base">
+                    <User className="w-4 h-4 flex-shrink-0" /> 보호자 이름 *
                   </label>
                   <input
                     {...form.register("customerName")}
@@ -485,8 +487,8 @@ export default function Booking() {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="font-medium text-foreground/80 flex items-center gap-2">
-                    <Phone className="w-4 h-4" /> 전화번호 *
+                  <label className="flex items-center gap-2 font-medium text-foreground/80 text-sm sm:text-base">
+                    <Phone className="w-4 h-4 flex-shrink-0" /> 전화번호 *
                   </label>
                   <div className="relative">
                     <input
@@ -526,13 +528,13 @@ export default function Booking() {
                 </div>
               )}
 
-              <div className="border-t pt-4 sm:pt-6">
-                <h3 className="font-bold text-base sm:text-lg mb-3 sm:mb-4 flex items-center gap-2">
-                  <PawPrint className="w-4 h-4 sm:w-5 sm:h-5 text-primary" /> 반려동물 정보
+              <div className="border-t pt-4 sm:pt-5">
+                <h3 className="font-semibold text-base sm:text-lg mb-3 sm:mb-4 flex items-center gap-2">
+                  <PawPrint className="w-4 h-4 sm:w-5 sm:h-5 text-primary flex-shrink-0" /> 반려동물 정보
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                   <div className="space-y-2">
-                    <label className="font-medium text-foreground/80">반려동물 이름 *</label>
+                    <label className="font-medium text-foreground/80 text-sm sm:text-base">반려동물 이름 *</label>
                     <input
                       {...form.register("petName")}
                       placeholder="예: 뭉치"
@@ -543,7 +545,7 @@ export default function Booking() {
                   </div>
 
                   <div className="space-y-2">
-                    <label className="font-medium text-foreground/80">반려동물 종 *</label>
+                    <label className="font-medium text-foreground/80 text-sm sm:text-base">반려동물 종 *</label>
                     <input
                       {...form.register("petBreed")}
                       placeholder="예: 말티즈, 푸들, 시츄 등"
@@ -554,7 +556,7 @@ export default function Booking() {
                   </div>
 
                   <div className="space-y-2">
-                    <label className="font-medium text-foreground/80">반려동물 나이 (선택)</label>
+                    <label className="font-medium text-foreground/80 text-sm sm:text-base">반려동물 나이 (선택)</label>
                     <input
                       {...form.register("petAge")}
                       placeholder="예: 3살"
@@ -564,7 +566,7 @@ export default function Booking() {
                   </div>
 
                   <div className="space-y-2">
-                    <label className="font-medium text-foreground/80">반려동물 몸무게 (선택)</label>
+                    <label className="font-medium text-foreground/80 text-sm sm:text-base">반려동물 몸무게 (선택)</label>
                     <input
                       {...form.register("petWeight")}
                       placeholder="예: 5kg"
@@ -575,10 +577,10 @@ export default function Booking() {
                 </div>
               </div>
 
-              <div className="border-t pt-4 sm:pt-6">
+              <div className="border-t pt-4 sm:pt-5">
                 <div className="space-y-2">
-                  <label className="font-medium text-foreground/80 flex items-center gap-2 text-sm sm:text-base">
-                    <FileText className="w-4 h-4" /> 특이사항 (선택)
+                  <label className="flex items-center gap-2 font-medium text-foreground/80 text-sm sm:text-base">
+                    <FileText className="w-4 h-4 flex-shrink-0" /> 특이사항 (선택)
                   </label>
                   <textarea
                     {...form.register("memo")}
