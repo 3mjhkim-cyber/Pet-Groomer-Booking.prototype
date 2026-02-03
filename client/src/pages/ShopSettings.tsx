@@ -264,7 +264,9 @@ export default function ShopSettings() {
   const { data: bookedSlotsForDate } = useQuery<{ time: string; duration: number }[]>({
     queryKey: ['/api/shop/booked-slots', blockDate],
     queryFn: async () => {
-      const res = await fetch(`/api/shop/booked-slots/${blockDate}`);
+      const res = await fetch(`/api/shop/booked-slots/${blockDate}`, {
+        credentials: "include",
+      });
       if (!res.ok) return [];
       return res.json();
     },
