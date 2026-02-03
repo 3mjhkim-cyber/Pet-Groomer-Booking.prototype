@@ -15,6 +15,8 @@ export const shops = pgTable("shops", {
   closedDates: text("closed_dates"),
   // 특정 날짜의 차단된 시간대 (JSON): {"2026-02-03": ["10:00", "10:30"], ...}
   blockedSlots: text("blocked_slots"),
+  // 예약이 있어도 강제로 열어둔 시간대 (JSON): {"2026-02-03": ["14:00", "14:30"], ...}
+  forceOpenSlots: text("force_open_slots"),
   // 가게 소개/메모 (주차 안내, 공지사항 등)
   shopMemo: text("shop_memo"),
   depositAmount: integer("deposit_amount").default(10000).notNull(),

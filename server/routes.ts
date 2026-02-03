@@ -339,9 +339,9 @@ export async function registerRoutes(
     if (!user.shopId) {
       return res.status(400).json({ message: "No shop associated" });
     }
-    const { name, phone, address, businessHours, depositAmount, depositRequired, businessDays, closedDates, shopMemo, blockedSlots } = req.body;
+    const { name, phone, address, businessHours, depositAmount, depositRequired, businessDays, closedDates, shopMemo, blockedSlots, forceOpenSlots } = req.body;
     const shop = await storage.updateShop(user.shopId, {
-      name, phone, address, businessHours, depositAmount, depositRequired, businessDays, closedDates, shopMemo, blockedSlots
+      name, phone, address, businessHours, depositAmount, depositRequired, businessDays, closedDates, shopMemo, blockedSlots, forceOpenSlots
     });
     res.json(shop);
   });
@@ -771,6 +771,17 @@ export async function registerRoutes(
       } catch {}
     }
 
+    // 강제 오픈된 시간대 확인
+    let forceOpenSlotsForDate: string[] = [];
+    if (shop.forceOpenSlots) {
+      try {
+        const allForceOpenSlots = JSON.parse(shop.forceOpenSlots);
+        if (allForceOpenSlots[date] && Array.isArray(allForceOpenSlots[date])) {
+          forceOpenSlotsForDate = allForceOpenSlots[date];
+        }
+      } catch {}
+    }
+
     // 오늘 날짜인지 확인 (지나간 시간 비활성화용) - KST(UTC+9) 기준
     const now = new Date();
     const kstOffset = 9 * 60; // KST = UTC+9
@@ -799,14 +810,16 @@ export async function registerRoutes(
         return { time: slot, available: false, reason: '영업시간 초과' };
       }
 
-      // 예약된 시간대와 충돌 여부 확인
-      for (const booked of bookedSlots) {
-        const bookedMinutes = parseInt(booked.time.split(':')[0]) * 60 + parseInt(booked.time.split(':')[1]);
-        const bookedEndMinutes = bookedMinutes + booked.duration;
+      // 예약된 시간대와 충돌 여부 확인 (강제 오픈된 시간대는 건너뜀)
+      if (!forceOpenSlotsForDate.includes(slot)) {
+        for (const booked of bookedSlots) {
+          const bookedMinutes = parseInt(booked.time.split(':')[0]) * 60 + parseInt(booked.time.split(':')[1]);
+          const bookedEndMinutes = bookedMinutes + booked.duration;
 
-        // 시간대가 겹치는지 확인
-        if (slotMinutes < bookedEndMinutes && slotEndMinutes > bookedMinutes) {
-          return { time: slot, available: false, reason: '예약 불가' };
+          // 시간대가 겹치는지 확인
+          if (slotMinutes < bookedEndMinutes && slotEndMinutes > bookedMinutes) {
+            return { time: slot, available: false, reason: '예약 불가' };
+          }
         }
       }
 
@@ -814,6 +827,18 @@ export async function registerRoutes(
     });
 
     res.json(availableSlots);
+  });
+
+  // Shop owner: 특정 날짜의 예약된 시간대 조회 (시간대 관리용)
+  app.get('/api/shop/booked-slots/:date', requireShopOwner, async (req, res) => {
+    const user = req.user as any;
+    if (!user.shopId) {
+      return res.status(400).json({ message: "No shop associated" });
+    }
+    const { date } = req.params;
+    const bookedSlots = await storage.getBookedTimeSlots(user.shopId, date);
+    // 예약된 시간대 목록 반환 (시간 + duration)
+    res.json(bookedSlots);
   });
 
   // Revenue Stats API (Shop Owner only)

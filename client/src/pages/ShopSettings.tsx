@@ -105,6 +105,7 @@ export default function ShopSettings() {
 
   // 시간대 차단 상태
   const [blockedSlots, setBlockedSlots] = useState<BlockedSlots>({});
+  const [forceOpenSlots, setForceOpenSlots] = useState<BlockedSlots>({});
   const [blockDate, setBlockDate] = useState('');
 
   const [newService, setNewService] = useState({ name: '', description: '', duration: '' as string | number, price: '' as string | number });
@@ -150,6 +151,16 @@ export default function ShopSettings() {
           setBlockedSlots(typeof parsed === 'object' && parsed !== null ? parsed : {});
         } catch {
           setBlockedSlots({});
+        }
+      }
+
+      // 강제 오픈 시간대 파싱
+      if (shop.forceOpenSlots) {
+        try {
+          const parsed = JSON.parse(shop.forceOpenSlots);
+          setForceOpenSlots(typeof parsed === 'object' && parsed !== null ? parsed : {});
+        } catch {
+          setForceOpenSlots({});
         }
       }
     }
@@ -247,8 +258,38 @@ export default function ShopSettings() {
 
   const blockDateSlots = useMemo(() => getTimeSlotsForDate(blockDate), [blockDate, businessDays]);
   const blockedForDate = blockedSlots[blockDate] || [];
+  const forceOpenForDate = forceOpenSlots[blockDate] || [];
 
-  // 시간대 차단/해제 토글
+  // 선택된 날짜의 예약된 시간대 조회
+  const { data: bookedSlotsForDate } = useQuery<{ time: string; duration: number }[]>({
+    queryKey: ['/api/shop/booked-slots', blockDate],
+    queryFn: async () => {
+      const res = await fetch(`/api/shop/booked-slots/${blockDate}`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!blockDate,
+  });
+
+  // 예약으로 인해 점유된 시간대 계산
+  const bookedTimeSet = useMemo(() => {
+    const set = new Set<string>();
+    if (!bookedSlotsForDate) return set;
+    for (const booked of bookedSlotsForDate) {
+      const [h, m] = booked.time.split(':').map(Number);
+      const startMin = h * 60 + m;
+      const endMin = startMin + booked.duration;
+      // 30분 단위로 점유된 시간대 마킹
+      for (let min = startMin; min < endMin; min += 30) {
+        const hh = Math.floor(min / 60);
+        const mm = min % 60;
+        set.add(`${hh.toString().padStart(2, '0')}:${mm.toString().padStart(2, '0')}`);
+      }
+    }
+    return set;
+  }, [bookedSlotsForDate]);
+
+  // 시간대 차단/해제 토글 (빈 시간대용)
   const toggleBlockSlot = (slot: string) => {
     const current = blockedSlots[blockDate] || [];
     let updated: string[];
@@ -268,12 +309,40 @@ export default function ShopSettings() {
     updateShopMutation.mutate({ blockedSlots: JSON.stringify(newBlockedSlots) });
   };
 
-  // 해당 날짜의 모든 차단 해제
+  // 예약된 시간대 강제 오픈/잠금 토글
+  const toggleForceOpen = (slot: string) => {
+    const current = forceOpenSlots[blockDate] || [];
+    let updated: string[];
+    if (current.includes(slot)) {
+      updated = current.filter(s => s !== slot);
+    } else {
+      updated = [...current, slot].sort();
+    }
+
+    const newForceOpen = { ...forceOpenSlots };
+    if (updated.length === 0) {
+      delete newForceOpen[blockDate];
+    } else {
+      newForceOpen[blockDate] = updated;
+    }
+    setForceOpenSlots(newForceOpen);
+    updateShopMutation.mutate({ forceOpenSlots: JSON.stringify(newForceOpen) });
+  };
+
+  // 해당 날짜의 모든 차단/강제오픈 해제
   const clearBlockedDate = (dateStr: string) => {
     const newBlockedSlots = { ...blockedSlots };
     delete newBlockedSlots[dateStr];
     setBlockedSlots(newBlockedSlots);
-    updateShopMutation.mutate({ blockedSlots: JSON.stringify(newBlockedSlots) });
+
+    const newForceOpen = { ...forceOpenSlots };
+    delete newForceOpen[dateStr];
+    setForceOpenSlots(newForceOpen);
+
+    updateShopMutation.mutate({
+      blockedSlots: JSON.stringify(newBlockedSlots),
+      forceOpenSlots: JSON.stringify(newForceOpen),
+    });
   };
 
   const addServiceMutation = useMutation({
@@ -556,7 +625,7 @@ export default function ShopSettings() {
               <Clock className="w-5 h-5" />
               시간대 차단 관리
             </CardTitle>
-            <CardDescription>특정 날짜의 특정 시간대를 수동으로 차단하거나 해제할 수 있습니다</CardDescription>
+            <CardDescription>특정 날짜의 시간대를 수동으로 차단/해제하고, 예약된 시간대를 강제로 열 수 있습니다</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex flex-wrap gap-2 items-end">
@@ -578,25 +647,50 @@ export default function ShopSettings() {
 
             {blockDate && blockDateSlots.length > 0 && (
               <div className="space-y-3">
+                <div className="flex flex-wrap gap-3 text-xs">
+                  <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-green-100 border border-green-300 inline-block" /> 예약 가능</span>
+                  <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-blue-100 border border-blue-300 inline-block" /> 예약됨</span>
+                  <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-red-100 border border-red-300 inline-block" /> 수동 차단</span>
+                  <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-amber-100 border border-amber-300 inline-block" /> 강제 오픈</span>
+                </div>
                 <p className="text-sm text-muted-foreground">
-                  시간대를 클릭하면 차단/해제됩니다. <span className="text-red-500 font-medium">빨간색</span>은 차단된 시간대입니다.
+                  빈 시간대 클릭 → 차단/해제 | 예약된 시간대 클릭 → 강제 오픈/잠금
                 </p>
                 <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
                   {blockDateSlots.map(slot => {
+                    const isBooked = bookedTimeSet.has(slot);
                     const isBlocked = blockedForDate.includes(slot);
+                    const isForceOpen = forceOpenForDate.includes(slot);
+
+                    let className = '';
+                    let label = slot;
+                    if (isBlocked) {
+                      className = 'bg-red-100 text-red-700 border-red-300 hover:bg-red-200';
+                    } else if (isBooked && isForceOpen) {
+                      className = 'bg-amber-100 text-amber-700 border-amber-300 hover:bg-amber-200';
+                    } else if (isBooked) {
+                      className = 'bg-blue-100 text-blue-600 border-blue-300 hover:bg-blue-200';
+                    } else {
+                      className = 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100';
+                    }
+
+                    const handleClick = () => {
+                      if (isBooked) {
+                        toggleForceOpen(slot);
+                      } else {
+                        toggleBlockSlot(slot);
+                      }
+                    };
+
                     return (
                       <button
                         key={slot}
                         type="button"
-                        onClick={() => toggleBlockSlot(slot)}
+                        onClick={handleClick}
                         disabled={updateShopMutation.isPending}
-                        className={`px-2 py-2 rounded-lg text-sm font-medium border transition-colors ${
-                          isBlocked
-                            ? 'bg-red-100 text-red-700 border-red-300 hover:bg-red-200'
-                            : 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100'
-                        }`}
+                        className={`px-2 py-2 rounded-lg text-sm font-medium border transition-colors ${className}`}
                       >
-                        {slot}
+                        {label}
                       </button>
                     );
                   })}
@@ -604,15 +698,20 @@ export default function ShopSettings() {
               </div>
             )}
 
-            {/* 차단된 날짜 목록 */}
-            {Object.keys(blockedSlots).length > 0 && (
+            {/* 설정된 날짜 목록 */}
+            {(Object.keys(blockedSlots).length > 0 || Object.keys(forceOpenSlots).length > 0) && (
               <div className="space-y-2 pt-2 border-t">
-                <p className="text-sm font-medium text-muted-foreground">차단 설정된 날짜:</p>
+                <p className="text-sm font-medium text-muted-foreground">설정된 날짜:</p>
                 <div className="flex flex-wrap gap-2">
-                  {Object.entries(blockedSlots)
-                    .sort(([a], [b]) => a.localeCompare(b))
-                    .map(([dateStr, slots]) => {
+                  {[...new Set([...Object.keys(blockedSlots), ...Object.keys(forceOpenSlots)])]
+                    .sort()
+                    .map(dateStr => {
                       const dateObj = new Date(dateStr + 'T00:00:00');
+                      const bCount = (blockedSlots[dateStr] || []).length;
+                      const fCount = (forceOpenSlots[dateStr] || []).length;
+                      const parts: string[] = [];
+                      if (bCount > 0) parts.push(`차단 ${bCount}`);
+                      if (fCount > 0) parts.push(`오픈 ${fCount}`);
                       return (
                         <Badge
                           key={dateStr}
@@ -620,7 +719,7 @@ export default function ShopSettings() {
                           className="flex items-center gap-1 px-3 py-1.5 cursor-pointer hover:bg-secondary/50"
                           onClick={() => setBlockDate(dateStr)}
                         >
-                          {format(dateObj, 'M월 d일 (EEE)', { locale: ko })} - {slots.length}건
+                          {format(dateObj, 'M월 d일 (EEE)', { locale: ko })} - {parts.join(', ')}
                           <button
                             onClick={(e) => { e.stopPropagation(); clearBlockedDate(dateStr); }}
                             className="ml-1 hover:text-destructive"
