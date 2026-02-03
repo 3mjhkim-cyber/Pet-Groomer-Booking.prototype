@@ -9,6 +9,9 @@ export function Navbar() {
   const { user, logout } = useAuth();
   const [location] = useLocation();
 
+  // 예약 페이지에서는 로그인 버튼 숨김
+  const isBookingPage = location.startsWith('/book/');
+
   // Super Admin인 경우 승인 대기 수 조회
   const { data: pendingCount } = useQuery<{ count: number }>({
     queryKey: ['/api/admin/pending-users/count'],
@@ -137,24 +140,27 @@ export function Navbar() {
               </button>
             </div>
           ) : (
-            <div className="flex items-center gap-2">
-              <Link href="/book/gangnam">
-                <button className={cn(
-                  "hidden sm:flex items-center px-4 py-2 rounded-full font-medium transition-all",
-                  location === "/book/gangnam" 
-                    ? "bg-primary text-white shadow-lg shadow-primary/30" 
-                    : "text-foreground/70 hover:bg-secondary/50"
-                )}>
-                  예약하기
-                </button>
-              </Link>
-              <Link href="/login">
-                <button className="flex items-center gap-2 px-4 py-2 rounded-full border border-border hover:bg-secondary/20 transition-all text-sm font-medium text-foreground/80" data-testid="link-login">
-                  <User className="h-4 w-4" />
-                  <span>로그인</span>
-                </button>
-              </Link>
-            </div>
+            // 예약 페이지에서는 로그인 버튼 숨김
+            !isBookingPage && (
+              <div className="flex items-center gap-2">
+                <Link href="/book/gangnam">
+                  <button className={cn(
+                    "hidden sm:flex items-center px-4 py-2 rounded-full font-medium transition-all",
+                    location === "/book/gangnam"
+                      ? "bg-primary text-white shadow-lg shadow-primary/30"
+                      : "text-foreground/70 hover:bg-secondary/50"
+                  )}>
+                    예약하기
+                  </button>
+                </Link>
+                <Link href="/login">
+                  <button className="flex items-center gap-2 px-4 py-2 rounded-full border border-border hover:bg-secondary/20 transition-all text-sm font-medium text-foreground/80" data-testid="link-login">
+                    <User className="h-4 w-4" />
+                    <span>로그인</span>
+                  </button>
+                </Link>
+              </div>
+            )
           )}
         </div>
       </div>
