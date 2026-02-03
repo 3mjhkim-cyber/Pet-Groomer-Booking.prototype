@@ -1,7 +1,7 @@
 import { useAuth } from "@/hooks/use-auth";
 import { useBookings, useServices, useApproveBooking, useRejectBooking, useRequestDeposit, useAdminCreateBooking, useSearchCustomers, useCustomerHistory, useCancelBooking, useUpdateBooking, useUpdateBookingCustomer, useAdminConfirmDeposit } from "@/hooks/use-shop";
 import { useLocation } from "wouter";
-import { Loader2, Calendar, Clock, User, Phone, Scissors, Check, X, Banknote, Plus, Link, Copy, History, Edit, XCircle, UserCog, PawPrint, FileText, Bell, MessageCircle, ChevronLeft, ChevronRight } from "lucide-react";
+import { Loader2, Calendar, Clock, User, Phone, Scissors, Check, X, Banknote, Plus, Link, Copy, History, Edit, XCircle, UserCog, PawPrint, FileText, Bell, MessageCircle, ChevronLeft, ChevronRight, LayoutDashboard, TrendingUp, DollarSign, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect, useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
@@ -15,7 +15,7 @@ import { formatKoreanPhone } from "@/lib/phone";
 import { useQueryClient, useMutation, useQuery } from "@tanstack/react-query";
 import { api } from "@shared/routes";
 import { apiRequest } from "@/lib/queryClient";
-import { format, addDays, subDays, isAfter, parse, isSameDay } from "date-fns";
+import { format, addDays, subDays, isAfter, parse, isSameDay, startOfWeek, endOfWeek } from "date-fns";
 import { ko } from "date-fns/locale";
 
 export default function Dashboard() {
@@ -215,6 +215,45 @@ export default function Dashboard() {
   const todayStr = format(new Date(), 'yyyy-MM-dd');
   const todayConfirmedCount = bookings?.filter(b => b.status === 'confirmed' && b.date === todayStr).length || 0;
 
+  // 대시보드 통계
+  const allConfirmedCount = bookings?.filter(b => b.status === 'confirmed').length || 0;
+  const rejectedCount = bookings?.filter(b => b.status === 'rejected').length || 0;
+
+  // 서비스 가격 맵
+  const servicePriceMap = useMemo(() => {
+    const map: Record<number, number> = {};
+    services?.forEach((s: any) => { map[s.id] = s.price; });
+    return map;
+  }, [services]);
+
+  // 총 매출 (확정 예약 기준)
+  const totalRevenue = useMemo(() => {
+    return bookings
+      ?.filter(b => b.status === 'confirmed')
+      .reduce((sum, b) => sum + (servicePriceMap[b.serviceId] || 0), 0) || 0;
+  }, [bookings, servicePriceMap]);
+
+  // 오늘의 확정 예약 (시간순)
+  const todayConfirmedBookings = useMemo(() => {
+    return bookings
+      ?.filter(b => b.status === 'confirmed' && b.date === todayStr)
+      .sort((a, b) => a.time.localeCompare(b.time)) || [];
+  }, [bookings, todayStr]);
+
+  // 이번 주 통계
+  const weekStats = useMemo(() => {
+    const now = new Date();
+    const weekStart = format(startOfWeek(now, { weekStartsOn: 1 }), 'yyyy-MM-dd');
+    const weekEnd = format(endOfWeek(now, { weekStartsOn: 1 }), 'yyyy-MM-dd');
+    const weekBookings = bookings?.filter(b =>
+      (b.status === 'confirmed' || b.status === 'pending') &&
+      b.date >= weekStart && b.date <= weekEnd
+    ) || [];
+    const weekConfirmed = weekBookings.filter(b => b.status === 'confirmed');
+    const weekRevenue = weekConfirmed.reduce((sum, b) => sum + (servicePriceMap[b.serviceId] || 0), 0);
+    return { count: weekBookings.length, revenue: weekRevenue };
+  }, [bookings, servicePriceMap]);
+
   const handleManualSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!manualForm.serviceId) return;
@@ -386,23 +425,162 @@ export default function Dashboard() {
             <Loader2 className="w-10 h-10 animate-spin text-primary" />
           </div>
         ) : (
-          <Tabs defaultValue="pending" className="w-full">
-            <TabsList className="grid w-full grid-cols-2 mb-6">
+          <Tabs defaultValue="dashboard" className="w-full">
+            <TabsList className="grid w-full grid-cols-3 mb-6">
+              <TabsTrigger value="dashboard" className="gap-2" data-testid="tab-dashboard">
+                <LayoutDashboard className="w-4 h-4" />
+                <span className="hidden sm:inline">대시보드</span>
+                <span className="sm:hidden">홈</span>
+              </TabsTrigger>
               <TabsTrigger value="pending" className="gap-2" data-testid="tab-pending">
                 <Clock className="w-4 h-4" />
-                대기 중
+                <span className="hidden sm:inline">예약 요청</span>
+                <span className="sm:hidden">요청</span>
                 {totalPendingCount > 0 && (
                   <Badge variant="destructive" className="ml-1">{totalPendingCount}</Badge>
                 )}
               </TabsTrigger>
               <TabsTrigger value="confirmed" className="gap-2" data-testid="tab-confirmed">
-                <Check className="w-4 h-4" />
-                확정된 예약
+                <Calendar className="w-4 h-4" />
+                <span className="hidden sm:inline">확정 예약</span>
+                <span className="sm:hidden">확정</span>
                 {todayConfirmedCount > 0 && (
                   <Badge variant="secondary" className="ml-1">{todayConfirmedCount}</Badge>
                 )}
               </TabsTrigger>
             </TabsList>
+
+            {/* 대시보드 개요 탭 */}
+            <TabsContent value="dashboard" className="space-y-6">
+              {/* 상태 요약 카드 */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                {/* 대기 중 */}
+                <div className="rounded-2xl p-4 sm:p-5 border" style={{ backgroundColor: '#FFFDE7', borderColor: '#FFF59D' }}>
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="font-semibold text-sm sm:text-base text-gray-700">대기 중</span>
+                    <Clock className="w-5 h-5 text-amber-500" />
+                  </div>
+                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">{totalPendingCount}</p>
+                  <p className="text-xs sm:text-sm text-gray-500 mt-1">승인 대기 중인 예약</p>
+                  {totalPendingCount > 0 && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full mt-3 text-xs"
+                      onClick={() => {
+                        const tabEl = document.querySelector('[data-testid="tab-pending"]') as HTMLElement;
+                        tabEl?.click();
+                      }}
+                    >
+                      확인하기
+                    </Button>
+                  )}
+                </div>
+
+                {/* 승인됨 */}
+                <div className="rounded-2xl p-4 sm:p-5 border" style={{ backgroundColor: '#E8F5E9', borderColor: '#A5D6A7' }}>
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="font-semibold text-sm sm:text-base text-gray-700">승인됨</span>
+                    <Check className="w-5 h-5 text-green-500" />
+                  </div>
+                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">{allConfirmedCount}</p>
+                  <p className="text-xs sm:text-sm text-gray-500 mt-1">확정된 예약</p>
+                </div>
+
+                {/* 거부됨 */}
+                <div className="rounded-2xl p-4 sm:p-5 border" style={{ backgroundColor: '#FFEBEE', borderColor: '#EF9A9A' }}>
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="font-semibold text-sm sm:text-base text-gray-700">거부됨</span>
+                    <AlertCircle className="w-5 h-5 text-red-400" />
+                  </div>
+                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">{rejectedCount}</p>
+                  <p className="text-xs sm:text-sm text-gray-500 mt-1">거부된 예약</p>
+                </div>
+
+                {/* 총 매출 */}
+                <div className="rounded-2xl p-4 sm:p-5 border" style={{ backgroundColor: '#F3E5F5', borderColor: '#CE93D8' }}>
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="font-semibold text-sm sm:text-base text-gray-700">총 매출</span>
+                    <DollarSign className="w-5 h-5 text-purple-500" />
+                  </div>
+                  <p className="text-2xl sm:text-3xl font-bold text-purple-700">{totalRevenue.toLocaleString()}원</p>
+                  <p className="text-xs sm:text-sm text-gray-500 mt-1">승인된 예약 기준</p>
+                </div>
+              </div>
+
+              {/* 하단: 오늘의 일정 + 이번 주 현황 */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+                {/* 오늘의 일정 */}
+                <div className="bg-white rounded-2xl border border-border p-4 sm:p-6 shadow-sm">
+                  <h3 className="font-semibold text-base sm:text-lg mb-4 flex items-center gap-2">
+                    <Calendar className="w-5 h-5 text-primary" />
+                    오늘의 일정
+                    {todayConfirmedCount > 0 && (
+                      <Badge variant="secondary" className="ml-auto">{todayConfirmedCount}건</Badge>
+                    )}
+                  </h3>
+                  {todayConfirmedBookings.length === 0 ? (
+                    <div className="text-center py-10 text-muted-foreground">
+                      <Calendar className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                      <p>오늘 예약이 없습니다</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {todayConfirmedBookings.map(booking => {
+                        const past = isPastTime(booking.date, booking.time);
+                        return (
+                          <div
+                            key={booking.id}
+                            className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${
+                              past ? 'bg-gray-50 border-gray-200 opacity-60' : 'bg-white border-border hover:border-primary/30'
+                            }`}
+                          >
+                            <div className={`text-center min-w-[52px] px-2 py-1.5 rounded-lg font-bold text-sm ${
+                              past ? 'bg-gray-100 text-gray-500' : 'bg-primary/10 text-primary'
+                            }`}>
+                              {booking.time}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-sm truncate">{booking.customerName}</p>
+                              <p className="text-xs text-muted-foreground truncate">{booking.serviceName}</p>
+                            </div>
+                            {past && <Check className="w-4 h-4 text-gray-400 flex-shrink-0" />}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* 이번 주 현황 */}
+                <div className="bg-white rounded-2xl border border-border p-4 sm:p-6 shadow-sm">
+                  <h3 className="font-semibold text-base sm:text-lg mb-4 flex items-center gap-2">
+                    <TrendingUp className="w-5 h-5 text-primary" />
+                    이번 주 현황
+                  </h3>
+                  <div className="space-y-4">
+                    <div className="rounded-xl p-4 border" style={{ backgroundColor: '#E3F2FD', borderColor: '#90CAF9' }}>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm text-gray-600">예약 건수</p>
+                          <p className="text-2xl font-bold text-gray-900">{weekStats.count}건</p>
+                        </div>
+                        <Calendar className="w-6 h-6 text-blue-400" />
+                      </div>
+                    </div>
+                    <div className="rounded-xl p-4 border" style={{ backgroundColor: '#E8F5E9', borderColor: '#A5D6A7' }}>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm text-gray-600">예상 매출</p>
+                          <p className="text-2xl font-bold text-gray-900">{weekStats.revenue.toLocaleString()}원</p>
+                        </div>
+                        <DollarSign className="w-6 h-6 text-green-400" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </TabsContent>
 
             {/* 대기 중 탭 (승인 대기 + 예약금 대기) */}
             <TabsContent value="pending" className="space-y-8">
