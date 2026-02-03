@@ -759,11 +759,13 @@ export async function registerRoutes(
     // 해당 날짜의 예약된 시간대 조회
     const bookedSlots = await storage.getBookedTimeSlots(shop.id, date);
 
-    // 오늘 날짜인지 확인 (지나간 시간 비활성화용)
+    // 오늘 날짜인지 확인 (지나간 시간 비활성화용) - KST(UTC+9) 기준
     const now = new Date();
-    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const kstOffset = 9 * 60; // KST = UTC+9
+    const kstTime = new Date(now.getTime() + kstOffset * 60 * 1000);
+    const todayStr = `${kstTime.getUTCFullYear()}-${String(kstTime.getUTCMonth() + 1).padStart(2, '0')}-${String(kstTime.getUTCDate()).padStart(2, '0')}`;
     const isToday = date === todayStr;
-    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+    const currentMinutes = kstTime.getUTCHours() * 60 + kstTime.getUTCMinutes();
 
     // 각 시간대에 대해 가능 여부 확인
     const availableSlots = allSlots.map(slot => {
