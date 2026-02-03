@@ -262,15 +262,10 @@ export default function ShopSettings() {
 
   // 선택된 날짜의 예약된 시간대 조회
   const { data: bookedSlotsForDate } = useQuery<{ time: string; duration: number }[]>({
-    queryKey: ['/api/shop/booked-slots', blockDate],
-    queryFn: async () => {
-      const res = await fetch(`/api/shop/booked-slots/${blockDate}`, {
-        credentials: "include",
-      });
-      if (!res.ok) return [];
-      return res.json();
-    },
+    queryKey: [`/api/shop/booked-slots/${blockDate}`],
     enabled: !!blockDate,
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   // 예약으로 인해 점유된 시간대 계산
