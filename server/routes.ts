@@ -339,9 +339,9 @@ export async function registerRoutes(
     if (!user.shopId) {
       return res.status(400).json({ message: "No shop associated" });
     }
-    const { name, phone, address, businessHours, depositAmount, depositRequired, businessDays, closedDates, shopMemo } = req.body;
+    const { name, phone, address, businessHours, depositAmount, depositRequired, businessDays, closedDates, shopMemo, blockedSlots } = req.body;
     const shop = await storage.updateShop(user.shopId, {
-      name, phone, address, businessHours, depositAmount, depositRequired, businessDays, closedDates, shopMemo
+      name, phone, address, businessHours, depositAmount, depositRequired, businessDays, closedDates, shopMemo, blockedSlots
     });
     res.json(shop);
   });
@@ -361,6 +361,7 @@ export async function registerRoutes(
       businessHours: shop.businessHours,
       businessDays: shop.businessDays,
       closedDates: shop.closedDates,
+      blockedSlots: shop.blockedSlots,
       shopMemo: shop.shopMemo,
       depositAmount: shop.depositAmount,
       depositRequired: shop.depositRequired,
@@ -759,6 +760,17 @@ export async function registerRoutes(
     // 해당 날짜의 예약된 시간대 조회
     const bookedSlots = await storage.getBookedTimeSlots(shop.id, date);
 
+    // 수동 차단된 시간대 확인
+    let blockedSlotsForDate: string[] = [];
+    if (shop.blockedSlots) {
+      try {
+        const allBlockedSlots = JSON.parse(shop.blockedSlots);
+        if (allBlockedSlots[date] && Array.isArray(allBlockedSlots[date])) {
+          blockedSlotsForDate = allBlockedSlots[date];
+        }
+      } catch {}
+    }
+
     // 오늘 날짜인지 확인 (지나간 시간 비활성화용) - KST(UTC+9) 기준
     const now = new Date();
     const kstOffset = 9 * 60; // KST = UTC+9
@@ -775,6 +787,11 @@ export async function registerRoutes(
       // 오늘이면 이미 지나간 시간은 예약 불가
       if (isToday && slotMinutes <= currentMinutes) {
         return { time: slot, available: false, reason: '지난 시간' };
+      }
+
+      // 수동 차단된 시간대 확인
+      if (blockedSlotsForDate.includes(slot)) {
+        return { time: slot, available: false, reason: '차단됨' };
       }
 
       // 영업종료 시간 이후면 불가

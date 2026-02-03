@@ -10,11 +10,14 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import type { Shop, Service } from "@shared/schema";
 import { formatKoreanPhone } from "@/lib/phone";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
+
+// 차단된 시간대 타입: { "2026-02-03": ["10:00", "10:30"], ... }
+type BlockedSlots = Record<string, string[]>;
 
 // 요일별 영업시간 타입
 type DaySchedule = {
@@ -100,6 +103,10 @@ export default function ShopSettings() {
   // 가게 메모 상태
   const [shopMemo, setShopMemo] = useState('');
 
+  // 시간대 차단 상태
+  const [blockedSlots, setBlockedSlots] = useState<BlockedSlots>({});
+  const [blockDate, setBlockDate] = useState('');
+
   const [newService, setNewService] = useState({ name: '', description: '', duration: '' as string | number, price: '' as string | number });
 
   useEffect(() => {
@@ -135,6 +142,16 @@ export default function ShopSettings() {
 
       // 가게 메모
       setShopMemo(shop.shopMemo || '');
+
+      // 차단된 시간대 파싱
+      if (shop.blockedSlots) {
+        try {
+          const parsed = JSON.parse(shop.blockedSlots);
+          setBlockedSlots(typeof parsed === 'object' && parsed !== null ? parsed : {});
+        } catch {
+          setBlockedSlots({});
+        }
+      }
     }
   }, [shop]);
 
@@ -197,6 +214,66 @@ export default function ShopSettings() {
   // 가게 메모 저장
   const saveShopMemo = () => {
     updateShopMutation.mutate({ shopMemo });
+  };
+
+  // 선택된 날짜의 시간대 슬롯 생성 (영업시간 기반)
+  const getTimeSlotsForDate = (dateStr: string): string[] => {
+    if (!dateStr) return [];
+    const [year, month, day] = dateStr.split('-').map(Number);
+    const dayOfWeek = new Date(year, month - 1, day).getDay();
+    const dayKeys: (keyof BusinessDays)[] = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+    const dayKey = dayKeys[dayOfWeek];
+
+    let sH = 9, sM = 0, eH = 18, eM = 0;
+
+    const daySchedule = businessDays[dayKey];
+    if (daySchedule) {
+      if (daySchedule.closed) return [];
+      const [oh, om] = daySchedule.open.split(':').map(Number);
+      const [ch, cm] = daySchedule.close.split(':').map(Number);
+      sH = oh; sM = om || 0; eH = ch; eM = cm || 0;
+    }
+
+    const slots: string[] = [];
+    const start = sH * 60 + sM;
+    const end = eH * 60 + eM;
+    for (let m = start; m < end; m += 30) {
+      const h = Math.floor(m / 60);
+      const min = m % 60;
+      slots.push(`${h.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}`);
+    }
+    return slots;
+  };
+
+  const blockDateSlots = useMemo(() => getTimeSlotsForDate(blockDate), [blockDate, businessDays]);
+  const blockedForDate = blockedSlots[blockDate] || [];
+
+  // 시간대 차단/해제 토글
+  const toggleBlockSlot = (slot: string) => {
+    const current = blockedSlots[blockDate] || [];
+    let updated: string[];
+    if (current.includes(slot)) {
+      updated = current.filter(s => s !== slot);
+    } else {
+      updated = [...current, slot].sort();
+    }
+
+    const newBlockedSlots = { ...blockedSlots };
+    if (updated.length === 0) {
+      delete newBlockedSlots[blockDate];
+    } else {
+      newBlockedSlots[blockDate] = updated;
+    }
+    setBlockedSlots(newBlockedSlots);
+    updateShopMutation.mutate({ blockedSlots: JSON.stringify(newBlockedSlots) });
+  };
+
+  // 해당 날짜의 모든 차단 해제
+  const clearBlockedDate = (dateStr: string) => {
+    const newBlockedSlots = { ...blockedSlots };
+    delete newBlockedSlots[dateStr];
+    setBlockedSlots(newBlockedSlots);
+    updateShopMutation.mutate({ blockedSlots: JSON.stringify(newBlockedSlots) });
   };
 
   const addServiceMutation = useMutation({
@@ -468,6 +545,93 @@ export default function ShopSettings() {
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">등록된 임시 휴무일이 없습니다</p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* 시간대 차단 관리 */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Clock className="w-5 h-5" />
+              시간대 차단 관리
+            </CardTitle>
+            <CardDescription>특정 날짜의 특정 시간대를 수동으로 차단하거나 해제할 수 있습니다</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex flex-wrap gap-2 items-end">
+              <div className="space-y-1">
+                <Label>날짜 선택</Label>
+                <Input
+                  type="date"
+                  value={blockDate}
+                  onChange={(e) => setBlockDate(e.target.value)}
+                  min={new Date().toISOString().split('T')[0]}
+                  className="w-auto min-w-[150px]"
+                />
+              </div>
+            </div>
+
+            {blockDate && blockDateSlots.length === 0 && (
+              <p className="text-sm text-muted-foreground">해당 날짜는 휴무일입니다.</p>
+            )}
+
+            {blockDate && blockDateSlots.length > 0 && (
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  시간대를 클릭하면 차단/해제됩니다. <span className="text-red-500 font-medium">빨간색</span>은 차단된 시간대입니다.
+                </p>
+                <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
+                  {blockDateSlots.map(slot => {
+                    const isBlocked = blockedForDate.includes(slot);
+                    return (
+                      <button
+                        key={slot}
+                        type="button"
+                        onClick={() => toggleBlockSlot(slot)}
+                        disabled={updateShopMutation.isPending}
+                        className={`px-2 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                          isBlocked
+                            ? 'bg-red-100 text-red-700 border-red-300 hover:bg-red-200'
+                            : 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100'
+                        }`}
+                      >
+                        {slot}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* 차단된 날짜 목록 */}
+            {Object.keys(blockedSlots).length > 0 && (
+              <div className="space-y-2 pt-2 border-t">
+                <p className="text-sm font-medium text-muted-foreground">차단 설정된 날짜:</p>
+                <div className="flex flex-wrap gap-2">
+                  {Object.entries(blockedSlots)
+                    .sort(([a], [b]) => a.localeCompare(b))
+                    .map(([dateStr, slots]) => {
+                      const dateObj = new Date(dateStr + 'T00:00:00');
+                      return (
+                        <Badge
+                          key={dateStr}
+                          variant="outline"
+                          className="flex items-center gap-1 px-3 py-1.5 cursor-pointer hover:bg-secondary/50"
+                          onClick={() => setBlockDate(dateStr)}
+                        >
+                          {format(dateObj, 'M월 d일 (EEE)', { locale: ko })} - {slots.length}건
+                          <button
+                            onClick={(e) => { e.stopPropagation(); clearBlockedDate(dateStr); }}
+                            className="ml-1 hover:text-destructive"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </Badge>
+                      );
+                    })}
+                </div>
+              </div>
             )}
           </CardContent>
         </Card>
