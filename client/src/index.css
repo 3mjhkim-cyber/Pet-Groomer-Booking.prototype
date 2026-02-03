@@ -133,8 +133,87 @@
     @apply border-border;
   }
 
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
   body {
     @apply font-sans antialiased bg-background text-foreground;
+  }
+}
+
+/* 예약 페이지 가로 overflow 방지 */
+.booking-page,
+.booking-page .booking-container {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* 날짜 선택 섹션 flex 밀림 방지 */
+.date-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.date-section * {
+  min-width: 0;
+}
+
+/* 캘린더 wrapper - 7칸 고정 그리드 */
+.calendar-wrap {
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  border-radius: 12px;
+}
+.calendar-wrap table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+}
+.calendar-wrap th,
+.calendar-wrap td {
+  width: calc(100% / 7);
+  text-align: center;
+  vertical-align: middle;
+  padding: 10px 0;
+}
+
+/* FullCalendar 헤더 모바일 대응 */
+.fc .fc-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.fc .fc-toolbar-chunk {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.fc .fc-toolbar-title {
+  font-size: 1.1rem !important;
+  font-weight: 600;
+}
+.fc .fc-button {
+  padding: 4px 10px !important;
+  font-size: 0.85rem !important;
+}
+
+@media (max-width: 640px) {
+  .fc .fc-toolbar {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .fc .fc-toolbar-title {
+    font-size: 1rem !important;
+  }
+  .fc .fc-button {
+    padding: 3px 8px !important;
+    font-size: 0.8rem !important;
   }
 }
 

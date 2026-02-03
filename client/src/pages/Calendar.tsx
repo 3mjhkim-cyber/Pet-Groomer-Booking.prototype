@@ -76,7 +76,7 @@ export default function Calendar() {
             <Loader2 className="w-10 h-10 animate-spin text-primary" />
           </div>
         ) : (
-          <div className="bg-white rounded-2xl border border-border p-6 shadow-sm">
+          <div className="bg-white rounded-2xl border border-border p-4 sm:p-6 shadow-sm calendar-wrap">
             <FullCalendar
               plugins={[dayGridPlugin, timeGridPlugin]}
               initialView="dayGridMonth"

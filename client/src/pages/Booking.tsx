@@ -250,9 +250,9 @@ export default function Booking() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-20">
+    <div className="min-h-screen bg-background pb-20 booking-page">
       <div className="bg-primary text-white py-4 px-4">
-        <div className="container mx-auto max-w-4xl">
+        <div className="container mx-auto max-w-4xl booking-container">
           {/* 상단: 가게명 + 액션 버튼 */}
           <div className="flex items-center justify-between gap-2 mb-3">
             <h1 className="text-xl sm:text-2xl font-bold truncate">{shop.name}</h1>
@@ -352,7 +352,7 @@ export default function Booking() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 bg-white p-4 sm:p-6 rounded-2xl border border-border shadow-sm">
-              <div className="space-y-3">
+              <div className="date-section">
                 <label className="flex items-center gap-2 font-medium text-foreground/80 text-sm sm:text-base">
                   <CalendarIcon className="w-4 h-4 flex-shrink-0" />
                   <span>날짜 선택</span>
