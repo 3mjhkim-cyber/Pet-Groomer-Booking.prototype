@@ -58,6 +58,9 @@ export default function Dashboard() {
   // 리마인드 모달 상태
   const [remindBooking, setRemindBooking] = useState<(Booking & { serviceName: string }) | null>(null);
 
+  // 대시보드 일정 상세 모달 상태
+  const [dashboardDetailBooking, setDashboardDetailBooking] = useState<(Booking & { serviceName: string }) | null>(null);
+
   // 확정 예약 날짜 필터 상태
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
@@ -465,10 +468,11 @@ export default function Dashboard() {
                     {todayConfirmedBookings.map(booking => {
                       const past = isPastTime(booking.date, booking.time);
                       return (
-                        <div
+                        <button
                           key={booking.id}
-                          className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${
-                            past ? 'bg-gray-50 border-gray-200 opacity-60' : 'bg-white border-border hover:border-primary/30'
+                          onClick={() => setDashboardDetailBooking(booking)}
+                          className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all text-left cursor-pointer ${
+                            past ? 'bg-gray-50 border-gray-200 opacity-60' : 'bg-white border-border hover:border-primary/30 hover:shadow-sm'
                           }`}
                         >
                           <div className={`text-center min-w-[52px] px-2 py-1.5 rounded-lg font-bold text-sm ${
@@ -480,8 +484,8 @@ export default function Dashboard() {
                             <p className="font-medium text-sm truncate">{booking.customerName}</p>
                             <p className="text-xs text-muted-foreground truncate">{booking.serviceName}</p>
                           </div>
-                          {past && <Check className="w-4 h-4 text-gray-400 flex-shrink-0" />}
-                        </div>
+                          {past ? <Check className="w-4 h-4 text-gray-400 flex-shrink-0" /> : <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />}
+                        </button>
                       );
                     })}
                   </div>
@@ -1229,6 +1233,55 @@ export default function Dashboard() {
         </DialogContent>
       </Dialog>
       
+      {/* 대시보드 일정 상세 다이얼로그 */}
+      <Dialog open={!!dashboardDetailBooking} onOpenChange={() => setDashboardDetailBooking(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>예약 상세</DialogTitle>
+          </DialogHeader>
+          {dashboardDetailBooking && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 p-3 bg-primary/5 rounded-xl">
+                <Clock className="w-5 h-5 text-primary" />
+                <span className="text-lg font-bold">{dashboardDetailBooking.time}</span>
+                <Badge className="ml-auto bg-green-500 text-white">확정</Badge>
+              </div>
+              <div className="space-y-3 text-sm">
+                <div className="flex items-center gap-3">
+                  <User className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                  <span className="font-medium">{dashboardDetailBooking.customerName}</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Phone className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                  <span className="font-mono">{dashboardDetailBooking.customerPhone}</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Scissors className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                  <span>{dashboardDetailBooking.serviceName}</span>
+                </div>
+                {(dashboardDetailBooking.petName || dashboardDetailBooking.petBreed) && (
+                  <div className="flex items-center gap-3">
+                    <PawPrint className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                    <span>
+                      {dashboardDetailBooking.petName}
+                      {dashboardDetailBooking.petBreed && ` (${dashboardDetailBooking.petBreed})`}
+                    </span>
+                  </div>
+                )}
+                {dashboardDetailBooking.memo && (
+                  <div className="p-3 bg-muted/50 rounded-lg">
+                    <div className="flex items-start gap-2">
+                      <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                      <span className="text-muted-foreground">{dashboardDetailBooking.memo}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* 고객 상세 정보 다이얼로그 */}
       <CustomerDetailDialog 
         customerId={customerDetailId} 

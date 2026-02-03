@@ -706,8 +706,9 @@ export async function registerRoutes(
       } catch {}
     }
 
-    // 요일별 영업시간 확인
-    const dayOfWeek = new Date(date).getDay();
+    // 요일별 영업시간 확인 (날짜 파싱 시 timezone 이슈 방지)
+    const [year, month, day] = date.split('-').map(Number);
+    const dayOfWeek = new Date(year, month - 1, day).getDay();
     const dayKeys = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
     const dayKey = dayKeys[dayOfWeek];
 
@@ -733,11 +734,15 @@ export async function registerRoutes(
           endMinute = closeMin || 0;
         }
       } catch {}
-    } else {
+    } else if (shop.businessHours && shop.businessHours.includes('-')) {
       // 기본 영업시간 파싱 (예: "09:00-18:00")
       const [startTime, endTime] = shop.businessHours.split('-');
-      startHour = parseInt(startTime.split(':')[0]);
-      endHour = parseInt(endTime.split(':')[0]);
+      const [sH, sM] = startTime.split(':').map(Number);
+      const [eH, eM] = endTime.split(':').map(Number);
+      startHour = sH;
+      startMinute = sM || 0;
+      endHour = eH;
+      endMinute = eM || 0;
     }
 
     // 30분 단위로 시간대 생성
@@ -754,10 +759,21 @@ export async function registerRoutes(
     // 해당 날짜의 예약된 시간대 조회
     const bookedSlots = await storage.getBookedTimeSlots(shop.id, date);
 
+    // 오늘 날짜인지 확인 (지나간 시간 비활성화용)
+    const now = new Date();
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const isToday = date === todayStr;
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
     // 각 시간대에 대해 가능 여부 확인
     const availableSlots = allSlots.map(slot => {
       const slotMinutes = parseInt(slot.split(':')[0]) * 60 + parseInt(slot.split(':')[1]);
       const slotEndMinutes = slotMinutes + serviceDuration;
+
+      // 오늘이면 이미 지나간 시간은 예약 불가
+      if (isToday && slotMinutes <= currentMinutes) {
+        return { time: slot, available: false, reason: '지난 시간' };
+      }
 
       // 영업종료 시간 이후면 불가
       if (slotEndMinutes > endMinutes) {
