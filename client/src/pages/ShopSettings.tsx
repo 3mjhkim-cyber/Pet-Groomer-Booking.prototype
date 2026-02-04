@@ -260,36 +260,25 @@ export default function ShopSettings() {
   const blockedForDate = blockedSlots[blockDate] || [];
   const forceOpenForDate = forceOpenSlots[blockDate] || [];
 
-  // 선택된 날짜의 예약된 시간대 조회
-  const { data: bookedSlotsForDate } = useQuery<{ time: string; duration: number }[]>({
-    queryKey: ['/api/shop/booked-slots', blockDate],
-    queryFn: async () => {
-      const res = await fetch(`/api/shop/booked-slots/${blockDate}`, {
-        credentials: "include",
-      });
-      if (!res.ok) return [];
-      return res.json();
-    },
-    enabled: !!blockDate,
+  // 선택된 날짜의 예약 상태 조회 (공개 available-times API 사용)
+  const { data: availableTimesForDate } = useQuery<{ time: string; available: boolean; reason?: string }[]>({
+    queryKey: [`/api/shops/${shop?.slug}/available-times/${blockDate}`],
+    enabled: !!blockDate && !!shop?.slug,
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
-  // 예약으로 인해 점유된 시간대 계산
+  // 예약으로 인해 점유된 시간대 계산 (reason이 '예약 불가'인 슬롯)
   const bookedTimeSet = useMemo(() => {
     const set = new Set<string>();
-    if (!bookedSlotsForDate) return set;
-    for (const booked of bookedSlotsForDate) {
-      const [h, m] = booked.time.split(':').map(Number);
-      const startMin = h * 60 + m;
-      const endMin = startMin + booked.duration;
-      // 30분 단위로 점유된 시간대 마킹
-      for (let min = startMin; min < endMin; min += 30) {
-        const hh = Math.floor(min / 60);
-        const mm = min % 60;
-        set.add(`${hh.toString().padStart(2, '0')}:${mm.toString().padStart(2, '0')}`);
+    if (!availableTimesForDate) return set;
+    for (const slot of availableTimesForDate) {
+      if (!slot.available && slot.reason === '예약 불가') {
+        set.add(slot.time);
       }
     }
     return set;
-  }, [bookedSlotsForDate]);
+  }, [availableTimesForDate]);
 
   // 시간대 차단/해제 토글 (빈 시간대용)
   const toggleBlockSlot = (slot: string) => {
