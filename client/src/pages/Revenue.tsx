@@ -20,8 +20,8 @@ import {
   LineChart,
   Line,
 } from "recharts";
-import { TrendingUp, TrendingDown, DollarSign, Calendar, Clock } from "lucide-react";
-import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subMonths } from "date-fns";
+import { TrendingUp, TrendingDown, DollarSign, Calendar, Clock, ChevronLeft, ChevronRight } from "lucide-react";
+import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subMonths, addMonths, subWeeks, addWeeks, subDays, addDays } from "date-fns";
 import { ko } from "date-fns/locale";
 
 type Period = "today" | "week" | "month";
@@ -38,23 +38,22 @@ interface RevenueStats {
 const COLORS = ["#8b5cf6", "#06b6d4", "#f59e0b", "#ef4444", "#22c55e", "#ec4899"];
 const DAY_NAMES = ["일", "월", "화", "수", "목", "금", "토"];
 
-function getDateRange(period: Period): { startDate: string; endDate: string } {
-  const now = new Date();
+function getDateRange(period: Period, ref: Date): { startDate: string; endDate: string } {
   let start: Date;
   let end: Date;
 
   switch (period) {
     case "today":
-      start = startOfDay(now);
-      end = endOfDay(now);
+      start = startOfDay(ref);
+      end = endOfDay(ref);
       break;
     case "week":
-      start = startOfWeek(now, { weekStartsOn: 1 });
-      end = endOfWeek(now, { weekStartsOn: 1 });
+      start = startOfWeek(ref, { weekStartsOn: 1 });
+      end = endOfWeek(ref, { weekStartsOn: 1 });
       break;
     case "month":
-      start = startOfMonth(now);
-      end = endOfMonth(now);
+      start = startOfMonth(ref);
+      end = endOfMonth(ref);
       break;
   }
 
@@ -64,41 +63,52 @@ function getDateRange(period: Period): { startDate: string; endDate: string } {
   };
 }
 
-function getPrevDateRange(period: Period): { startDate: string; endDate: string } {
-  const now = new Date();
-  let start: Date;
-  let end: Date;
-
+function getPrevDateRange(period: Period, ref: Date): { startDate: string; endDate: string } {
+  let prevRef: Date;
   switch (period) {
     case "today":
-      const yesterday = new Date(now);
-      yesterday.setDate(yesterday.getDate() - 1);
-      start = startOfDay(yesterday);
-      end = endOfDay(yesterday);
+      prevRef = subDays(ref, 1);
       break;
     case "week":
-      const lastWeek = new Date(now);
-      lastWeek.setDate(lastWeek.getDate() - 7);
-      start = startOfWeek(lastWeek, { weekStartsOn: 1 });
-      end = endOfWeek(lastWeek, { weekStartsOn: 1 });
+      prevRef = subWeeks(ref, 1);
       break;
     case "month":
-      const lastMonth = subMonths(now, 1);
-      start = startOfMonth(lastMonth);
-      end = endOfMonth(lastMonth);
+      prevRef = subMonths(ref, 1);
       break;
   }
+  return getDateRange(period, prevRef);
+}
 
-  return {
-    startDate: format(start, "yyyy-MM-dd"),
-    endDate: format(end, "yyyy-MM-dd"),
-  };
+function navigateDate(period: Period, ref: Date, direction: -1 | 1): Date {
+  switch (period) {
+    case "today":
+      return direction === -1 ? subDays(ref, 1) : addDays(ref, 1);
+    case "week":
+      return direction === -1 ? subWeeks(ref, 1) : addWeeks(ref, 1);
+    case "month":
+      return direction === -1 ? subMonths(ref, 1) : addMonths(ref, 1);
+  }
+}
+
+function getPeriodLabel(period: Period, ref: Date): string {
+  switch (period) {
+    case "today":
+      return format(ref, "yyyy년 M월 d일 (EEE)", { locale: ko });
+    case "week": {
+      const s = startOfWeek(ref, { weekStartsOn: 1 });
+      const e = endOfWeek(ref, { weekStartsOn: 1 });
+      return `${format(s, "M/d")} ~ ${format(e, "M/d")}`;
+    }
+    case "month":
+      return format(ref, "yyyy년 M월", { locale: ko });
+  }
 }
 
 export default function Revenue() {
   const { user } = useAuth();
   const [, navigate] = useLocation();
   const [period, setPeriod] = useState<Period>("month");
+  const [refDate, setRefDate] = useState(new Date());
 
   // 로그인 체크
   if (!user || user.role !== "shop_owner") {
@@ -106,8 +116,13 @@ export default function Revenue() {
     return null;
   }
 
-  const { startDate, endDate } = getDateRange(period);
-  const { startDate: prevStartDate, endDate: prevEndDate } = getPrevDateRange(period);
+  const { startDate, endDate } = getDateRange(period, refDate);
+  const { startDate: prevStartDate, endDate: prevEndDate } = getPrevDateRange(period, refDate);
+
+  const handlePeriodChange = (v: string) => {
+    setPeriod(v as Period);
+    setRefDate(new Date());
+  };
 
   // 현재 기간 매출 조회
   const { data: stats, isLoading } = useQuery<RevenueStats>({
@@ -175,15 +190,15 @@ export default function Revenue() {
   }, [stats]);
 
   const periodLabel = {
-    today: "오늘",
-    week: "이번 주",
-    month: "이번 달",
+    today: getPeriodLabel("today", refDate),
+    week: getPeriodLabel("week", refDate),
+    month: getPeriodLabel("month", refDate),
   };
 
   const prevPeriodLabel = {
-    today: "어제",
-    week: "지난 주",
-    month: "지난 달",
+    today: "전일",
+    week: "전주",
+    month: "전월",
   };
 
   if (isLoading) {
@@ -196,19 +211,50 @@ export default function Revenue() {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-7xl">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">매출 대시보드</h1>
-          <p className="text-muted-foreground mt-1">매출 현황을 한눈에 확인하세요</p>
+      <div className="flex flex-col gap-4 mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">매출 대시보드</h1>
+            <p className="text-muted-foreground mt-1">매출 현황을 한눈에 확인하세요</p>
+          </div>
+
+          <Tabs value={period} onValueChange={handlePeriodChange}>
+            <TabsList>
+              <TabsTrigger value="today">일별</TabsTrigger>
+              <TabsTrigger value="week">주별</TabsTrigger>
+              <TabsTrigger value="month">월별</TabsTrigger>
+            </TabsList>
+          </Tabs>
         </div>
 
-        <Tabs value={period} onValueChange={(v) => setPeriod(v as Period)}>
-          <TabsList>
-            <TabsTrigger value="today">오늘</TabsTrigger>
-            <TabsTrigger value="week">이번 주</TabsTrigger>
-            <TabsTrigger value="month">이번 달</TabsTrigger>
-          </TabsList>
-        </Tabs>
+        <div className="flex items-center justify-center gap-3 py-2 bg-white rounded-xl border">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setRefDate(navigateDate(period, refDate, -1))}
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </Button>
+          <span className="text-lg font-semibold min-w-[180px] text-center">
+            {getPeriodLabel(period, refDate)}
+          </span>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setRefDate(navigateDate(period, refDate, 1))}
+            disabled={format(refDate, 'yyyy-MM-dd') >= format(new Date(), 'yyyy-MM-dd')}
+          >
+            <ChevronRight className="w-5 h-5" />
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setRefDate(new Date())}
+            className="ml-2"
+          >
+            오늘
+          </Button>
+        </div>
       </div>
 
       {/* 요약 카드 */}
@@ -380,8 +426,8 @@ export default function Revenue() {
           </CardContent>
         </Card>
 
-        {/* 일별 매출 추이 (월간만 표시) */}
-        {period === "month" && stats && stats.byDate.length > 0 && (
+        {/* 일별 매출 추이 */}
+        {(period === "month" || period === "week") && stats && stats.byDate.length > 0 && (
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">일별 매출 추이</CardTitle>
