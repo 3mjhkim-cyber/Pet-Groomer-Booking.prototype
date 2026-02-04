@@ -143,11 +143,21 @@
 }
 
 /* 예약 페이지 가로 overflow 방지 */
-.booking-page,
+.booking-page {
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
+}
 .booking-page .booking-container {
   width: 100%;
   max-width: 100%;
   overflow-x: hidden;
+}
+.booking-page section {
+  overflow: hidden;
+}
+.booking-page .container {
+  max-width: 100%;
 }
 
 /* 날짜 선택 섹션 flex 밀림 방지 */
@@ -155,9 +165,16 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+  overflow: hidden;
 }
 .date-section * {
   min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.date-section input[type="date"] {
+  width: 100%;
+  max-width: 100%;
 }
 
 /* 캘린더 wrapper - 7칸 고정 그리드 */
@@ -241,12 +258,14 @@
 .fc .fc-day-today .fc-daygrid-day-number {
   background-color: hsl(var(--primary));
   color: white;
-  border-radius: 50%;
-  width: 28px;
+  border-radius: 9999px;
+  min-width: 28px;
   height: 28px;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
+  white-space: nowrap;
+  padding: 0 6px;
 }
 .fc .fc-event {
   border-radius: 6px !important;

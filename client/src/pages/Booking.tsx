@@ -351,7 +351,7 @@ export default function Booking() {
               <h2 className="text-lg sm:text-2xl font-bold">언제 방문하실 건가요?</h2>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 bg-white p-4 sm:p-6 rounded-2xl border border-border shadow-sm">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 bg-white p-4 sm:p-6 rounded-2xl border border-border shadow-sm overflow-hidden">
               <div className="date-section">
                 <label className="flex items-center gap-2 font-medium text-foreground/80 text-sm sm:text-base">
                   <CalendarIcon className="w-4 h-4 flex-shrink-0" />
