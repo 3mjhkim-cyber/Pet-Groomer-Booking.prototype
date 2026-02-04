@@ -1,25 +1,32 @@
 import { useAuth } from "@/hooks/use-auth";
 import { useBookings } from "@/hooks/use-shop";
 import { useLocation } from "wouter";
-import { Loader2, CalendarDays, Clock, User, Scissors } from "lucide-react";
+import { Loader2, CalendarDays, Clock, User, Scissors, Phone } from "lucide-react";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
 
 interface BookingEvent {
   id: string;
   title: string;
   start: string;
+  end: string;
   backgroundColor: string;
   borderColor: string;
+  textColor: string;
   extendedProps: {
     customerName: string;
     customerPhone: string;
     serviceName: string;
+    petName: string;
+    petBreed: string;
     status: string;
     time: string;
+    duration: number;
+    depositStatus: string;
   };
 }
 
@@ -36,26 +43,60 @@ export default function Calendar() {
     return null;
   }
 
-  // cancelled, rejected 예약은 캘린더에서 숨김 (pending, confirmed만 표시)
   const events: BookingEvent[] = bookings
     ?.filter(booking => booking.status === 'pending' || booking.status === 'confirmed')
-    .map(booking => ({
-      id: String(booking.id),
-      title: `${booking.time} ${booking.customerName}`,
-      start: `${booking.date}T${booking.time}`,
-      backgroundColor: booking.status === 'confirmed' ? '#22c55e' : '#f97316',
-      borderColor: booking.status === 'confirmed' ? '#16a34a' : '#ea580c',
-      extendedProps: {
-        customerName: booking.customerName,
-        customerPhone: booking.customerPhone,
-        serviceName: booking.serviceName,
-        status: booking.status,
-        time: booking.time,
-      },
-    })) || [];
+    .map(booking => {
+      const [h, m] = booking.time.split(':').map(Number);
+      const duration = (booking as any).serviceDuration || 60;
+      const startMin = h * 60 + m;
+      const endMin = startMin + duration;
+      const endH = Math.floor(endMin / 60);
+      const endM = endMin % 60;
+      const endTime = `${endH.toString().padStart(2, '0')}:${endM.toString().padStart(2, '0')}`;
+
+      const isConfirmed = booking.status === 'confirmed';
+
+      return {
+        id: String(booking.id),
+        title: `${booking.customerName} - ${booking.serviceName}`,
+        start: `${booking.date}T${booking.time}`,
+        end: `${booking.date}T${endTime}`,
+        backgroundColor: isConfirmed ? '#dcfce7' : '#fff7ed',
+        borderColor: isConfirmed ? '#22c55e' : '#f97316',
+        textColor: isConfirmed ? '#166534' : '#9a3412',
+        extendedProps: {
+          customerName: booking.customerName,
+          customerPhone: booking.customerPhone,
+          serviceName: booking.serviceName,
+          petName: (booking as any).petName || '',
+          petBreed: (booking as any).petBreed || '',
+          status: booking.status,
+          time: booking.time,
+          duration,
+          depositStatus: (booking as any).depositStatus || 'none',
+        },
+      };
+    }) || [];
 
   const handleEventClick = (info: any) => {
     setSelectedEvent(info.event as unknown as BookingEvent);
+  };
+
+  const renderEventContent = (eventInfo: any) => {
+    const props = eventInfo.event.extendedProps;
+    const isConfirmed = props.status === 'confirmed';
+    const timeStr = eventInfo.timeText;
+
+    return (
+      <div className="w-full px-1.5 py-1 overflow-hidden leading-tight">
+        <div className="flex items-center gap-1 text-[11px] font-semibold">
+          <span>{timeStr}</span>
+          <span className={`inline-block w-1.5 h-1.5 rounded-full flex-shrink-0 ${isConfirmed ? 'bg-green-500' : 'bg-orange-400'}`} />
+        </div>
+        <div className="text-[12px] font-bold truncate">{props.customerName}</div>
+        <div className="text-[10px] opacity-75 truncate">{props.serviceName}</div>
+      </div>
+    );
   };
 
   return (
@@ -66,6 +107,16 @@ export default function Calendar() {
           <div>
             <h1 className="text-xl font-bold">예약 캘린더</h1>
             <p className="text-sm text-muted-foreground">{user.shopName}</p>
+          </div>
+          <div className="ml-auto flex items-center gap-3 text-xs">
+            <span className="flex items-center gap-1.5">
+              <span className="w-3 h-3 rounded-sm bg-green-100 border border-green-500" />
+              확정
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-3 h-3 rounded-sm bg-orange-50 border border-orange-400" />
+              대기
+            </span>
           </div>
         </div>
       </div>
@@ -87,6 +138,7 @@ export default function Calendar() {
               }}
               events={events}
               eventClick={handleEventClick}
+              eventContent={renderEventContent}
               height="auto"
               locale="ko"
               buttonText={{
@@ -95,6 +147,17 @@ export default function Calendar() {
                 week: '주',
                 day: '일'
               }}
+              dayMaxEvents={3}
+              moreLinkText={(n) => `+${n}건 더보기`}
+              slotMinTime="08:00:00"
+              slotMaxTime="21:00:00"
+              slotLabelFormat={{
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false,
+              }}
+              eventDisplay="block"
+              displayEventEnd={false}
             />
           </div>
         )}
@@ -110,15 +173,23 @@ export default function Calendar() {
               <div className="flex items-center gap-3 p-3 bg-secondary/30 rounded-lg">
                 <Clock className="w-5 h-5 text-primary" />
                 <span className="font-bold text-lg">{selectedEvent.extendedProps.time}</span>
-                <span className={`ml-auto px-2 py-1 rounded text-xs font-bold ${
-                  selectedEvent.extendedProps.status === 'confirmed' 
-                    ? 'bg-green-100 text-green-700' 
-                    : selectedEvent.extendedProps.status === 'pending'
-                    ? 'bg-orange-100 text-orange-700'
-                    : 'bg-red-100 text-red-700'
-                }`}>
+                <Badge
+                  variant="outline"
+                  className={`ml-auto ${
+                    selectedEvent.extendedProps.status === 'confirmed'
+                      ? 'bg-green-100 text-green-700 border-green-300'
+                      : selectedEvent.extendedProps.status === 'pending'
+                      ? 'bg-orange-100 text-orange-700 border-orange-300'
+                      : 'bg-red-100 text-red-700 border-red-300'
+                  }`}
+                >
                   {selectedEvent.extendedProps.status === 'confirmed' ? '확정' : selectedEvent.extendedProps.status === 'pending' ? '대기' : '거절'}
-                </span>
+                </Badge>
+                {selectedEvent.extendedProps.depositStatus === 'paid' && (
+                  <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-300">
+                    입금완료
+                  </Badge>
+                )}
               </div>
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
@@ -126,12 +197,23 @@ export default function Calendar() {
                   <span className="font-medium">{selectedEvent.extendedProps.customerName}</span>
                 </div>
                 <div className="flex items-center gap-3">
+                  <Phone className="w-5 h-5 text-muted-foreground" />
+                  <span className="font-mono text-sm">{selectedEvent.extendedProps.customerPhone}</span>
+                </div>
+                <div className="flex items-center gap-3">
                   <Scissors className="w-5 h-5 text-muted-foreground" />
                   <span>{selectedEvent.extendedProps.serviceName}</span>
+                  <span className="text-sm text-muted-foreground">({selectedEvent.extendedProps.duration}분)</span>
                 </div>
-                <div className="flex items-center gap-3 text-muted-foreground">
-                  <span className="font-mono">{selectedEvent.extendedProps.customerPhone}</span>
-                </div>
+                {selectedEvent.extendedProps.petName && (
+                  <div className="flex items-center gap-3">
+                    <span className="w-5 h-5 text-center text-muted-foreground">🐾</span>
+                    <span>{selectedEvent.extendedProps.petName}</span>
+                    {selectedEvent.extendedProps.petBreed && (
+                      <span className="text-sm text-muted-foreground">({selectedEvent.extendedProps.petBreed})</span>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           )}
