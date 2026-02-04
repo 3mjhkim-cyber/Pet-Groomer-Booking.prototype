@@ -5,7 +5,8 @@ import { Loader2, CalendarDays, Clock, User, Scissors, Phone } from "lucide-reac
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
-import { useState } from "react";
+import listPlugin from "@fullcalendar/list";
+import { useState, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 
@@ -35,6 +36,8 @@ export default function Calendar() {
   const { data: bookings, isLoading: isBookingsLoading } = useBookings();
   const [_, setLocation] = useLocation();
   const [selectedEvent, setSelectedEvent] = useState<BookingEvent | null>(null);
+  const [currentView, setCurrentView] = useState("dayGridMonth");
+  const calendarRef = useRef<any>(null);
 
   if (isAuthLoading) return <div className="h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
 
@@ -82,15 +85,59 @@ export default function Calendar() {
     setSelectedEvent(info.event as unknown as BookingEvent);
   };
 
+  // 월간/주간 뷰 이벤트 렌더링
   const renderEventContent = (eventInfo: any) => {
     const props = eventInfo.event.extendedProps;
     const isConfirmed = props.status === 'confirmed';
-    const timeStr = eventInfo.timeText;
+    const viewType = eventInfo.view.type;
 
+    // 리스트(일간) 뷰 - 상세 카드 스타일
+    if (viewType === 'listDay') {
+      return (
+        <div className="flex items-center gap-4 py-1 w-full">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <span className={`inline-block w-2.5 h-2.5 rounded-full flex-shrink-0 ${isConfirmed ? 'bg-green-500' : 'bg-orange-400'}`} />
+            <span className="font-bold text-[15px] truncate">{props.customerName}</span>
+            <span className="text-muted-foreground text-sm hidden sm:inline">|</span>
+            <span className="text-sm text-muted-foreground truncate hidden sm:inline">{props.serviceName} ({props.duration}분)</span>
+          </div>
+          {props.petName && (
+            <span className="text-xs text-muted-foreground flex-shrink-0 hidden md:inline">
+              🐾 {props.petName}
+            </span>
+          )}
+          <Badge
+            variant="outline"
+            className={`flex-shrink-0 text-[11px] ${
+              isConfirmed
+                ? 'bg-green-50 text-green-700 border-green-300'
+                : 'bg-orange-50 text-orange-700 border-orange-300'
+            }`}
+          >
+            {isConfirmed ? '확정' : '대기'}
+          </Badge>
+        </div>
+      );
+    }
+
+    // 월간 뷰 - 컴팩트
+    if (viewType === 'dayGridMonth') {
+      return (
+        <div className="w-full px-1.5 py-0.5 overflow-hidden leading-tight">
+          <div className="flex items-center gap-1 text-[11px]">
+            <span className="font-semibold">{eventInfo.timeText}</span>
+            <span className={`inline-block w-1.5 h-1.5 rounded-full flex-shrink-0 ${isConfirmed ? 'bg-green-500' : 'bg-orange-400'}`} />
+          </div>
+          <div className="text-[12px] font-bold truncate">{props.customerName}</div>
+        </div>
+      );
+    }
+
+    // 주간 뷰 - 시간 그리드 안에서
     return (
       <div className="w-full px-1.5 py-1 overflow-hidden leading-tight">
         <div className="flex items-center gap-1 text-[11px] font-semibold">
-          <span>{timeStr}</span>
+          <span>{eventInfo.timeText}</span>
           <span className={`inline-block w-1.5 h-1.5 rounded-full flex-shrink-0 ${isConfirmed ? 'bg-green-500' : 'bg-orange-400'}`} />
         </div>
         <div className="text-[12px] font-bold truncate">{props.customerName}</div>
@@ -129,12 +176,29 @@ export default function Calendar() {
         ) : (
           <div className="bg-white rounded-2xl border border-border p-4 sm:p-6 shadow-sm calendar-wrap">
             <FullCalendar
-              plugins={[dayGridPlugin, timeGridPlugin]}
+              ref={calendarRef}
+              plugins={[dayGridPlugin, timeGridPlugin, listPlugin]}
               initialView="dayGridMonth"
               headerToolbar={{
                 left: 'prev,next today',
                 center: 'title',
-                right: 'dayGridMonth,timeGridWeek,timeGridDay'
+                right: 'dayGridMonth,timeGridWeek,listDay'
+              }}
+              views={{
+                listDay: {
+                  listDayFormat: { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' },
+                  noEventsContent: '예약이 없습니다',
+                },
+                timeGridWeek: {
+                  slotMinTime: '08:00:00',
+                  slotMaxTime: '21:00:00',
+                  allDaySlot: false,
+                  slotLabelFormat: {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: false,
+                  },
+                },
               }}
               events={events}
               eventClick={handleEventClick}
@@ -149,15 +213,12 @@ export default function Calendar() {
               }}
               dayMaxEvents={3}
               moreLinkText={(n) => `+${n}건 더보기`}
-              slotMinTime="08:00:00"
-              slotMaxTime="21:00:00"
-              slotLabelFormat={{
-                hour: '2-digit',
-                minute: '2-digit',
-                hour12: false,
-              }}
+              allDaySlot={false}
               eventDisplay="block"
               displayEventEnd={false}
+              datesSet={(dateInfo) => {
+                setCurrentView(dateInfo.view.type);
+              }}
             />
           </div>
         )}
@@ -173,6 +234,7 @@ export default function Calendar() {
               <div className="flex items-center gap-3 p-3 bg-secondary/30 rounded-lg">
                 <Clock className="w-5 h-5 text-primary" />
                 <span className="font-bold text-lg">{selectedEvent.extendedProps.time}</span>
+                <span className="text-sm text-muted-foreground">~ {selectedEvent.extendedProps.duration}분</span>
                 <Badge
                   variant="outline"
                   className={`ml-auto ${
