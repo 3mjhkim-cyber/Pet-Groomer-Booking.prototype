@@ -20,9 +20,11 @@ import {
   LineChart,
   Line,
 } from "recharts";
-import { TrendingUp, TrendingDown, DollarSign, Calendar, Clock, ChevronLeft, ChevronRight } from "lucide-react";
+import { TrendingUp, TrendingDown, DollarSign, Calendar as CalendarIcon, Clock, ChevronLeft, ChevronRight } from "lucide-react";
 import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subMonths, addMonths, subWeeks, addWeeks, subDays, addDays } from "date-fns";
 import { ko } from "date-fns/locale";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 
 type Period = "today" | "week" | "month";
 
@@ -109,6 +111,7 @@ export default function Revenue() {
   const [, navigate] = useLocation();
   const [period, setPeriod] = useState<Period>("month");
   const [refDate, setRefDate] = useState(new Date());
+  const [calendarOpen, setCalendarOpen] = useState(false);
 
   // 로그인 체크
   if (!user || user.role !== "shop_owner") {
@@ -235,9 +238,27 @@ export default function Revenue() {
           >
             <ChevronLeft className="w-5 h-5" />
           </Button>
-          <span className="text-lg font-semibold min-w-[180px] text-center">
-            {getPeriodLabel(period, refDate)}
-          </span>
+          <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+            <PopoverTrigger asChild>
+              <button className="text-lg font-semibold min-w-[180px] text-center hover:bg-secondary/50 rounded-lg px-3 py-1 transition-colors cursor-pointer">
+                {getPeriodLabel(period, refDate)}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="center">
+              <Calendar
+                mode="single"
+                selected={refDate}
+                onSelect={(date) => {
+                  if (date) {
+                    setRefDate(date);
+                    setCalendarOpen(false);
+                  }
+                }}
+                defaultMonth={refDate}
+                locale={ko}
+              />
+            </PopoverContent>
+          </Popover>
           <Button
             variant="ghost"
             size="icon"
@@ -291,7 +312,7 @@ export default function Revenue() {
             <CardTitle className="text-sm font-medium text-muted-foreground">
               예약 건수
             </CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <CalendarIcon className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats?.bookingCount || 0}건</div>
