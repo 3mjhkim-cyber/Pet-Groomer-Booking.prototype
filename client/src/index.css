@@ -2,6 +2,18 @@
 @tailwind components;
 @tailwind utilities;
 
+/* 모바일 하단 네비게이션 safe-area 지원 (iPhone 등) */
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+/* 모바일에서 하단 네비게이션 공간 확보 */
+@media (max-width: 767px) {
+  .pb-20 {
+    padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0)) !important;
+  }
+}
+
 /* LIGHT MODE - Professional SaaS Blue Theme */
 :root {
   --button-outline: rgba(0,0,0, .10);
