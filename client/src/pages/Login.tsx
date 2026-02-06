@@ -1,15 +1,17 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation, Link } from "wouter";
 import { Loader2, Dog, ArrowLeft, Store } from "lucide-react";
-import { useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+
+const SAVED_EMAIL_KEY = "saved_login_email";
 
 const loginSchema = z.object({
   email: z.string().email("올바른 이메일 형식이 아닙니다."),
@@ -21,16 +23,33 @@ type LoginForm = z.infer<typeof loginSchema>;
 export default function Login() {
   const { login, isLoggingIn, user } = useAuth();
   const [_, setLocation] = useLocation();
+  const [rememberMe, setRememberMe] = useState(false);
+
+  // 저장된 이메일 불러오기
+  const savedEmail = typeof window !== 'undefined' ? localStorage.getItem(SAVED_EMAIL_KEY) || "" : "";
 
   const form = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: "",
+      email: savedEmail,
       password: "",
     },
   });
 
+  // 저장된 이메일이 있으면 아이디 저장 체크
+  useEffect(() => {
+    if (savedEmail) {
+      setRememberMe(true);
+    }
+  }, []);
+
   const onSubmit = (data: LoginForm) => {
+    // 아이디 저장 처리
+    if (rememberMe) {
+      localStorage.setItem(SAVED_EMAIL_KEY, data.email);
+    } else {
+      localStorage.removeItem(SAVED_EMAIL_KEY);
+    }
     login(data);
   };
 
@@ -91,6 +110,20 @@ export default function Login() {
                 {form.formState.errors.password && (
                   <p className="text-sm text-destructive">{form.formState.errors.password.message}</p>
                 )}
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="rememberMe"
+                  checked={rememberMe}
+                  onCheckedChange={(checked) => setRememberMe(checked === true)}
+                />
+                <label
+                  htmlFor="rememberMe"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                >
+                  아이디 저장
+                </label>
               </div>
 
               <Button

@@ -314,16 +314,16 @@
   overflow: hidden;
 }
 
-/* 리스트(일간) 뷰 스타일 */
+/* 리스트(일간/주간) 뷰 스타일 */
 .fc .fc-list {
   border-radius: 12px;
   overflow: hidden;
 }
 .fc .fc-list-day-cushion {
   background-color: hsl(var(--secondary)) !important;
-  padding: 10px 16px !important;
+  padding: 8px 12px !important;
   font-weight: 700 !important;
-  font-size: 0.95rem !important;
+  font-size: 0.9rem !important;
 }
 .fc .fc-list-event {
   cursor: pointer !important;
@@ -333,23 +333,25 @@
 }
 .fc .fc-list-event-time {
   font-weight: 600 !important;
-  font-size: 0.9rem !important;
+  font-size: 0.85rem !important;
   color: hsl(var(--foreground)) !important;
   white-space: nowrap !important;
-  padding: 12px 16px !important;
-  min-width: 80px !important;
-  vertical-align: middle !important;
+  padding: 10px 12px !important;
+  min-width: 70px !important;
+  width: 70px !important;
+  vertical-align: top !important;
+  border-right: 1px solid hsl(var(--border)) !important;
 }
 .fc .fc-list-event-graphic {
   display: none !important;
 }
 .fc .fc-list-event-title {
-  padding: 10px 16px !important;
+  padding: 8px 12px !important;
   vertical-align: middle !important;
 }
 .fc .fc-list-empty-cushion {
   padding: 40px 16px !important;
-  font-size: 0.95rem !important;
+  font-size: 0.9rem !important;
   color: hsl(var(--muted-foreground)) !important;
 }
 /* 주간 뷰 이벤트 영역 개선 */
@@ -361,20 +363,78 @@
   padding: 2px 0 !important;
 }
 
-@media (max-width: 640px) {
-  .fc .fc-toolbar {
-    flex-direction: column;
-    gap: 8px;
+/* 모바일 캘린더 스타일 */
+@media (max-width: 767px) {
+  .calendar-mobile .fc .fc-toolbar {
+    flex-direction: row !important;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 0 0 12px 0;
   }
-  .fc .fc-toolbar-title {
+  .calendar-mobile .fc .fc-toolbar-chunk {
+    display: flex;
+    align-items: center;
+  }
+  .calendar-mobile .fc .fc-toolbar-chunk:first-child {
+    order: 1;
+  }
+  .calendar-mobile .fc .fc-toolbar-chunk:nth-child(2) {
+    order: 3;
+    width: 100%;
+    justify-content: center;
+    margin-top: 4px;
+  }
+  .calendar-mobile .fc .fc-toolbar-chunk:last-child {
+    order: 2;
+    margin-left: auto;
+  }
+  .calendar-mobile .fc .fc-toolbar-title {
     font-size: 1rem !important;
+    font-weight: 700;
   }
-  .fc .fc-button {
-    padding: 4px 8px !important;
+  .calendar-mobile .fc .fc-button {
+    padding: 6px 10px !important;
+    font-size: 0.75rem !important;
+    border-radius: 6px !important;
+  }
+  .calendar-mobile .fc .fc-button-group .fc-button {
+    padding: 5px 8px !important;
+  }
+  /* 월간 뷰 모바일 */
+  .calendar-mobile .fc .fc-daygrid-day {
+    min-height: 50px;
+  }
+  .calendar-mobile .fc .fc-daygrid-day-number {
+    font-size: 0.75rem;
+    padding: 4px 6px !important;
+  }
+  .calendar-mobile .fc .fc-col-header-cell {
+    padding: 6px 0 !important;
+    font-size: 0.7rem;
+  }
+  .calendar-mobile .fc .fc-daygrid-day-events {
+    margin-top: 0 !important;
+  }
+  .calendar-mobile .fc .fc-event {
+    margin: 1px 2px !important;
+  }
+  .calendar-mobile .fc .fc-more-link {
+    font-size: 0.65rem;
+    padding: 1px 3px;
+  }
+  /* 리스트 뷰 모바일 */
+  .calendar-mobile .fc .fc-list-day-cushion {
+    padding: 8px 10px !important;
+    font-size: 0.85rem !important;
+  }
+  .calendar-mobile .fc .fc-list-event-time {
     font-size: 0.8rem !important;
+    padding: 8px 10px !important;
+    min-width: 60px !important;
+    width: 60px !important;
   }
-  .fc .fc-daygrid-day {
-    min-height: 60px;
+  .calendar-mobile .fc .fc-list-event-title {
+    padding: 6px 10px !important;
   }
 }
 
