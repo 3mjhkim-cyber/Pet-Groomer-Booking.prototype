@@ -6,7 +6,7 @@ import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import listPlugin from "@fullcalendar/list";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 
@@ -37,7 +37,16 @@ export default function Calendar() {
   const [_, setLocation] = useLocation();
   const [selectedEvent, setSelectedEvent] = useState<BookingEvent | null>(null);
   const [currentView, setCurrentView] = useState("dayGridMonth");
+  const [isMobile, setIsMobile] = useState(false);
   const calendarRef = useRef<any>(null);
+
+  // 모바일 감지
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   if (isAuthLoading) return <div className="h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
 
@@ -85,37 +94,34 @@ export default function Calendar() {
     setSelectedEvent(info.event as unknown as BookingEvent);
   };
 
-  // 월간/주간 뷰 이벤트 렌더링
+  // 이벤트 렌더링
   const renderEventContent = (eventInfo: any) => {
     const props = eventInfo.event.extendedProps;
     const isConfirmed = props.status === 'confirmed';
     const viewType = eventInfo.view.type;
 
-    // 리스트(일간) 뷰 - 상세 카드 스타일
-    if (viewType === 'listDay') {
+    // 리스트 뷰 (일간/주간) - 카드 스타일
+    if (viewType === 'listDay' || viewType === 'listWeek') {
       return (
-        <div className="flex items-center gap-4 py-1 w-full">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 py-1 w-full">
           <div className="flex items-center gap-2 flex-1 min-w-0">
-            <span className={`inline-block w-2.5 h-2.5 rounded-full flex-shrink-0 ${isConfirmed ? 'bg-green-500' : 'bg-orange-400'}`} />
-            <span className="font-bold text-[15px] truncate">{props.customerName}</span>
-            <span className="text-muted-foreground text-sm hidden sm:inline">|</span>
-            <span className="text-sm text-muted-foreground truncate hidden sm:inline">{props.serviceName} ({props.duration}분)</span>
+            <span className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${isConfirmed ? 'bg-green-500' : 'bg-orange-400'}`} />
+            <span className="font-bold text-sm truncate">{props.customerName}</span>
+            <span className="text-xs text-muted-foreground truncate">· {props.serviceName}</span>
           </div>
-          {props.petName && (
-            <span className="text-xs text-muted-foreground flex-shrink-0 hidden md:inline">
-              🐾 {props.petName}
-            </span>
-          )}
-          <Badge
-            variant="outline"
-            className={`flex-shrink-0 text-[11px] ${
-              isConfirmed
-                ? 'bg-green-50 text-green-700 border-green-300'
-                : 'bg-orange-50 text-orange-700 border-orange-300'
-            }`}
-          >
-            {isConfirmed ? '확정' : '대기'}
-          </Badge>
+          <div className="flex items-center gap-2 pl-4 sm:pl-0">
+            <span className="text-xs text-muted-foreground">{props.duration}분</span>
+            <Badge
+              variant="outline"
+              className={`text-[10px] px-1.5 py-0 h-5 ${
+                isConfirmed
+                  ? 'bg-green-50 text-green-700 border-green-300'
+                  : 'bg-orange-50 text-orange-700 border-orange-300'
+              }`}
+            >
+              {isConfirmed ? '확정' : '대기'}
+            </Badge>
+          </div>
         </div>
       );
     }
@@ -123,17 +129,17 @@ export default function Calendar() {
     // 월간 뷰 - 컴팩트
     if (viewType === 'dayGridMonth') {
       return (
-        <div className="w-full px-1.5 py-0.5 overflow-hidden leading-tight">
-          <div className="flex items-center gap-1 text-[11px]">
+        <div className="w-full px-1 py-0.5 overflow-hidden leading-tight">
+          <div className="flex items-center gap-1 text-[10px] sm:text-[11px]">
             <span className="font-semibold">{eventInfo.timeText}</span>
             <span className={`inline-block w-1.5 h-1.5 rounded-full flex-shrink-0 ${isConfirmed ? 'bg-green-500' : 'bg-orange-400'}`} />
           </div>
-          <div className="text-[12px] font-bold truncate">{props.customerName}</div>
+          <div className="text-[11px] sm:text-[12px] font-bold truncate">{props.customerName}</div>
         </div>
       );
     }
 
-    // 주간 뷰 - 시간 그리드 안에서
+    // 주간 타임그리드 뷰 (데스크탑)
     return (
       <div className="w-full px-1.5 py-1 overflow-hidden leading-tight">
         <div className="flex items-center gap-1 text-[11px] font-semibold">
@@ -146,48 +152,62 @@ export default function Calendar() {
     );
   };
 
+  // 모바일/데스크탑별 뷰 설정
+  const headerToolbar = isMobile
+    ? {
+        left: 'prev,next',
+        center: 'title',
+        right: 'dayGridMonth,listWeek,listDay'
+      }
+    : {
+        left: 'prev,next today',
+        center: 'title',
+        right: 'dayGridMonth,timeGridWeek,listDay'
+      };
+
   return (
     <div className="min-h-screen bg-secondary/10 pb-20">
       <div className="bg-white border-b border-border shadow-sm sticky top-16 z-10">
-        <div className="container mx-auto px-4 h-16 flex items-center gap-3">
-          <CalendarDays className="w-6 h-6 text-primary" />
-          <div>
-            <h1 className="text-xl font-bold">예약 캘린더</h1>
-            <p className="text-sm text-muted-foreground">{user.shopName}</p>
+        <div className="container mx-auto px-4 h-14 sm:h-16 flex items-center gap-2 sm:gap-3">
+          <CalendarDays className="w-5 h-5 sm:w-6 sm:h-6 text-primary flex-shrink-0" />
+          <div className="min-w-0">
+            <h1 className="text-lg sm:text-xl font-bold truncate">예약 캘린더</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground truncate">{user.shopName}</p>
           </div>
-          <div className="ml-auto flex items-center gap-3 text-xs">
-            <span className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded-sm bg-green-100 border border-green-500" />
-              확정
+          <div className="ml-auto flex items-center gap-2 sm:gap-3 text-[10px] sm:text-xs flex-shrink-0">
+            <span className="flex items-center gap-1">
+              <span className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-sm bg-green-100 border border-green-500" />
+              <span className="hidden sm:inline">확정</span>
             </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded-sm bg-orange-50 border border-orange-400" />
-              대기
+            <span className="flex items-center gap-1">
+              <span className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-sm bg-orange-50 border border-orange-400" />
+              <span className="hidden sm:inline">대기</span>
             </span>
           </div>
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-8 max-w-7xl">
+      <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-8 max-w-7xl">
         {isBookingsLoading ? (
           <div className="flex justify-center py-20">
             <Loader2 className="w-10 h-10 animate-spin text-primary" />
           </div>
         ) : (
-          <div className="bg-white rounded-2xl border border-border p-4 sm:p-6 shadow-sm calendar-wrap">
+          <div className="bg-white rounded-xl sm:rounded-2xl border border-border p-2 sm:p-6 shadow-sm calendar-wrap calendar-mobile">
             <FullCalendar
               ref={calendarRef}
               plugins={[dayGridPlugin, timeGridPlugin, listPlugin]}
               initialView="dayGridMonth"
-              headerToolbar={{
-                left: 'prev,next today',
-                center: 'title',
-                right: 'dayGridMonth,timeGridWeek,listDay'
-              }}
+              headerToolbar={headerToolbar}
               views={{
                 listDay: {
-                  listDayFormat: { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' },
+                  listDayFormat: { month: 'long', day: 'numeric', weekday: 'short' },
                   noEventsContent: '예약이 없습니다',
+                },
+                listWeek: {
+                  listDayFormat: { month: 'numeric', day: 'numeric', weekday: 'short' },
+                  listDaySideFormat: false,
+                  noEventsContent: '이번 주 예약이 없습니다',
                 },
                 timeGridWeek: {
                   slotMinTime: '08:00:00',
@@ -198,6 +218,9 @@ export default function Calendar() {
                     minute: '2-digit',
                     hour12: false,
                   },
+                },
+                dayGridMonth: {
+                  dayMaxEvents: isMobile ? 2 : 3,
                 },
               }}
               events={events}
@@ -211,65 +234,66 @@ export default function Calendar() {
                 week: '주',
                 day: '일'
               }}
-              dayMaxEvents={3}
-              moreLinkText={(n) => `+${n}건 더보기`}
+              moreLinkText={(n) => `+${n}`}
               allDaySlot={false}
               eventDisplay="block"
               displayEventEnd={false}
               datesSet={(dateInfo) => {
                 setCurrentView(dateInfo.view.type);
               }}
+              titleFormat={isMobile ? { year: 'numeric', month: 'short' } : { year: 'numeric', month: 'long' }}
             />
           </div>
         )}
       </div>
 
       <Dialog open={!!selectedEvent} onOpenChange={() => setSelectedEvent(null)}>
-        <DialogContent>
+        <DialogContent className="max-w-[95vw] sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>예약 상세</DialogTitle>
           </DialogHeader>
           {selectedEvent && (
             <div className="space-y-4">
               <div className="flex items-center gap-3 p-3 bg-secondary/30 rounded-lg">
-                <Clock className="w-5 h-5 text-primary" />
+                <Clock className="w-5 h-5 text-primary flex-shrink-0" />
                 <span className="font-bold text-lg">{selectedEvent.extendedProps.time}</span>
-                <span className="text-sm text-muted-foreground">~ {selectedEvent.extendedProps.duration}분</span>
-                <Badge
-                  variant="outline"
-                  className={`ml-auto ${
-                    selectedEvent.extendedProps.status === 'confirmed'
-                      ? 'bg-green-100 text-green-700 border-green-300'
-                      : selectedEvent.extendedProps.status === 'pending'
-                      ? 'bg-orange-100 text-orange-700 border-orange-300'
-                      : 'bg-red-100 text-red-700 border-red-300'
-                  }`}
-                >
-                  {selectedEvent.extendedProps.status === 'confirmed' ? '확정' : selectedEvent.extendedProps.status === 'pending' ? '대기' : '거절'}
-                </Badge>
-                {selectedEvent.extendedProps.depositStatus === 'paid' && (
-                  <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-300">
-                    입금완료
+                <span className="text-sm text-muted-foreground">({selectedEvent.extendedProps.duration}분)</span>
+                <div className="ml-auto flex gap-1.5">
+                  <Badge
+                    variant="outline"
+                    className={
+                      selectedEvent.extendedProps.status === 'confirmed'
+                        ? 'bg-green-100 text-green-700 border-green-300'
+                        : selectedEvent.extendedProps.status === 'pending'
+                        ? 'bg-orange-100 text-orange-700 border-orange-300'
+                        : 'bg-red-100 text-red-700 border-red-300'
+                    }
+                  >
+                    {selectedEvent.extendedProps.status === 'confirmed' ? '확정' : selectedEvent.extendedProps.status === 'pending' ? '대기' : '거절'}
                   </Badge>
-                )}
+                  {selectedEvent.extendedProps.depositStatus === 'paid' && (
+                    <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-300">
+                      입금
+                    </Badge>
+                  )}
+                </div>
               </div>
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
-                  <User className="w-5 h-5 text-muted-foreground" />
+                  <User className="w-5 h-5 text-muted-foreground flex-shrink-0" />
                   <span className="font-medium">{selectedEvent.extendedProps.customerName}</span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <Phone className="w-5 h-5 text-muted-foreground" />
+                  <Phone className="w-5 h-5 text-muted-foreground flex-shrink-0" />
                   <span className="font-mono text-sm">{selectedEvent.extendedProps.customerPhone}</span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <Scissors className="w-5 h-5 text-muted-foreground" />
+                  <Scissors className="w-5 h-5 text-muted-foreground flex-shrink-0" />
                   <span>{selectedEvent.extendedProps.serviceName}</span>
-                  <span className="text-sm text-muted-foreground">({selectedEvent.extendedProps.duration}분)</span>
                 </div>
                 {selectedEvent.extendedProps.petName && (
                   <div className="flex items-center gap-3">
-                    <span className="w-5 h-5 text-center text-muted-foreground">🐾</span>
+                    <span className="w-5 h-5 text-center text-muted-foreground flex-shrink-0">🐾</span>
                     <span>{selectedEvent.extendedProps.petName}</span>
                     {selectedEvent.extendedProps.petBreed && (
                       <span className="text-sm text-muted-foreground">({selectedEvent.extendedProps.petBreed})</span>
