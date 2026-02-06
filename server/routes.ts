@@ -69,8 +69,8 @@ export async function registerRoutes(
     resave: false,
     saveUninitialized: false,
     store: new SessionStore({ checkPeriod: 86400000 }),
-    cookie: { 
-      secure: false,
+    cookie: {
+      secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       httpOnly: true
     }
@@ -864,10 +864,10 @@ export async function registerRoutes(
   });
 
   // Seed Data - Super Admin
-  if (await storage.getUserByUsername("admin@admin.com") === undefined) {
+  if (await storage.getUserByUsername("admin@yeyakhagae.com") === undefined) {
     const hashedPassword = await hashPassword("admin1234");
     await storage.createUser({
-      email: "admin@admin.com",
+      email: "admin@yeyakhagae.com",
       password: hashedPassword,
       role: 'super_admin',
       status: 'approved',
