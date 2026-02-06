@@ -87,17 +87,11 @@ app.use((req, res, next) => {
     await setupVite(httpServer, app);
   }
 
-  // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Replit Autoscale requires PORT to be set - no fallback allowed
-  if (!process.env.PORT) {
-    throw new Error("PORT environment variable is required");
-  }
-  const port = parseInt(process.env.PORT, 10);
+  const port = parseInt(process.env.PORT || "5000", 10);
   httpServer.listen(
     {
       port,
-      host: "127.0.0.1",
-      reusePort: true,
+      host: "0.0.0.0",
     },
     () => {
       log(`serving on port ${port}`);
