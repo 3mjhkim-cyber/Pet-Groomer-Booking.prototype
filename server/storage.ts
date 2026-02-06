@@ -1,4 +1,4 @@
-import { users, services, bookings, customers, shops, type User, type InsertUser, type Service, type InsertService, type Booking, type InsertBooking, type Customer, type InsertCustomer, type Shop, type InsertShop } from "@shared/schema";
+import { users, services, bookings, customers, shops, type User, type InsertUser, type Service, type InsertService, type Booking, type InsertBooking, type Customer, type InsertCustomer, type Shop, type InsertShop } from "../shared/schema";
 import { db } from "./db";
 import { eq, ilike, or, desc, and, count, gte, lte, sql } from "drizzle-orm";
 
