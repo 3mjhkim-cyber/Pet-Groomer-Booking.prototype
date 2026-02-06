@@ -13,7 +13,7 @@ export function useAuth() {
   const { data: user, isLoading } = useQuery<UserWithShop | null>({
     queryKey: [api.auth.me.path],
     queryFn: async () => {
-      const res = await fetch(api.auth.me.path);
+      const res = await fetch(api.auth.me.path, { credentials: "include" });
       if (!res.ok) return null;
       return await res.json();
     },
@@ -27,11 +27,16 @@ export function useAuth() {
         method: api.auth.login.method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(credentials),
+        credentials: "include",
       });
       
       if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.message || "로그인에 실패했습니다.");
+        let message = "로그인에 실패했습니다.";
+        try {
+          const data = await res.json();
+          message = data.message || message;
+        } catch {}
+        throw new Error(message);
       }
       
       return await res.json() as UserWithShop;
