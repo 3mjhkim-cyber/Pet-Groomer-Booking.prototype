@@ -28,15 +28,20 @@ let routesReady: Promise<any> | null = null;
 
 function ensureRoutes() {
   if (!routesReady) {
-    routesReady = registerRoutes(httpServer, app).then(() => {
-      // Express error handler — always return JSON
-      app.use((err: any, _req: any, res: any, _next: any) => {
-        console.error("Server error:", err);
-        res.status(err.status || 500).json({
-          message: err.message || "Internal Server Error",
+    routesReady = registerRoutes(httpServer, app)
+      .then(() => {
+        app.use((err: any, _req: any, res: any, _next: any) => {
+          console.error("Server error:", err);
+          res.status(err.status || 500).json({
+            message: err.message || "Internal Server Error",
+          });
         });
+      })
+      .catch((err) => {
+        console.error("Route init failed, will retry next request:", err);
+        routesReady = null;
+        throw err;
       });
-    });
   }
   return routesReady;
 }
@@ -46,7 +51,7 @@ export default async function handler(req: any, res: any) {
     await ensureRoutes();
     app(req, res);
   } catch (err: any) {
-    console.error("Handler init error:", err);
-    res.status(500).json({ message: "서버 초기화 오류가 발생했습니다." });
+    console.error("Handler error:", err);
+    res.status(500).json({ message: err.message || "서버 초기화 오류가 발생했습니다." });
   }
 }

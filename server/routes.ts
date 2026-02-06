@@ -863,61 +863,63 @@ export async function registerRoutes(
     res.json(stats);
   });
 
-  // Seed Data - Super Admin
-  if (await storage.getUserByUsername("admin@jeongridog.com") === undefined) {
-    const hashedPassword = await hashPassword("admin1234");
-    await storage.createUser({
-      email: "admin@jeongridog.com",
-      password: hashedPassword,
-      role: 'super_admin',
-      status: 'approved',
-      shopId: null,
-      shopName: null,
-      phone: null,
-      address: null,
-      businessNumber: null,
-    });
-  }
+  // Seed data — 실패해도 라우트 동작에 영향 없음
+  try {
+    if (await storage.getUserByUsername("admin@jeongridog.com") === undefined) {
+      const hashedPassword = await hashPassword("admin1234");
+      await storage.createUser({
+        email: "admin@jeongridog.com",
+        password: hashedPassword,
+        role: 'super_admin',
+        status: 'approved',
+        shopId: null,
+        shopName: null,
+        phone: null,
+        address: null,
+        businessNumber: null,
+      });
+    }
 
-  // Seed Data - Demo Shop
-  let demoShop = await storage.getShopBySlug("gangnam");
-  if (!demoShop) {
-    demoShop = await storage.createShop({
-      name: "정리하개 강남점",
-      slug: "gangnam",
-      phone: "02-123-4567",
-      address: "서울 강남구 테헤란로 123",
-      businessHours: "09:00-18:00",
-      depositAmount: 10000,
-      depositRequired: true,
-    });
-  }
-  if (!demoShop.isApproved) {
-    await storage.approveShop(demoShop.id);
-    demoShop = await storage.getShop(demoShop.id) as Shop;
-  }
+    let demoShop = await storage.getShopBySlug("gangnam");
+    if (!demoShop) {
+      demoShop = await storage.createShop({
+        name: "정리하개 강남점",
+        slug: "gangnam",
+        phone: "02-123-4567",
+        address: "서울 강남구 테헤란로 123",
+        businessHours: "09:00-18:00",
+        depositAmount: 10000,
+        depositRequired: true,
+      });
+    }
+    if (!demoShop.isApproved) {
+      await storage.approveShop(demoShop.id);
+      demoShop = await storage.getShop(demoShop.id) as Shop;
+    }
 
-  // Seed Data - 테스트 Shop Owner (새 이메일)
-  if (await storage.getUserByUsername("test@shop.com") === undefined) {
-    const hashedPassword = await hashPassword("test1234");
-    await storage.createUser({
-      email: "test@shop.com",
-      password: hashedPassword,
-      role: 'shop_owner',
-      status: 'approved',
-      shopId: demoShop.id,
-      shopName: "정리하개 강남점",
-      phone: "02-123-4567",
-      address: "서울 강남구 테헤란로 123",
-      businessNumber: null,
-    });
-  }
+    if (await storage.getUserByUsername("test@shop.com") === undefined) {
+      const hashedPassword = await hashPassword("test1234");
+      await storage.createUser({
+        email: "test@shop.com",
+        password: hashedPassword,
+        role: 'shop_owner',
+        status: 'approved',
+        shopId: demoShop.id,
+        shopName: "정리하개 강남점",
+        phone: "02-123-4567",
+        address: "서울 강남구 테헤란로 123",
+        businessNumber: null,
+      });
+    }
 
-  const existingServices = await storage.getServices(demoShop.id);
-  if (existingServices.length === 0) {
-    await storage.createService({ shopId: demoShop.id, name: "전체미용", duration: 120, price: 50000 });
-    await storage.createService({ shopId: demoShop.id, name: "부분미용", duration: 60, price: 30000 });
-    await storage.createService({ shopId: demoShop.id, name: "목욕", duration: 60, price: 20000 });
+    const existingServices = await storage.getServices(demoShop.id);
+    if (existingServices.length === 0) {
+      await storage.createService({ shopId: demoShop.id, name: "전체미용", duration: 120, price: 50000 });
+      await storage.createService({ shopId: demoShop.id, name: "부분미용", duration: 60, price: 30000 });
+      await storage.createService({ shopId: demoShop.id, name: "목욕", duration: 60, price: 20000 });
+    }
+  } catch (err) {
+    console.error("Seed data error (non-fatal):", err);
   }
 
   return httpServer;
