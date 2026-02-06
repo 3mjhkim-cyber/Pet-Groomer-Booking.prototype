@@ -68,29 +68,29 @@ export function Navbar() {
                 </>
               )}
 
-              {/* Shop Owner 메뉴 */}
+              {/* Shop Owner 메뉴 - 데스크탑만 표시 (모바일은 하단 네비게이션) */}
               {user.role === 'shop_owner' && (
-                <>
+                <div className="hidden md:flex items-center gap-1">
                   <Link href="/admin/dashboard">
                     <button className={cn(
                       "flex items-center gap-2 px-3 py-2 rounded-full font-medium transition-all",
-                      location === "/admin/dashboard" 
-                        ? "bg-secondary text-secondary-foreground" 
+                      location === "/admin/dashboard"
+                        ? "bg-secondary text-secondary-foreground"
                         : "text-foreground/70 hover:bg-secondary/30"
                     )} data-testid="link-dashboard">
                       <LayoutDashboard className="h-4 w-4" />
-                      <span className="hidden sm:inline">대시보드</span>
+                      <span>대시보드</span>
                     </button>
                   </Link>
                   <Link href="/admin/customers">
                     <button className={cn(
                       "flex items-center gap-2 px-3 py-2 rounded-full font-medium transition-all",
-                      location === "/admin/customers" 
-                        ? "bg-secondary text-secondary-foreground" 
+                      location === "/admin/customers"
+                        ? "bg-secondary text-secondary-foreground"
                         : "text-foreground/70 hover:bg-secondary/30"
                     )} data-testid="link-customers">
                       <Users className="h-4 w-4" />
-                      <span className="hidden sm:inline">고객</span>
+                      <span>고객</span>
                     </button>
                   </Link>
                   <Link href="/admin/calendar">
@@ -101,7 +101,7 @@ export function Navbar() {
                         : "text-foreground/70 hover:bg-secondary/30"
                     )} data-testid="link-calendar">
                       <CalendarDays className="h-4 w-4" />
-                      <span className="hidden sm:inline">캘린더</span>
+                      <span>캘린더</span>
                     </button>
                   </Link>
                   <Link href="/admin/revenue">
@@ -112,21 +112,21 @@ export function Navbar() {
                         : "text-foreground/70 hover:bg-secondary/30"
                     )} data-testid="link-revenue">
                       <TrendingUp className="h-4 w-4" />
-                      <span className="hidden sm:inline">매출</span>
+                      <span>매출</span>
                     </button>
                   </Link>
                   <Link href="/admin/settings">
                     <button className={cn(
                       "flex items-center gap-2 px-3 py-2 rounded-full font-medium transition-all",
-                      location === "/admin/settings" 
-                        ? "bg-secondary text-secondary-foreground" 
+                      location === "/admin/settings"
+                        ? "bg-secondary text-secondary-foreground"
                         : "text-foreground/70 hover:bg-secondary/30"
                     )} data-testid="link-settings">
                       <Settings className="h-4 w-4" />
-                      <span className="hidden sm:inline">설정</span>
+                      <span>설정</span>
                     </button>
                   </Link>
-                </>
+                </div>
               )}
 
               {/* 로그아웃 버튼 */}
