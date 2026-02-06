@@ -69,8 +69,8 @@ export async function registerRoutes(
     resave: false,
     saveUninitialized: false,
     store: new SessionStore({ checkPeriod: 86400000 }),
-    cookie: { 
-      secure: false,
+    cookie: {
+      secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       httpOnly: true
     }
@@ -133,7 +133,7 @@ export async function registerRoutes(
           return res.status(403).json({ message: "승인 대기 중입니다. 관리자 승인 후 이용 가능합니다." });
         }
         if (user.status === 'rejected') {
-          return res.status(403).json({ message: "계정이 거절되었습니다. 문의: admin@yeyakhagae.com" });
+          return res.status(403).json({ message: "계정이 거절되었습니다. 문의: admin@jeongridog.com" });
         }
       }
       
@@ -864,10 +864,10 @@ export async function registerRoutes(
   });
 
   // Seed Data - Super Admin
-  if (await storage.getUserByUsername("admin@admin.com") === undefined) {
+  if (await storage.getUserByUsername("admin@jeongridog.com") === undefined) {
     const hashedPassword = await hashPassword("admin1234");
     await storage.createUser({
-      email: "admin@admin.com",
+      email: "admin@jeongridog.com",
       password: hashedPassword,
       role: 'super_admin',
       status: 'approved',
