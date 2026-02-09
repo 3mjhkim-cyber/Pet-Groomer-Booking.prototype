@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { supabase } from "@/lib/supabase";
-import { useLocation, Link } from "wouter";
+import { Link } from "wouter";
 import { Loader2, Dog, ArrowLeft, Store } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,7 +21,6 @@ const loginSchema = z.object({
 type LoginForm = z.infer<typeof loginSchema>;
 
 export default function Login() {
-  const [_, setLocation] = useLocation();
   const [rememberMe, setRememberMe] = useState(false);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [loginResult, setLoginResult] = useState<{ type: "success" | "error"; message: string } | null>(null);
@@ -71,8 +70,14 @@ export default function Login() {
     if (error) {
       setLoginResult({ type: "error", message: error.message });
     } else {
-      setLoginResult({ type: "success", message: `로그인 성공! (${authData.user?.email})` });
-      setLocation("/admin/dashboard");
+      const email = authData.user?.email ?? "";
+      const role =
+        authData.user?.user_metadata?.role ||
+        authData.user?.app_metadata?.role ||
+        (email === "admin@jeongridog.com" ? "super_admin" : "shop_owner");
+      setLoginResult({ type: "success", message: `로그인 성공! (${email})` });
+      const target = role === "super_admin" ? "/admin/platform" : "/admin/dashboard";
+      window.location.href = target;
     }
   };
 

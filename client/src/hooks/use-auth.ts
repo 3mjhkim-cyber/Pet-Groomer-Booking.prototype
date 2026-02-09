@@ -2,6 +2,17 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
+import type { User } from "@supabase/supabase-js";
+
+const SUPER_ADMIN_EMAILS = ["admin@jeongridog.com"];
+
+function resolveRole(user: User): string {
+  return (
+    user.user_metadata?.role ||
+    user.app_metadata?.role ||
+    (SUPER_ADMIN_EMAILS.includes(user.email ?? "") ? "super_admin" : "shop_owner")
+  );
+}
 
 interface AuthUser {
   id: string;
@@ -26,7 +37,7 @@ export function useAuth() {
       return {
         id: session.user.id,
         email: session.user.email ?? "",
-        role: (session.user.user_metadata?.role as string) || "shop_owner",
+        role: resolveRole(session.user),
       };
     },
     retry: false,
@@ -41,13 +52,14 @@ export function useAuth() {
       return {
         id: data.user.id,
         email: data.user.email ?? "",
-        role: (data.user.user_metadata?.role as string) || "shop_owner",
+        role: resolveRole(data.user),
       } as AuthUser;
     },
     onSuccess: (data) => {
       queryClient.setQueryData(["supabase-user"], data);
       toast({ title: "환영합니다!", description: `${data.email} 로그인되었습니다.` });
-      setLocation("/admin/dashboard");
+      const target = data.role === "super_admin" ? "/admin/platform" : "/admin/dashboard";
+      window.location.href = target;
     },
     onError: (error: Error) => {
       toast({ title: "로그인 실패", description: error.message, variant: "destructive" });
@@ -63,8 +75,7 @@ export function useAuth() {
     onSuccess: () => {
       queryClient.setQueryData(["supabase-user"], null);
       localStorage.removeItem("user");
-      setLocation("/login");
-      toast({ title: "로그아웃", description: "성공적으로 로그아웃되었습니다." });
+      window.location.href = "/login";
     },
   });
 
