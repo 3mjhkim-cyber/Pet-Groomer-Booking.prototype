@@ -61,7 +61,33 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  // 세션 테이블을 명시적으로 생성 (await로 완료 보장)
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS "session" (
+        "sid" varchar NOT NULL COLLATE "default",
+        "sess" json NOT NULL,
+        "expire" timestamp(6) NOT NULL,
+        CONSTRAINT "session_pkey" PRIMARY KEY ("sid")
+      )
+    `);
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON "session" ("expire")
+    `);
+    console.log("[session] Session table ready");
+  } catch (err) {
+    console.error("[session] Failed to create session table:", err);
+  }
+
   const PgStore = connectPgSimple(session);
+
+  const sessionStore = new PgStore({
+    pool,
+    createTableIfMissing: false,
+    errorLog: (err: Error) => {
+      console.error("[session-store] PgStore error:", err.message);
+    },
+  });
 
   app.set("trust proxy", 1);
 
@@ -69,10 +95,7 @@ export async function registerRoutes(
     secret: process.env.SESSION_SECRET || "secret",
     resave: false,
     saveUninitialized: false,
-    store: new PgStore({
-      pool,
-      createTableIfMissing: true,
-    }),
+    store: sessionStore,
     cookie: {
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
@@ -112,52 +135,94 @@ export async function registerRoutes(
     }
   });
 
+  // 서버 상태 확인 API
+  app.get('/api/health', async (_req, res) => {
+    const checks: Record<string, any> = { ok: true };
+    try {
+      const dbResult = await pool.query('SELECT NOW() as now');
+      checks.db = { ok: true, time: dbResult.rows[0].now };
+    } catch (err: any) {
+      checks.db = { ok: false, error: err.message };
+      checks.ok = false;
+    }
+    try {
+      const sessionResult = await pool.query('SELECT COUNT(*) as count FROM "session"');
+      checks.session_table = { ok: true, sessions: sessionResult.rows[0].count };
+    } catch (err: any) {
+      checks.session_table = { ok: false, error: err.message };
+      checks.ok = false;
+    }
+    try {
+      const userCount = await pool.query('SELECT COUNT(*) as count FROM users');
+      checks.users = { ok: true, count: userCount.rows[0].count };
+    } catch (err: any) {
+      checks.users = { ok: false, error: err.message };
+      checks.ok = false;
+    }
+    checks.env = {
+      NODE_ENV: process.env.NODE_ENV,
+      hasSessionSecret: !!process.env.SESSION_SECRET,
+      hasDatabaseUrl: !!process.env.DATABASE_URL,
+    };
+    res.json(checks);
+  });
+
   // 로그인 API
   app.post(api.auth.login.path, async (req, res) => {
     try {
       const { email, password } = req.body;
+      console.log(`[login] Attempt: ${email}`);
       if (!email || !password) {
+        console.log(`[login] Missing credentials`);
         return res.status(400).json({ message: "이메일과 비밀번호를 입력해주세요." });
       }
-      
+
       const user = await storage.getUserByUsername(email);
       if (!user) {
+        console.log(`[login] User not found: ${email}`);
         return res.status(401).json({ message: "이메일 또는 비밀번호가 올바르지 않습니다." });
       }
-      
+      console.log(`[login] User found: id=${user.id}, role=${user.role}, status=${user.status}`);
+
       // 비밀번호 검증
       const isValid = await comparePasswords(password, user.password);
       if (!isValid) {
+        console.log(`[login] Password mismatch for: ${email}`);
         return res.status(401).json({ message: "이메일 또는 비밀번호가 올바르지 않습니다." });
       }
-      
+      console.log(`[login] Password verified`);
+
       // super_admin은 status 체크 없이 바로 로그인
       if (user.role !== 'super_admin') {
         // shop_owner는 status 체크
         if (user.status === 'pending') {
+          console.log(`[login] Blocked: pending status`);
           return res.status(403).json({ message: "승인 대기 중입니다. 관리자 승인 후 이용 가능합니다." });
         }
         if (user.status === 'rejected') {
+          console.log(`[login] Blocked: rejected status`);
           return res.status(403).json({ message: "계정이 거절되었습니다. 문의: admin@jeongridog.com" });
         }
       }
-      
+
       let shop = null;
       if (user.shopId) {
         shop = await storage.getShop(user.shopId);
+        console.log(`[login] Shop loaded: ${shop?.name || 'not found'}`);
       }
-      
+
       // 세션에 사용자 저장
       (req as any).login(user, (err: any) => {
         if (err) {
-          console.error('Login error:', err);
+          console.error('[login] Session save error:', err);
           return res.status(500).json({ message: "로그인 처리 중 오류가 발생했습니다." });
         }
+        console.log(`[login] Success: ${email}, sessionID=${(req as any).sessionID}`);
         const { password: _, ...userWithoutPassword } = user;
         res.json({ ...userWithoutPassword, shop });
       });
     } catch (err) {
-      console.error('Login error:', err);
+      console.error('[login] Unexpected error:', err);
       res.status(500).json({ message: "로그인 처리 중 오류가 발생했습니다." });
     }
   });
@@ -170,6 +235,7 @@ export async function registerRoutes(
   });
 
   app.get(api.auth.me.path, async (req, res) => {
+    console.log(`[auth/me] sessionID=${(req as any).sessionID}, hasUser=${!!req.user}`);
     if (!req.user) return res.json(null);
     const user = req.user as any;
     let shop = null;
