@@ -1,3 +1,4 @@
+'use client';
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -21,7 +22,7 @@ const loginSchema = z.object({
 type LoginForm = z.infer<typeof loginSchema>;
 
 export default function Login() {
-  const { login, isLoggingIn, user } = useAuth();
+  const { isLoggingIn, user } = useAuth();
   const [_, setLocation] = useLocation();
   const [rememberMe, setRememberMe] = useState(false);
 
@@ -43,14 +44,25 @@ export default function Login() {
     }
   }, []);
 
-  const onSubmit = (data: LoginForm) => {
+  const onSubmit = async (data: LoginForm) => {
     // 아이디 저장 처리
     if (rememberMe) {
       localStorage.setItem(SAVED_EMAIL_KEY, data.email);
     } else {
       localStorage.removeItem(SAVED_EMAIL_KEY);
     }
-    login(data);
+    const { error } = await supabase.auth.signInWithPassword({
+  email: data.email,
+  password: data.password,
+});
+
+if (error) {
+  alert('로그인 실패');
+} else {
+  alert('로그인 성공');
+}
+
+
   };
 
   // 이미 로그인된 경우 리다이렉트
