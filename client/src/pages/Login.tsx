@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useAuth } from "@/hooks/use-auth";
+import { supabase } from "@/lib/supabase";
 import { useLocation, Link } from "wouter";
 import { Loader2, Dog, ArrowLeft, Store } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,9 +21,10 @@ const loginSchema = z.object({
 type LoginForm = z.infer<typeof loginSchema>;
 
 export default function Login() {
-  const { login, isLoggingIn, user } = useAuth();
   const [_, setLocation] = useLocation();
   const [rememberMe, setRememberMe] = useState(false);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [loginResult, setLoginResult] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   // 저장된 이메일 불러오기
   const savedEmail = typeof window !== 'undefined' ? localStorage.getItem(SAVED_EMAIL_KEY) || "" : "";
@@ -43,27 +44,31 @@ export default function Login() {
     }
   }, []);
 
-  const onSubmit = (data: LoginForm) => {
+  const onSubmit = async (data: LoginForm) => {
     // 아이디 저장 처리
     if (rememberMe) {
       localStorage.setItem(SAVED_EMAIL_KEY, data.email);
     } else {
       localStorage.removeItem(SAVED_EMAIL_KEY);
     }
-    login({ email: data.email, password: data.password });
-  };
 
-  // 이미 로그인된 경우 리다이렉트
-  useEffect(() => {
-    if (user) {
-      const targetPath = user.role === 'super_admin' ? '/admin/platform' : '/admin/dashboard';
-      setLocation(targetPath);
+    setIsLoggingIn(true);
+    setLoginResult(null);
+
+    const { data: authData, error } = await supabase.auth.signInWithPassword({
+      email: data.email,
+      password: data.password,
+    });
+
+    setIsLoggingIn(false);
+
+    if (error) {
+      setLoginResult({ type: "error", message: error.message });
+    } else {
+      setLoginResult({ type: "success", message: `로그인 성공! (${authData.user?.email})` });
+      setLocation("/admin/dashboard");
     }
-  }, [user, setLocation]);
-
-  if (user) {
-    return null;
-  }
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-primary/5 to-background p-4">
@@ -141,6 +146,16 @@ export default function Login() {
                   "로그인"
                 )}
               </Button>
+
+              {loginResult && (
+                <div className={`mt-3 p-3 rounded-md text-sm ${
+                  loginResult.type === "error"
+                    ? "bg-destructive/10 text-destructive"
+                    : "bg-green-50 text-green-700"
+                }`}>
+                  {loginResult.message}
+                </div>
+              )}
             </form>
             
             <div className="mt-6 pt-6 border-t border-dashed text-center space-y-3">
