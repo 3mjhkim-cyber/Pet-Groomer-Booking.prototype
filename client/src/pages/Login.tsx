@@ -55,6 +55,12 @@ export default function Login() {
     setIsLoggingIn(true);
     setLoginResult(null);
 
+    if (!supabase) {
+      setIsLoggingIn(false);
+      setLoginResult({ type: "error", message: "Supabase 연결이 설정되지 않았습니다. 환경변수를 확인해주세요." });
+      return;
+    }
+
     const { data: authData, error } = await supabase.auth.signInWithPassword({
       email: data.email,
       password: data.password,
