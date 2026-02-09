@@ -160,7 +160,7 @@ if (error) {
                 테스트 계정: test@shop.com / test1234
               </p>
               <p className="text-sm text-muted-foreground">
-                총관리자: admin@yeyakhagae.com / admin1234
+                총관리자: admin@jeongridog.com / admin1234
               </p>
               
               <div className="pt-3">
