@@ -6,9 +6,10 @@ import { z } from "zod";
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import session from "express-session";
+import connectPgSimple from "connect-pg-simple";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
-import MemoryStore from "memorystore";
+import { pool } from "./db";
 import { insertShopSchema, Shop } from "../shared/schema";
 
 const scryptAsync = promisify(scrypt);
@@ -60,19 +61,23 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  const SessionStore = MemoryStore(session);
-  
+  const PgStore = connectPgSimple(session);
+
   app.set("trust proxy", 1);
-  
+
   app.use(session({
     secret: process.env.SESSION_SECRET || "secret",
     resave: false,
     saveUninitialized: false,
-    store: new SessionStore({ checkPeriod: 86400000 }),
+    store: new PgStore({
+      pool,
+      createTableIfMissing: true,
+    }),
     cookie: {
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
-      httpOnly: true
+      httpOnly: true,
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7일
     }
   }));
 
