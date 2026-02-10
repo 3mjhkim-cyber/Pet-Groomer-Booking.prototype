@@ -8,7 +8,7 @@
 }
 
 /* 모바일에서 하단 네비게이션 공간 확보 */
-@media (max-width: 767px) {
+@media (max-width: 1023px) {
   .pb-20 {
     padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0)) !important;
   }
