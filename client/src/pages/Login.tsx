@@ -68,7 +68,12 @@ export default function Login() {
     setIsLoggingIn(false);
 
     if (error) {
-      setLoginResult({ type: "error", message: error.message });
+      const msg = error.message === "Invalid login credentials"
+        ? "이메일 또는 비밀번호가 일치하지 않습니다. 다시 한번 확인해주세요."
+        : error.message === "Email not confirmed"
+        ? "이메일 인증이 아직 완료되지 않았습니다. 메일함을 확인해주세요."
+        : `로그인 중 문제가 발생했습니다. 잠시 후 다시 시도해주세요. (${error.message})`;
+      setLoginResult({ type: "error", message: msg });
     } else {
       const email = authData.user?.email ?? "";
       const role =
