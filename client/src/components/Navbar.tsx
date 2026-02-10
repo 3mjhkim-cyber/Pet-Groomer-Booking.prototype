@@ -70,7 +70,7 @@ export function Navbar() {
 
               {/* Shop Owner 메뉴 - 데스크탑만 표시 (모바일은 하단 네비게이션) */}
               {user.role === 'shop_owner' && (
-                <div className="hidden md:flex items-center gap-1">
+                <div className="hidden lg:flex items-center gap-1">
                   <Link href="/admin/dashboard">
                     <button className={cn(
                       "flex items-center gap-2 px-3 py-2 rounded-full font-medium transition-all",

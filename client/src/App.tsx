@@ -43,7 +43,7 @@ function Router() {
 
       <MobileBottomNav />
 
-      <footer className="hidden md:block py-6 text-center text-muted-foreground text-sm border-t border-border bg-white">
+      <footer className="hidden lg:block py-6 text-center text-muted-foreground text-sm border-t border-border bg-white">
         <p>&copy; 2024 정리하개. All rights reserved.</p>
       </footer>
     </div>

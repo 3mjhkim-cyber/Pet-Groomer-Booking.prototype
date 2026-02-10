@@ -26,7 +26,7 @@ export function MobileBottomNav() {
   }
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-border safe-area-bottom">
+    <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-border safe-area-bottom">
       <div className="grid grid-cols-5 h-16">
         {shopOwnerNavItems.map((item) => {
           const isActive = location === item.href;
