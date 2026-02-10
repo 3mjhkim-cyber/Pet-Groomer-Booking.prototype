@@ -9,18 +9,29 @@ interface AuthUser {
   role: string;
   shopId?: number;
   shopName?: string;
-  shop?: { name: string };
+  shop?: { id: number; name: string; slug: string; isApproved: boolean };
 }
 
-async function fetchProfile(userId: string): Promise<{ role: string } | null> {
+async function fetchProfile(userId: string): Promise<{ role: string; shop_id?: number } | null> {
   if (!supabase) return null;
   const { data, error } = await supabase
     .from("profiles")
-    .select("role")
+    .select("role, shop_id")
     .eq("user_id", userId)
     .single();
   if (error || !data) return null;
-  return data as { role: string };
+  return data as { role: string; shop_id?: number };
+}
+
+async function fetchShop(shopId: number): Promise<{ id: number; name: string; slug: string; is_approved: boolean } | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from("shops")
+    .select("id, name, slug, is_approved")
+    .eq("id", shopId)
+    .single();
+  if (error || !data) return null;
+  return data as { id: number; name: string; slug: string; is_approved: boolean };
 }
 
 export function useAuth() {
@@ -38,10 +49,25 @@ export function useAuth() {
       const profile = await fetchProfile(session.user.id);
       const role = profile?.role || "shop_owner";
 
+      let shopData: AuthUser["shop"] = undefined;
+      let shopId: number | undefined;
+      let shopName: string | undefined;
+      if (profile?.shop_id) {
+        const shop = await fetchShop(profile.shop_id);
+        if (shop) {
+          shopData = { id: shop.id, name: shop.name, slug: shop.slug, isApproved: shop.is_approved };
+          shopId = shop.id;
+          shopName = shop.name;
+        }
+      }
+
       return {
         id: session.user.id,
         email: session.user.email ?? "",
         role,
+        shopId,
+        shopName,
+        shop: shopData,
       };
     },
     retry: false,
@@ -57,10 +83,25 @@ export function useAuth() {
       const profile = await fetchProfile(data.user.id);
       const role = profile?.role || "shop_owner";
 
+      let shopData: AuthUser["shop"] = undefined;
+      let shopId: number | undefined;
+      let shopName: string | undefined;
+      if (profile?.shop_id) {
+        const shop = await fetchShop(profile.shop_id);
+        if (shop) {
+          shopData = { id: shop.id, name: shop.name, slug: shop.slug, isApproved: shop.is_approved };
+          shopId = shop.id;
+          shopName = shop.name;
+        }
+      }
+
       return {
         id: data.user.id,
         email: data.user.email ?? "",
         role,
+        shopId,
+        shopName,
+        shop: shopData,
       } as AuthUser;
     },
     onSuccess: (data) => {
