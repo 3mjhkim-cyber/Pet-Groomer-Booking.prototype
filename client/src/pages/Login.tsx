@@ -76,10 +76,16 @@ export default function Login() {
       setLoginResult({ type: "error", message: msg });
     } else {
       const email = authData.user?.email ?? "";
-      const role =
-        authData.user?.user_metadata?.role ||
-        authData.user?.app_metadata?.role ||
-        (email === "admin@jeongridog.com" ? "super_admin" : "shop_owner");
+      // profiles 테이블에서 role 조회
+      let role = "shop_owner";
+      if (supabase && authData.user) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("user_id", authData.user.id)
+          .single();
+        if (profile?.role) role = profile.role;
+      }
       setLoginResult({ type: "success", message: `로그인 성공! (${email})` });
       const target = role === "super_admin" ? "/admin/platform" : "/admin/dashboard";
       window.location.href = target;

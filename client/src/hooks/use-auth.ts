@@ -2,25 +2,25 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
-import type { User } from "@supabase/supabase-js";
-
-const SUPER_ADMIN_EMAILS = ["admin@jeongridog.com"];
-
-function resolveRole(user: User): string {
-  return (
-    user.user_metadata?.role ||
-    user.app_metadata?.role ||
-    (SUPER_ADMIN_EMAILS.includes(user.email ?? "") ? "super_admin" : "shop_owner")
-  );
-}
 
 interface AuthUser {
   id: string;
   email: string;
-  role?: string;
+  role: string;
   shopId?: number;
   shopName?: string;
   shop?: { name: string };
+}
+
+async function fetchProfile(userId: string): Promise<{ role: string } | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("user_id", userId)
+    .single();
+  if (error || !data) return null;
+  return data as { role: string };
 }
 
 export function useAuth() {
@@ -34,10 +34,14 @@ export function useAuth() {
       if (!supabase) return null;
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user) return null;
+
+      const profile = await fetchProfile(session.user.id);
+      const role = profile?.role || "shop_owner";
+
       return {
         id: session.user.id,
         email: session.user.email ?? "",
-        role: resolveRole(session.user),
+        role,
       };
     },
     retry: false,
@@ -49,10 +53,14 @@ export function useAuth() {
       if (!supabase) throw new Error("Supabase가 설정되지 않았습니다.");
       const { data, error } = await supabase.auth.signInWithPassword(credentials);
       if (error) throw new Error(error.message);
+
+      const profile = await fetchProfile(data.user.id);
+      const role = profile?.role || "shop_owner";
+
       return {
         id: data.user.id,
         email: data.user.email ?? "",
-        role: resolveRole(data.user),
+        role,
       } as AuthUser;
     },
     onSuccess: (data) => {

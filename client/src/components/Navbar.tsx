@@ -1,6 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/lib/supabase";
 import { Scissors, User, LogOut, LayoutDashboard, Users, CalendarDays, Bell, Settings, Shield, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -12,9 +13,18 @@ export function Navbar() {
   // 예약 페이지에서는 로그인 버튼 숨김
   const isBookingPage = location.startsWith('/book/');
 
-  // Super Admin인 경우 승인 대기 수 조회
+  // Super Admin인 경우 승인 대기 수 조회 (Supabase 직접 쿼리)
   const { data: pendingCount } = useQuery<{ count: number }>({
-    queryKey: ['/api/admin/pending-users/count'],
+    queryKey: ["admin-pending-count"],
+    queryFn: async () => {
+      if (!supabase) return { count: 0 };
+      const { count, error } = await supabase
+        .from("shops")
+        .select("*", { count: "exact", head: true })
+        .eq("is_approved", false);
+      if (error) return { count: 0 };
+      return { count: count ?? 0 };
+    },
     enabled: !!user && user.role === 'super_admin',
     refetchInterval: 30000, // 30초마다 갱신
   });
