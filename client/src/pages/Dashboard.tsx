@@ -178,38 +178,50 @@ export default function Dashboard() {
     }
   }, [manualForm.customerName]);
 
-  if (isAuthLoading) return <div className="h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
-
-  if (!user) {
-    setLocation("/login");
-    return null;
-  }
-
-  // 구독 상태 확인 (shop_owner만)
-  if (user.role === 'shop_owner' && user.shop && user.shop.subscriptionStatus === 'none') {
-    setLocation("/admin/subscription");
-    return null;
-  }
-
-  // pending, confirmed만 표시 (cancelled, rejected는 숨김)
-  // 순수 승인 대기: status === 'pending' && depositStatus !== 'waiting'
-  const pendingApprovalBookings = bookings?.filter(b => b.status === 'pending' && b.depositStatus !== 'waiting') || [];
-  // 예약금 대기: depositStatus === 'waiting' && status === 'pending'
-  const depositWaitingBookings = bookings?.filter(b => b.status === 'pending' && b.depositStatus === 'waiting') || [];
-  // 총 대기 중 예약 수 (탭 배지용)
-  const totalPendingCount = pendingApprovalBookings.length + depositWaitingBookings.length;
-
-  // 확정 예약: 선택한 날짜 필터링 + 시간순 정렬
   const selectedDateStr = format(selectedDate, 'yyyy-MM-dd');
+  const todayStr = format(new Date(), 'yyyy-MM-dd');
+
   const confirmedBookings = useMemo(() => {
     const filtered = bookings?.filter(b =>
       b.status === 'confirmed' && b.date === selectedDateStr
     ) || [];
-    // 시간순 정렬 (오름차순)
     return filtered.sort((a, b) => a.time.localeCompare(b.time));
   }, [bookings, selectedDateStr]);
 
-  // 지난 시간대인지 확인하는 함수
+  const servicePriceMap = useMemo(() => {
+    const map: Record<number, number> = {};
+    services?.forEach((s: any) => { map[s.id] = s.price; });
+    return map;
+  }, [services]);
+
+  const todayConfirmedBookings = useMemo(() => {
+    return bookings
+      ?.filter(b => b.status === 'confirmed' && b.date === todayStr)
+      .sort((a, b) => a.time.localeCompare(b.time)) || [];
+  }, [bookings, todayStr]);
+
+  useEffect(() => {
+    if (!isAuthLoading && !user) {
+      setLocation("/login");
+    }
+  }, [isAuthLoading, user, setLocation]);
+
+  useEffect(() => {
+    if (user?.role === 'shop_owner' && user?.shop && (user.shop as any).subscriptionStatus === 'none') {
+      setLocation("/admin/subscription");
+    }
+  }, [user, setLocation]);
+
+  if (isAuthLoading) return <div className="h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
+
+  if (!user) {
+    return null;
+  }
+
+  const pendingApprovalBookings = bookings?.filter(b => b.status === 'pending' && b.depositStatus !== 'waiting') || [];
+  const depositWaitingBookings = bookings?.filter(b => b.status === 'pending' && b.depositStatus === 'waiting') || [];
+  const totalPendingCount = pendingApprovalBookings.length + depositWaitingBookings.length;
+
   const isPastTime = (bookingDate: string, bookingTime: string): boolean => {
     const now = new Date();
     const bookingDateTime = parse(
@@ -220,23 +232,7 @@ export default function Dashboard() {
     return isAfter(now, bookingDateTime);
   };
 
-  // 오늘 확정 예약 수 (배지용)
-  const todayStr = format(new Date(), 'yyyy-MM-dd');
   const todayConfirmedCount = bookings?.filter(b => b.status === 'confirmed' && b.date === todayStr).length || 0;
-
-  // 서비스 가격 맵
-  const servicePriceMap = useMemo(() => {
-    const map: Record<number, number> = {};
-    services?.forEach((s: any) => { map[s.id] = s.price; });
-    return map;
-  }, [services]);
-
-  // 오늘의 확정 예약 (시간순)
-  const todayConfirmedBookings = useMemo(() => {
-    return bookings
-      ?.filter(b => b.status === 'confirmed' && b.date === todayStr)
-      .sort((a, b) => a.time.localeCompare(b.time)) || [];
-  }, [bookings, todayStr]);
 
   const handleManualSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1369,11 +1365,11 @@ function CustomerDetailDialog({ customerId, open, onOpenChange }: { customerId: 
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div>
                   <span className="text-muted-foreground">첫 방문일</span>
-                  <p className="font-medium">{customer.firstVisitDate || '-'}</p>
+                  <p className="font-medium">{customer.firstVisitDate ? new Date(customer.firstVisitDate).toLocaleDateString('ko-KR') : '-'}</p>
                 </div>
                 <div>
                   <span className="text-muted-foreground">마지막 방문</span>
-                  <p className="font-medium">{customer.lastVisit || '-'}</p>
+                  <p className="font-medium">{customer.lastVisit ? new Date(customer.lastVisit).toLocaleDateString('ko-KR') : '-'}</p>
                 </div>
                 <div className="col-span-2">
                   <span className="text-muted-foreground">총 방문 횟수</span>
