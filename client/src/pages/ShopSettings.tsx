@@ -416,6 +416,38 @@ export default function ShopSettings() {
       </header>
 
       <main className="max-w-4xl mx-auto px-4 py-8 space-y-6">
+        {/* 구독 상태 카드 */}
+        <Card className={shop?.subscriptionStatus === 'active' ? 'border-green-200 bg-green-50/50' : 'border-orange-200 bg-orange-50/50'}>
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <span>구독 상태</span>
+              <Badge variant={shop?.subscriptionStatus === 'active' ? 'default' : 'secondary'}>
+                {shop?.subscriptionStatus === 'active' ? '활성' :
+                 shop?.subscriptionStatus === 'expired' ? '만료' :
+                 shop?.subscriptionStatus === 'cancelled' ? '취소됨' : '미구독'}
+              </Badge>
+            </CardTitle>
+            <CardDescription>
+              {shop?.subscriptionStatus === 'active'
+                ? `${shop.subscriptionTier === 'basic' ? '베이직' : shop.subscriptionTier === 'premium' ? '프리미엄' : '엔터프라이즈'} 플랜 이용 중`
+                : '구독을 활성화하여 서비스를 이용하세요'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button
+              onClick={() => setLocation('/admin/subscription')}
+              variant={shop?.subscriptionStatus === 'active' ? 'outline' : 'default'}
+            >
+              {shop?.subscriptionStatus === 'active' ? '구독 관리' : '구독하기'}
+            </Button>
+            {shop?.subscriptionStatus === 'active' && shop.subscriptionEnd && (
+              <p className="text-sm text-muted-foreground mt-2">
+                만료일: {new Date(shop.subscriptionEnd).toLocaleDateString('ko-KR')}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader>
             <CardTitle>기본 정보</CardTitle>
