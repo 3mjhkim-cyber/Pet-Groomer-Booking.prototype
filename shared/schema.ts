@@ -21,7 +21,12 @@ export const shops = pgTable("shops", {
   shopMemo: text("shop_memo"),
   depositAmount: integer("deposit_amount").default(10000).notNull(),
   depositRequired: boolean("deposit_required").default(true).notNull(),
-  isApproved: boolean("is_approved").default(false).notNull(),
+  isApproved: boolean("is_approved").default(true).notNull(), // 자동 승인으로 변경
+  // 구독 관련 필드
+  subscriptionStatus: text("subscription_status").default("none").notNull(), // none, active, expired, cancelled
+  subscriptionTier: text("subscription_tier").default("basic"), // basic, premium, enterprise
+  subscriptionStart: timestamp("subscription_start"),
+  subscriptionEnd: timestamp("subscription_end"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -91,11 +96,26 @@ export const bookings = pgTable("bookings", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-export const insertShopSchema = createInsertSchema(shops).omit({ id: true, createdAt: true, isApproved: true });
+export const subscriptions = pgTable("subscriptions", {
+  id: serial("id").primaryKey(),
+  shopId: integer("shop_id").references(() => shops.id).notNull(),
+  tier: text("tier").notNull(), // basic, premium, enterprise
+  status: text("status").default("active").notNull(), // active, expired, cancelled
+  amount: integer("amount").notNull(),
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date").notNull(),
+  autoRenew: boolean("auto_renew").default(true).notNull(),
+  paymentMethod: text("payment_method"), // card, bank_transfer, etc
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertShopSchema = createInsertSchema(shops).omit({ id: true, createdAt: true, isApproved: true, subscriptionStatus: true, subscriptionStart: true, subscriptionEnd: true });
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
 export const insertCustomerSchema = createInsertSchema(customers).omit({ id: true, visitCount: true, lastVisit: true, firstVisitDate: true, createdAt: true, updatedAt: true });
 export const insertServiceSchema = createInsertSchema(services).omit({ id: true, isActive: true });
 export const insertBookingSchema = createInsertSchema(bookings).omit({ id: true, status: true, depositStatus: true, depositDeadline: true, isFirstVisit: true, remindSent: true, remindSentAt: true, visitCompleted: true, createdAt: true, updatedAt: true });
+export const insertSubscriptionSchema = createInsertSchema(subscriptions).omit({ id: true, createdAt: true, updatedAt: true });
 
 export type Shop = typeof shops.$inferSelect;
 export type InsertShop = z.infer<typeof insertShopSchema>;
@@ -107,3 +127,5 @@ export type Service = typeof services.$inferSelect;
 export type InsertService = z.infer<typeof insertServiceSchema>;
 export type Booking = typeof bookings.$inferSelect;
 export type InsertBooking = z.infer<typeof insertBookingSchema>;
+export type Subscription = typeof subscriptions.$inferSelect;
+export type InsertSubscription = z.infer<typeof insertSubscriptionSchema>;
