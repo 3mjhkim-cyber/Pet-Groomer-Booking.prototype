@@ -318,7 +318,7 @@ export default function PlatformAdmin() {
 
       {/* 가맹점 편집 다이얼로그 */}
       <Dialog open={!!editingShop} onOpenChange={(open) => !open && setEditingShop(null)}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>가맹점 정보 수정</DialogTitle>
             <DialogDescription>
