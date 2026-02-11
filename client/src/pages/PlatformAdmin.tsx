@@ -1,7 +1,7 @@
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation, Link } from "wouter";
-import { Loader2, Store, Check, X, Users, Calendar, LogOut, Settings, Bell, UserCheck, Pencil, Trash2 } from "lucide-react";
+import { Loader2, Store, Check, X, Users, Calendar, LogOut, Settings, Bell, UserCheck, Pencil, Trash2, CreditCard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +32,9 @@ export default function PlatformAdmin() {
     depositAmount: 0,
     depositRequired: true,
     isApproved: false,
+    subscriptionStatus: 'none',
+    subscriptionTier: 'basic',
+    subscriptionEnd: '',
   });
 
   const { data: shops, isLoading: isShopsLoading } = useQuery<Shop[]>({
@@ -109,6 +112,9 @@ export default function PlatformAdmin() {
       depositAmount: shop.depositAmount,
       depositRequired: shop.depositRequired,
       isApproved: shop.isApproved,
+      subscriptionStatus: shop.subscriptionStatus || 'none',
+      subscriptionTier: shop.subscriptionTier || 'basic',
+      subscriptionEnd: shop.subscriptionEnd ? new Date(shop.subscriptionEnd).toISOString().split('T')[0] : '',
     });
     setEditingShop(shop);
   };
@@ -264,6 +270,21 @@ export default function PlatformAdmin() {
                       <p><span className="text-muted-foreground">주소:</span> {shop.address}</p>
                       <p><span className="text-muted-foreground">영업시간:</span> {shop.businessHours}</p>
                       <p><span className="text-muted-foreground">예약금:</span> {shop.depositAmount.toLocaleString()}원</p>
+                      <div className="flex items-center gap-2 pt-2 border-t">
+                        <CreditCard className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-muted-foreground">구독:</span>
+                        <Badge variant={shop.subscriptionStatus === 'active' ? 'default' : 'secondary'}>
+                          {shop.subscriptionStatus === 'active' ? '활성' :
+                           shop.subscriptionStatus === 'expired' ? '만료' :
+                           shop.subscriptionStatus === 'cancelled' ? '취소' : '미구독'}
+                        </Badge>
+                        {shop.subscriptionStatus === 'active' && (
+                          <span className="text-xs text-muted-foreground">
+                            ({shop.subscriptionTier === 'basic' ? '베이직' :
+                              shop.subscriptionTier === 'premium' ? '프리미엄' : '엔터프라이즈'})
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <div className="flex gap-2">
                       <Button
@@ -362,6 +383,52 @@ export default function PlatformAdmin() {
                 checked={editForm.isApproved}
                 onCheckedChange={(checked) => setEditForm({ ...editForm, isApproved: checked })}
               />
+            </div>
+
+            {/* 구독 관리 섹션 */}
+            <div className="border-t pt-4 mt-4">
+              <h4 className="font-semibold mb-3 flex items-center gap-2">
+                <CreditCard className="w-4 h-4" />
+                구독 관리
+              </h4>
+              <div className="grid gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-subscription-status">구독 상태</Label>
+                  <select
+                    id="edit-subscription-status"
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    value={editForm.subscriptionStatus}
+                    onChange={(e) => setEditForm({ ...editForm, subscriptionStatus: e.target.value })}
+                  >
+                    <option value="none">미구독</option>
+                    <option value="active">활성</option>
+                    <option value="expired">만료</option>
+                    <option value="cancelled">취소</option>
+                  </select>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-subscription-tier">구독 플랜</Label>
+                  <select
+                    id="edit-subscription-tier"
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    value={editForm.subscriptionTier}
+                    onChange={(e) => setEditForm({ ...editForm, subscriptionTier: e.target.value })}
+                  >
+                    <option value="basic">베이직 (29,000원/월)</option>
+                    <option value="premium">프리미엄 (49,000원/월)</option>
+                    <option value="enterprise">엔터프라이즈 (99,000원/월)</option>
+                  </select>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-subscription-end">구독 만료일</Label>
+                  <Input
+                    id="edit-subscription-end"
+                    type="date"
+                    value={editForm.subscriptionEnd}
+                    onChange={(e) => setEditForm({ ...editForm, subscriptionEnd: e.target.value })}
+                  />
+                </div>
+              </div>
             </div>
           </div>
           <DialogFooter>

@@ -273,10 +273,24 @@ export async function registerRoutes(
 
   // 슈퍼관리자용 가맹점 정보 수정
   app.patch('/api/admin/shops/:id', requireSuperAdmin, async (req, res) => {
-    const { name, phone, address, businessHours, depositAmount, depositRequired, isApproved } = req.body;
-    const shop = await storage.updateShop(Number(req.params.id), {
+    const { name, phone, address, businessHours, depositAmount, depositRequired, isApproved, subscriptionStatus, subscriptionTier, subscriptionEnd } = req.body;
+
+    const updates: any = {
       name, phone, address, businessHours, depositAmount, depositRequired, isApproved
-    });
+    };
+
+    // 구독 정보가 있으면 추가
+    if (subscriptionStatus !== undefined) updates.subscriptionStatus = subscriptionStatus;
+    if (subscriptionTier !== undefined) updates.subscriptionTier = subscriptionTier;
+    if (subscriptionEnd !== undefined) {
+      updates.subscriptionEnd = subscriptionEnd ? new Date(subscriptionEnd) : null;
+      // 구독 시작일이 없고 구독이 활성화되면 현재 시간으로 설정
+      if (subscriptionStatus === 'active' && !updates.subscriptionStart) {
+        updates.subscriptionStart = new Date();
+      }
+    }
+
+    const shop = await storage.updateShop(Number(req.params.id), updates);
     if (!shop) {
       return res.status(404).json({ message: "가맹점을 찾을 수 없습니다." });
     }
