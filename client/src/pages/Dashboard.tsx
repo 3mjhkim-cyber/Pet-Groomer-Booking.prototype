@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarPicker } from "@/components/ui/calendar";
-import type { Customer, Booking, Shop } from "@shared/schema";
+import type { Customer, Booking } from "@shared/schema";
 import { formatKoreanPhone } from "@/lib/phone";
 import { useQueryClient, useMutation, useQuery } from "@tanstack/react-query";
 import { api } from "@shared/routes";
@@ -67,12 +67,6 @@ export default function Dashboard() {
 
   const { data: searchResults } = useSearchCustomers(searchQuery);
   const { data: customerHistoryData } = useCustomerHistory(selectedCustomerPhone);
-
-  // Shop 정보 조회 (구독 상태 확인용)
-  const { data: shop, isLoading: isShopLoading } = useQuery<Shop>({
-    queryKey: ['/api/shop/settings'],
-    enabled: !!user && user.role === 'shop_owner',
-  });
 
   // 리마인드 전송 mutation
   const { mutate: sendRemind, isPending: isSendingRemind } = useMutation({
@@ -184,7 +178,7 @@ export default function Dashboard() {
     }
   }, [manualForm.customerName]);
 
-  if (isAuthLoading || isShopLoading) return <div className="h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
+  if (isAuthLoading) return <div className="h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
 
   if (!user) {
     setLocation("/login");
@@ -192,7 +186,7 @@ export default function Dashboard() {
   }
 
   // 구독 상태 확인 (shop_owner만)
-  if (user.role === 'shop_owner' && shop && shop.subscriptionStatus === 'none') {
+  if (user.role === 'shop_owner' && user.shop && user.shop.subscriptionStatus === 'none') {
     setLocation("/admin/subscription");
     return null;
   }
