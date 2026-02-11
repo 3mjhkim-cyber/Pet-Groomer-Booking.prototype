@@ -275,25 +275,45 @@ export async function registerRoutes(
   app.patch('/api/admin/shops/:id', requireSuperAdmin, async (req, res) => {
     const { name, phone, address, businessHours, depositAmount, depositRequired, isApproved, subscriptionStatus, subscriptionTier, subscriptionEnd } = req.body;
 
+    console.log('[Admin Shop Update] Request body:', req.body);
+    console.log('[Admin Shop Update] Subscription fields:', { subscriptionStatus, subscriptionTier, subscriptionEnd });
+
+    // 현재 shop 정보 가져오기
+    const currentShop = await storage.getShop(Number(req.params.id));
+    if (!currentShop) {
+      return res.status(404).json({ message: "가맹점을 찾을 수 없습니다." });
+    }
+
     const updates: any = {
       name, phone, address, businessHours, depositAmount, depositRequired, isApproved
     };
 
     // 구독 정보가 있으면 추가
-    if (subscriptionStatus !== undefined) updates.subscriptionStatus = subscriptionStatus;
-    if (subscriptionTier !== undefined) updates.subscriptionTier = subscriptionTier;
-    if (subscriptionEnd !== undefined) {
-      updates.subscriptionEnd = subscriptionEnd ? new Date(subscriptionEnd) : null;
-      // 구독 시작일이 없고 구독이 활성화되면 현재 시간으로 설정
-      if (subscriptionStatus === 'active' && !updates.subscriptionStart) {
+    if (subscriptionStatus !== undefined) {
+      updates.subscriptionStatus = subscriptionStatus;
+
+      // 구독을 활성화하는데 시작일이 없으면 현재 시간으로 설정
+      if (subscriptionStatus === 'active' && !currentShop.subscriptionStart) {
         updates.subscriptionStart = new Date();
       }
     }
+
+    if (subscriptionTier !== undefined) {
+      updates.subscriptionTier = subscriptionTier;
+    }
+
+    if (subscriptionEnd !== undefined) {
+      updates.subscriptionEnd = subscriptionEnd ? new Date(subscriptionEnd) : null;
+    }
+
+    console.log('[Admin Shop Update] Updates to apply:', updates);
 
     const shop = await storage.updateShop(Number(req.params.id), updates);
     if (!shop) {
       return res.status(404).json({ message: "가맹점을 찾을 수 없습니다." });
     }
+
+    console.log('[Admin Shop Update] Updated shop:', shop);
     res.json(shop);
   });
 
