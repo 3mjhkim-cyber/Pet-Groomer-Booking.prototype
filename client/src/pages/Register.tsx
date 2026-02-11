@@ -127,7 +127,7 @@ export default function Register() {
     onSuccess: () => {
       toast({
         title: "가맹점 등록 완료",
-        description: "관리자 승인 후 서비스를 이용하실 수 있습니다.",
+        description: "로그인 후 구독을 활성화하시면 바로 서비스를 이용하실 수 있습니다.",
       });
       setLocation("/login");
     },

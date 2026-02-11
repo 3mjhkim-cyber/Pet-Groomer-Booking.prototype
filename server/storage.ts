@@ -1,4 +1,4 @@
-import { users, services, bookings, customers, shops, type User, type InsertUser, type Service, type InsertService, type Booking, type InsertBooking, type Customer, type InsertCustomer, type Shop, type InsertShop } from "@shared/schema";
+import { users, services, bookings, customers, shops, subscriptions, type User, type InsertUser, type Service, type InsertService, type Booking, type InsertBooking, type Customer, type InsertCustomer, type Shop, type InsertShop, type Subscription, type InsertSubscription } from "@shared/schema";
 import { db } from "./db";
 import { eq, ilike, or, desc, and, count, gte, lte, sql } from "drizzle-orm";
 
@@ -676,6 +676,39 @@ export class DatabaseStorage implements IStorage {
       byHour,
       byDayOfWeek,
     };
+  }
+
+  // ===== 구독 관련 메서드 =====
+  async createSubscription(data: any) {
+    const [subscription] = await this.db.insert(subscriptions).values(data).returning();
+    return subscription;
+  }
+
+  async getAllSubscriptions() {
+    return await this.db
+      .select()
+      .from(subscriptions)
+      .orderBy(subscriptions.createdAt);
+  }
+
+  async getSubscriptionsByShop(shopId: number) {
+    return await this.db
+      .select()
+      .from(subscriptions)
+      .where(eq(subscriptions.shopId, shopId))
+      .orderBy(subscriptions.createdAt);
+  }
+
+  async updateShopSubscription(shopId: number, data: {
+    subscriptionStatus?: string;
+    subscriptionTier?: string;
+    subscriptionStart?: Date;
+    subscriptionEnd?: Date;
+  }) {
+    await this.db
+      .update(shops)
+      .set(data)
+      .where(eq(shops.id, shopId));
   }
 }
 

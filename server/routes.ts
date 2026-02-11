@@ -863,6 +863,94 @@ export async function registerRoutes(
     res.json(stats);
   });
 
+  // ===== 구독 API =====
+  // 구독 신청
+  app.post('/api/subscriptions/subscribe', requireShopOwner, async (req, res) => {
+    const user = req.user!;
+    const { tier, paymentMethod } = req.body;
+
+    if (!tier || !paymentMethod) {
+      return res.status(400).json({ message: "tier and paymentMethod are required" });
+    }
+
+    const validTiers = ['basic', 'premium', 'enterprise'];
+    if (!validTiers.includes(tier)) {
+      return res.status(400).json({ message: "Invalid subscription tier" });
+    }
+
+    const shop = await storage.getShop(user.shopId);
+    if (!shop) {
+      return res.status(404).json({ message: "Shop not found" });
+    }
+
+    // 가격 설정
+    const prices: Record<string, number> = {
+      basic: 29000,
+      premium: 49000,
+      enterprise: 99000,
+    };
+
+    const amount = prices[tier];
+    const startDate = new Date();
+    const endDate = new Date();
+    endDate.setMonth(endDate.getMonth() + 1); // 1개월 후
+
+    // 구독 생성
+    const subscription = await storage.createSubscription({
+      shopId: user.shopId,
+      tier,
+      status: 'active',
+      amount,
+      startDate,
+      endDate,
+      autoRenew: true,
+      paymentMethod,
+    });
+
+    // Shop의 구독 상태 업데이트
+    await storage.updateShopSubscription(user.shopId, {
+      subscriptionStatus: 'active',
+      subscriptionTier: tier,
+      subscriptionStart: startDate,
+      subscriptionEnd: endDate,
+    });
+
+    res.json({ success: true, subscription });
+  });
+
+  // 구독 취소
+  app.post('/api/subscriptions/cancel', requireShopOwner, async (req, res) => {
+    const user = req.user!;
+
+    await storage.updateShopSubscription(user.shopId, {
+      subscriptionStatus: 'cancelled',
+    });
+
+    res.json({ success: true });
+  });
+
+  // 구독 목록 조회 (관리자용)
+  app.get('/api/admin/subscriptions', requireSuperAdmin, async (req, res) => {
+    const subscriptions = await storage.getAllSubscriptions();
+    res.json(subscriptions);
+  });
+
+  // 가맹점 구독 상태 업데이트 (관리자용)
+  app.patch('/api/admin/shops/:shopId/subscription', requireSuperAdmin, async (req, res) => {
+    const { shopId } = req.params;
+    const { subscriptionStatus, subscriptionTier, subscriptionStart, subscriptionEnd } = req.body;
+
+    const updates: any = {};
+    if (subscriptionStatus) updates.subscriptionStatus = subscriptionStatus;
+    if (subscriptionTier) updates.subscriptionTier = subscriptionTier;
+    if (subscriptionStart) updates.subscriptionStart = new Date(subscriptionStart);
+    if (subscriptionEnd) updates.subscriptionEnd = new Date(subscriptionEnd);
+
+    await storage.updateShopSubscription(parseInt(shopId), updates);
+
+    res.json({ success: true });
+  });
+
   // Seed Data - Super Admin
   if (await storage.getUserByUsername("admin@admin.com") === undefined) {
     const hashedPassword = await hashPassword("admin1234");
