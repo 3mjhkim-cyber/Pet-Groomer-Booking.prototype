@@ -185,8 +185,8 @@ export default function Dashboard() {
     return null;
   }
 
-  // 구독 상태 확인 (shop_owner만)
-  if (user.role === 'shop_owner' && user.shop && user.shop.subscriptionStatus === 'none') {
+  // 구독 상태 확인 (shop_owner만) - 활성 상태가 아니면 구독 페이지로 리디렉션
+  if (user.role === 'shop_owner' && user.shop && user.shop.subscriptionStatus !== 'active') {
     setLocation("/admin/subscription");
     return null;
   }
