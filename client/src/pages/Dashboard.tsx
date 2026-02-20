@@ -207,7 +207,7 @@ export default function Dashboard() {
   }, [isAuthLoading, user, setLocation]);
 
   useEffect(() => {
-    if (user?.role === 'shop_owner' && user?.shop && (user.shop as any).subscriptionStatus === 'none') {
+    if (user?.role === 'shop_owner' && user?.shop && (user.shop as any).subscriptionStatus !== 'active') {
       setLocation("/admin/subscription");
     }
   }, [user, setLocation]);
