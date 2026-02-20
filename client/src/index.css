@@ -307,32 +307,15 @@
   font-size: 0.8rem;
   color: hsl(var(--muted-foreground));
   text-align: left !important;
-  vertical-align: middle !important;
 }
-.fc .fc-timegrid-slot-label-cushion,
-.fc-direction-ltr .fc-timegrid-slot-label-cushion {
-  display: block !important;
+.fc .fc-timegrid-slot-label-cushion {
+  padding-left: 8px !important;
+  padding-right: 0 !important;
+  text-align: left !important;
+}
+.fc .fc-timegrid-axis-cushion {
   text-align: left !important;
   padding-left: 8px !important;
-  padding-right: 8px !important;
-  justify-content: flex-start !important;
-}
-.fc .fc-timegrid-axis-cushion,
-.fc-direction-ltr .fc-timegrid-axis-cushion {
-  display: block !important;
-  text-align: left !important;
-  padding-left: 8px !important;
-  padding-right: 8px !important;
-  justify-content: flex-start !important;
-}
-/* 시간 축 전체를 왼쪽 정렬 */
-.fc .fc-timegrid-axis,
-.fc-direction-ltr .fc-timegrid-axis {
-  text-align: left !important;
-}
-.fc .fc-timegrid-axis-frame {
-  justify-content: flex-start !important;
-  align-items: flex-start !important;
 }
 .fc td, .fc th {
   border-color: hsl(var(--border)) !important;

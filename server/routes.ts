@@ -273,13 +273,47 @@ export async function registerRoutes(
 
   // 슈퍼관리자용 가맹점 정보 수정
   app.patch('/api/admin/shops/:id', requireSuperAdmin, async (req, res) => {
-    const { name, phone, address, businessHours, depositAmount, depositRequired, isApproved } = req.body;
-    const shop = await storage.updateShop(Number(req.params.id), {
+    const { name, phone, address, businessHours, depositAmount, depositRequired, isApproved, subscriptionStatus, subscriptionTier, subscriptionEnd } = req.body;
+
+    console.log('[Admin Shop Update] Request body:', req.body);
+    console.log('[Admin Shop Update] Subscription fields:', { subscriptionStatus, subscriptionTier, subscriptionEnd });
+
+    // 현재 shop 정보 가져오기
+    const currentShop = await storage.getShop(Number(req.params.id));
+    if (!currentShop) {
+      return res.status(404).json({ message: "가맹점을 찾을 수 없습니다." });
+    }
+
+    const updates: any = {
       name, phone, address, businessHours, depositAmount, depositRequired, isApproved
-    });
+    };
+
+    // 구독 정보가 있으면 추가
+    if (subscriptionStatus !== undefined) {
+      updates.subscriptionStatus = subscriptionStatus;
+
+      // 구독을 활성화하는데 시작일이 없으면 현재 시간으로 설정
+      if (subscriptionStatus === 'active' && !currentShop.subscriptionStart) {
+        updates.subscriptionStart = new Date();
+      }
+    }
+
+    if (subscriptionTier !== undefined) {
+      updates.subscriptionTier = subscriptionTier;
+    }
+
+    if (subscriptionEnd !== undefined) {
+      updates.subscriptionEnd = subscriptionEnd ? new Date(subscriptionEnd) : null;
+    }
+
+    console.log('[Admin Shop Update] Updates to apply:', updates);
+
+    const shop = await storage.updateShop(Number(req.params.id), updates);
     if (!shop) {
       return res.status(404).json({ message: "가맹점을 찾을 수 없습니다." });
     }
+
+    console.log('[Admin Shop Update] Updated shop:', shop);
     res.json(shop);
   });
 
@@ -861,6 +895,94 @@ export async function registerRoutes(
     );
 
     res.json(stats);
+  });
+
+  // ===== 구독 API =====
+  // 구독 신청
+  app.post('/api/subscriptions/subscribe', requireShopOwner, async (req, res) => {
+    const user = req.user!;
+    const { tier, paymentMethod } = req.body;
+
+    if (!tier || !paymentMethod) {
+      return res.status(400).json({ message: "tier and paymentMethod are required" });
+    }
+
+    const validTiers = ['basic', 'premium', 'enterprise'];
+    if (!validTiers.includes(tier)) {
+      return res.status(400).json({ message: "Invalid subscription tier" });
+    }
+
+    const shop = await storage.getShop(user.shopId);
+    if (!shop) {
+      return res.status(404).json({ message: "Shop not found" });
+    }
+
+    // 가격 설정
+    const prices: Record<string, number> = {
+      basic: 29000,
+      premium: 49000,
+      enterprise: 99000,
+    };
+
+    const amount = prices[tier];
+    const startDate = new Date();
+    const endDate = new Date();
+    endDate.setMonth(endDate.getMonth() + 1); // 1개월 후
+
+    // 구독 생성
+    const subscription = await storage.createSubscription({
+      shopId: user.shopId,
+      tier,
+      status: 'active',
+      amount,
+      startDate,
+      endDate,
+      autoRenew: true,
+      paymentMethod,
+    });
+
+    // Shop의 구독 상태 업데이트
+    await storage.updateShopSubscription(user.shopId, {
+      subscriptionStatus: 'active',
+      subscriptionTier: tier,
+      subscriptionStart: startDate,
+      subscriptionEnd: endDate,
+    });
+
+    res.json({ success: true, subscription });
+  });
+
+  // 구독 취소
+  app.post('/api/subscriptions/cancel', requireShopOwner, async (req, res) => {
+    const user = req.user!;
+
+    await storage.updateShopSubscription(user.shopId, {
+      subscriptionStatus: 'cancelled',
+    });
+
+    res.json({ success: true });
+  });
+
+  // 구독 목록 조회 (관리자용)
+  app.get('/api/admin/subscriptions', requireSuperAdmin, async (req, res) => {
+    const subscriptions = await storage.getAllSubscriptions();
+    res.json(subscriptions);
+  });
+
+  // 가맹점 구독 상태 업데이트 (관리자용)
+  app.patch('/api/admin/shops/:shopId/subscription', requireSuperAdmin, async (req, res) => {
+    const { shopId } = req.params;
+    const { subscriptionStatus, subscriptionTier, subscriptionStart, subscriptionEnd } = req.body;
+
+    const updates: any = {};
+    if (subscriptionStatus) updates.subscriptionStatus = subscriptionStatus;
+    if (subscriptionTier) updates.subscriptionTier = subscriptionTier;
+    if (subscriptionStart) updates.subscriptionStart = new Date(subscriptionStart);
+    if (subscriptionEnd) updates.subscriptionEnd = new Date(subscriptionEnd);
+
+    await storage.updateShopSubscription(parseInt(shopId), updates);
+
+    res.json({ success: true });
   });
 
   // Seed Data - Super Admin
