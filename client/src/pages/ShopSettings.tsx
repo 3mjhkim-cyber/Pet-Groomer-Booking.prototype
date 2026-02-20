@@ -355,7 +355,7 @@ export default function ShopSettings() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/shop/services'] });
-      setNewService({ name: '', duration: '', price: '' });
+      setNewService({ name: '', description: '', duration: '', price: '' });
       toast({ title: "추가 완료", description: "서비스가 추가되었습니다." });
     },
   });
@@ -369,6 +369,28 @@ export default function ShopSettings() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/shop/services'] });
       toast({ title: "삭제 완료", description: "서비스가 삭제되었습니다." });
+    },
+  });
+
+  const changePasswordMutation = useMutation({
+    mutationFn: async (data: { currentPassword: string; newPassword: string }) => {
+      const res = await fetch('/api/user/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "비밀번호 변경 실패");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      toast({ title: "변경 완료", description: "비밀번호가 변경되었습니다." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "변경 실패", description: error.message, variant: "destructive" });
     },
   });
 
@@ -408,7 +430,7 @@ export default function ShopSettings() {
     }
     addServiceMutation.mutate({
       name: newService.name,
-      description: newService.description || undefined,
+      description: newService.description || '',
       duration,
       price
     });
@@ -774,7 +796,7 @@ export default function ShopSettings() {
               <div className="space-y-2 pt-2 border-t">
                 <p className="text-sm font-medium text-muted-foreground">설정된 날짜:</p>
                 <div className="flex flex-wrap gap-2">
-                  {[...new Set([...Object.keys(blockedSlots), ...Object.keys(forceOpenSlots)])]
+                  {Array.from(new Set([...Object.keys(blockedSlots), ...Object.keys(forceOpenSlots)]))
                     .sort()
                     .map(dateStr => {
                       const dateObj = new Date(dateStr + 'T00:00:00');
