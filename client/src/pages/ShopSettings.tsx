@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect, useMemo } from "react";
 import type { Shop, Service } from "@shared/schema";
@@ -110,7 +111,7 @@ export default function ShopSettings() {
 
   const [newService, setNewService] = useState({ name: '', description: '', duration: '' as string | number, price: '' as string | number });
 
-  // 비밀번호 변경 상태
+  const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: '',
     newPassword: '',
@@ -387,6 +388,7 @@ export default function ShopSettings() {
     },
     onSuccess: () => {
       setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      setIsPasswordDialogOpen(false);
       toast({ title: "변경 완료", description: "비밀번호가 변경되었습니다." });
     },
     onError: (error: Error) => {
@@ -556,10 +558,16 @@ export default function ShopSettings() {
                   data-testid="input-shop-address"
                 />
               </div>
-              <Button type="submit" disabled={updateShopMutation.isPending} data-testid="button-save-shop">
-                <Save className="w-4 h-4 mr-2" />
-                저장
-              </Button>
+              <div className="flex items-center gap-3">
+                <Button type="submit" disabled={updateShopMutation.isPending} data-testid="button-save-shop">
+                  <Save className="w-4 h-4 mr-2" />
+                  저장
+                </Button>
+                <Button type="button" variant="outline" onClick={() => setIsPasswordDialogOpen(true)} data-testid="button-open-password-dialog">
+                  <Key className="w-4 h-4 mr-2" />
+                  비밀번호 변경
+                </Button>
+              </div>
             </form>
           </CardContent>
         </Card>
@@ -856,16 +864,19 @@ export default function ShopSettings() {
           </CardContent>
         </Card>
 
-        {/* 비밀번호 변경 */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Key className="w-5 h-5" />
-              비밀번호 변경
-            </CardTitle>
-            <CardDescription>로그인 비밀번호를 변경합니다</CardDescription>
-          </CardHeader>
-          <CardContent>
+        {/* 비밀번호 변경 다이얼로그 */}
+        <Dialog open={isPasswordDialogOpen} onOpenChange={(open) => {
+          setIsPasswordDialogOpen(open);
+          if (!open) setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+        }}>
+          <DialogContent className="max-w-[95vw] sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Key className="w-5 h-5" />
+                비밀번호 변경
+              </DialogTitle>
+              <DialogDescription>로그인 비밀번호를 변경합니다</DialogDescription>
+            </DialogHeader>
             <form onSubmit={handleChangePassword} className="space-y-4">
               <div className="grid gap-2">
                 <Label htmlFor="current-password">현재 비밀번호</Label>
@@ -875,6 +886,7 @@ export default function ShopSettings() {
                   value={passwordForm.currentPassword}
                   onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
                   placeholder="현재 비밀번호를 입력하세요"
+                  data-testid="input-current-password"
                 />
               </div>
               <div className="grid gap-2">
@@ -885,6 +897,7 @@ export default function ShopSettings() {
                   value={passwordForm.newPassword}
                   onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
                   placeholder="새 비밀번호를 입력하세요"
+                  data-testid="input-new-password"
                 />
                 <p className="text-xs text-muted-foreground">
                   영문 대문자, 소문자, 숫자, 특수문자를 포함하여 10자 이상
@@ -898,15 +911,16 @@ export default function ShopSettings() {
                   value={passwordForm.confirmPassword}
                   onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
                   placeholder="새 비밀번호를 다시 입력하세요"
+                  data-testid="input-confirm-password"
                 />
               </div>
-              <Button type="submit" disabled={changePasswordMutation.isPending}>
+              <Button type="submit" className="w-full" disabled={changePasswordMutation.isPending} data-testid="button-change-password">
                 {changePasswordMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                 비밀번호 변경
               </Button>
             </form>
-          </CardContent>
-        </Card>
+          </DialogContent>
+        </Dialog>
 
         <Card>
           <CardHeader>
