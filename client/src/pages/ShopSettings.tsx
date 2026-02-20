@@ -365,18 +365,23 @@ export default function ShopSettings() {
     },
   });
 
+  useEffect(() => {
+    if (!isAuthLoading && (!user || user.role !== 'shop_owner')) {
+      setLocation("/login");
+    }
+  }, [isAuthLoading, user, setLocation]);
+
+  useEffect(() => {
+    if (user?.shop && (user.shop as any).subscriptionStatus !== 'active') {
+      setLocation("/admin/subscription");
+    }
+  }, [user, setLocation]);
+
   if (isAuthLoading || isShopLoading) {
     return <div className="h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
   }
 
   if (!user || user.role !== 'shop_owner') {
-    setLocation("/login");
-    return null;
-  }
-
-  // 구독 상태 확인
-  if (user.shop && user.shop.subscriptionStatus !== 'active') {
-    setLocation("/admin/subscription");
     return null;
   }
 

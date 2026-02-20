@@ -40,7 +40,6 @@ export default function Calendar() {
   const [isMobile, setIsMobile] = useState(false);
   const calendarRef = useRef<any>(null);
 
-  // 모바일 감지
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 768);
     checkMobile();
@@ -48,16 +47,21 @@ export default function Calendar() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  useEffect(() => {
+    if (!isAuthLoading && !user) {
+      setLocation("/login");
+    }
+  }, [isAuthLoading, user, setLocation]);
+
+  useEffect(() => {
+    if (user?.role === 'shop_owner' && user?.shop && (user.shop as any).subscriptionStatus !== 'active') {
+      setLocation("/admin/subscription");
+    }
+  }, [user, setLocation]);
+
   if (isAuthLoading) return <div className="h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
 
   if (!user) {
-    setLocation("/login");
-    return null;
-  }
-
-  // 구독 상태 확인
-  if (user.role === 'shop_owner' && user.shop && user.shop.subscriptionStatus !== 'active') {
-    setLocation("/admin/subscription");
     return null;
   }
 
@@ -234,6 +238,7 @@ export default function Calendar() {
               eventContent={renderEventContent}
               height="auto"
               locale="ko"
+              direction="ltr"
               buttonText={{
                 today: '오늘',
                 month: '월',
