@@ -1,7 +1,7 @@
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Loader2, Store, Save, Plus, Trash2, ArrowLeft, Calendar, Clock, FileText, X } from "lucide-react";
+import { Loader2, Store, Save, Plus, Trash2, ArrowLeft, Calendar, Clock, FileText, X, Key } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -109,6 +109,13 @@ export default function ShopSettings() {
   const [blockDate, setBlockDate] = useState('');
 
   const [newService, setNewService] = useState({ name: '', description: '', duration: '' as string | number, price: '' as string | number });
+
+  // 비밀번호 변경 상태
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
 
   useEffect(() => {
     if (shop) {
@@ -404,6 +411,36 @@ export default function ShopSettings() {
       description: newService.description || undefined,
       duration,
       price
+    });
+  };
+
+  const handleChangePassword = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    // 유효성 검사
+    if (!passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmPassword) {
+      toast({ title: "입력 오류", description: "모든 필드를 입력해주세요.", variant: "destructive" });
+      return;
+    }
+
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      toast({ title: "입력 오류", description: "새 비밀번호가 일치하지 않습니다.", variant: "destructive" });
+      return;
+    }
+
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]).{10,}$/;
+    if (!passwordRegex.test(passwordForm.newPassword)) {
+      toast({
+        title: "비밀번호 형식 오류",
+        description: "비밀번호는 영문 대문자, 소문자, 숫자, 특수문자를 포함하여 10자 이상이어야 합니다.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    changePasswordMutation.mutate({
+      currentPassword: passwordForm.currentPassword,
+      newPassword: passwordForm.newPassword,
     });
   };
 
@@ -794,6 +831,58 @@ export default function ShopSettings() {
                 저장
               </Button>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* 비밀번호 변경 */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Key className="w-5 h-5" />
+              비밀번호 변경
+            </CardTitle>
+            <CardDescription>로그인 비밀번호를 변경합니다</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleChangePassword} className="space-y-4">
+              <div className="grid gap-2">
+                <Label htmlFor="current-password">현재 비밀번호</Label>
+                <Input
+                  id="current-password"
+                  type="password"
+                  value={passwordForm.currentPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
+                  placeholder="현재 비밀번호를 입력하세요"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="new-password">새 비밀번호</Label>
+                <Input
+                  id="new-password"
+                  type="password"
+                  value={passwordForm.newPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+                  placeholder="새 비밀번호를 입력하세요"
+                />
+                <p className="text-xs text-muted-foreground">
+                  영문 대문자, 소문자, 숫자, 특수문자를 포함하여 10자 이상
+                </p>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="confirm-password">새 비밀번호 확인</Label>
+                <Input
+                  id="confirm-password"
+                  type="password"
+                  value={passwordForm.confirmPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+                  placeholder="새 비밀번호를 다시 입력하세요"
+                />
+              </div>
+              <Button type="submit" disabled={changePasswordMutation.isPending}>
+                {changePasswordMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                비밀번호 변경
+              </Button>
+            </form>
           </CardContent>
         </Card>
 
