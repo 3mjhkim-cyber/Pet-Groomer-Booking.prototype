@@ -301,7 +301,9 @@
 .fc .fc-timegrid-slot {
   height: 48px !important;
 }
-.fc .fc-timegrid-slot-label {
+/* 시간 레이블 왼쪽 정렬 */
+.fc .fc-timegrid-slot-label,
+.fc-direction-ltr .fc-timegrid-slot-label {
   font-size: 0.8rem;
   color: hsl(var(--muted-foreground));
   text-align: left !important;
