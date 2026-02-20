@@ -374,6 +374,12 @@ export default function ShopSettings() {
     return null;
   }
 
+  // 구독 상태 확인
+  if (user.shop && user.shop.subscriptionStatus !== 'active') {
+    setLocation("/admin/subscription");
+    return null;
+  }
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     updateShopMutation.mutate(formData);

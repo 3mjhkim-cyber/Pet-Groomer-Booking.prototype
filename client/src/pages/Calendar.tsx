@@ -55,6 +55,12 @@ export default function Calendar() {
     return null;
   }
 
+  // 구독 상태 확인
+  if (user.role === 'shop_owner' && user.shop && user.shop.subscriptionStatus !== 'active') {
+    setLocation("/admin/subscription");
+    return null;
+  }
+
   const events: BookingEvent[] = bookings
     ?.filter(booking => booking.status === 'pending' || booking.status === 'confirmed')
     .map(booking => {

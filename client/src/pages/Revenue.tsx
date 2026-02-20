@@ -119,6 +119,12 @@ export default function Revenue() {
     return null;
   }
 
+  // 구독 상태 확인
+  if (user.shop && user.shop.subscriptionStatus !== 'active') {
+    navigate("/admin/subscription");
+    return null;
+  }
+
   const { startDate, endDate } = getDateRange(period, refDate);
   const { startDate: prevStartDate, endDate: prevEndDate } = getPrevDateRange(period, refDate);
 

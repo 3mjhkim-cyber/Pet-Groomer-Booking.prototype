@@ -20,6 +20,12 @@ export default function Customers() {
     return null;
   }
 
+  // 구독 상태 확인
+  if (user.role === 'shop_owner' && user.shop && user.shop.subscriptionStatus !== 'active') {
+    setLocation("/admin/subscription");
+    return null;
+  }
+
   // 검색 및 정렬
   const filteredCustomers = useMemo(() => {
     let result = customers || [];
