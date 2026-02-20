@@ -304,6 +304,16 @@
 .fc .fc-timegrid-slot-label {
   font-size: 0.8rem;
   color: hsl(var(--muted-foreground));
+  text-align: left !important;
+}
+.fc .fc-timegrid-slot-label-cushion {
+  padding-left: 8px !important;
+  padding-right: 0 !important;
+  text-align: left !important;
+}
+.fc .fc-timegrid-axis-cushion {
+  text-align: left !important;
+  padding-left: 8px !important;
 }
 .fc td, .fc th {
   border-color: hsl(var(--border)) !important;
