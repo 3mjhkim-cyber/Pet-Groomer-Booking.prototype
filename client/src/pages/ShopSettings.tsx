@@ -372,41 +372,23 @@ export default function ShopSettings() {
     },
   });
 
-  // 비밀번호 변경 mutation
-  const changePasswordMutation = useMutation({
-    mutationFn: async (data: { currentPassword: string; newPassword: string }) => {
-      const res = await fetch('/api/user/change-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || "비밀번호 변경에 실패했습니다.");
-      }
-      return res.json();
-    },
-    onSuccess: () => {
-      toast({ title: "변경 완료", description: "비밀번호가 성공적으로 변경되었습니다." });
-      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
-    },
-    onError: (error: Error) => {
-      toast({ title: "변경 실패", description: error.message, variant: "destructive" });
-    },
-  });
+  useEffect(() => {
+    if (!isAuthLoading && (!user || user.role !== 'shop_owner')) {
+      setLocation("/login");
+    }
+  }, [isAuthLoading, user, setLocation]);
+
+  useEffect(() => {
+    if (user?.shop && (user.shop as any).subscriptionStatus !== 'active') {
+      setLocation("/admin/subscription");
+    }
+  }, [user, setLocation]);
 
   if (isAuthLoading || isShopLoading) {
     return <div className="h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
   }
 
   if (!user || user.role !== 'shop_owner') {
-    setLocation("/login");
-    return null;
-  }
-
-  // 구독 상태 확인
-  if (user.shop && user.shop.subscriptionStatus !== 'active') {
-    setLocation("/admin/subscription");
     return null;
   }
 
