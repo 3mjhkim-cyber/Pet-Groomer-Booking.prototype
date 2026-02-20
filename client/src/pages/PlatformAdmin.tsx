@@ -1,7 +1,7 @@
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation, Link } from "wouter";
-import { Loader2, Store, Check, X, Users, Calendar, LogOut, Settings, Bell, UserCheck, Pencil, Trash2, CreditCard } from "lucide-react";
+import { Loader2, Store, Check, X, Users, Calendar, LogOut, Settings, Bell, UserCheck, Pencil, Trash2, CreditCard, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -12,7 +12,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import type { Shop } from "@shared/schema";
 
 export default function PlatformAdmin() {
@@ -20,6 +20,9 @@ export default function PlatformAdmin() {
   const [_, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // 검색 상태
+  const [searchQuery, setSearchQuery] = useState('');
 
   // 편집/삭제 상태
   const [editingShop, setEditingShop] = useState<Shop | null>(null);
@@ -35,6 +38,7 @@ export default function PlatformAdmin() {
     subscriptionStatus: 'none',
     subscriptionTier: 'basic',
     subscriptionEnd: '',
+    password: '', // 비밀번호 변경 (선택사항)
   });
 
   const { data: shops, isLoading: isShopsLoading } = useQuery<Shop[]>({
@@ -115,6 +119,7 @@ export default function PlatformAdmin() {
       subscriptionStatus: shop.subscriptionStatus || 'none',
       subscriptionTier: shop.subscriptionTier || 'basic',
       subscriptionEnd: shop.subscriptionEnd ? new Date(shop.subscriptionEnd).toISOString().split('T')[0] : '',
+      password: '', // 비밀번호는 빈 값으로 시작
     });
     setEditingShop(shop);
   };
@@ -129,7 +134,20 @@ export default function PlatformAdmin() {
   }
 
   const pendingShops = shops?.filter(s => !s.isApproved) || [];
-  const approvedShops = shops?.filter(s => s.isApproved) || [];
+
+  // 검색 필터링된 승인된 가맹점 목록
+  const approvedShops = useMemo(() => {
+    const approved = shops?.filter(s => s.isApproved) || [];
+    if (!searchQuery.trim()) return approved;
+
+    const query = searchQuery.toLowerCase();
+    return approved.filter(shop =>
+      shop.name.toLowerCase().includes(query) ||
+      shop.phone.includes(query) ||
+      shop.address.toLowerCase().includes(query) ||
+      shop.slug.toLowerCase().includes(query)
+    );
+  }, [shops, searchQuery]);
 
   return (
     <div className="min-h-screen bg-secondary/30">
@@ -237,10 +255,21 @@ export default function PlatformAdmin() {
         )}
 
         <section>
-          <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-            <Store className="w-5 h-5 text-primary" />
-            운영 중인 가맹점 ({approvedShops.length})
-          </h2>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+            <h2 className="text-xl font-bold flex items-center gap-2">
+              <Store className="w-5 h-5 text-primary" />
+              운영 중인 가맹점 ({approvedShops.length})
+            </h2>
+            <div className="relative w-full sm:w-80">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="가맹점 이름, 전화번호, 주소, 슬러그 검색..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+          </div>
           {isShopsLoading ? (
             <div className="text-center py-10">
               <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto" />
@@ -383,6 +412,23 @@ export default function PlatformAdmin() {
                 checked={editForm.isApproved}
                 onCheckedChange={(checked) => setEditForm({ ...editForm, isApproved: checked })}
               />
+            </div>
+
+            {/* 비밀번호 변경 섹션 */}
+            <div className="border-t pt-4 mt-4">
+              <div className="grid gap-2">
+                <Label htmlFor="edit-password">비밀번호 변경 (선택사항)</Label>
+                <Input
+                  id="edit-password"
+                  type="password"
+                  placeholder="새 비밀번호 입력 (변경하지 않으려면 비워두세요)"
+                  value={editForm.password}
+                  onChange={(e) => setEditForm({ ...editForm, password: e.target.value })}
+                />
+                <p className="text-xs text-muted-foreground">
+                  비밀번호를 변경하려면 입력하세요. 비워두면 기존 비밀번호가 유지됩니다.
+                </p>
+              </div>
             </div>
 
             {/* 구독 관리 섹션 */}

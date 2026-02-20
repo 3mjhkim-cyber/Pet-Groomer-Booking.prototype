@@ -175,6 +175,47 @@ export async function registerRoutes(
     res.json({ ...userWithoutPassword, shop });
   });
 
+  // 비밀번호 변경
+  app.post('/api/user/change-password', requireAuth, async (req, res) => {
+    try {
+      const { currentPassword, newPassword } = req.body;
+      const user = req.user as any;
+
+      if (!currentPassword || !newPassword) {
+        return res.status(400).json({ message: "현재 비밀번호와 새 비밀번호를 입력해주세요." });
+      }
+
+      // 비밀번호 형식 검증
+      const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]).{10,}$/;
+      if (!passwordRegex.test(newPassword)) {
+        return res.status(400).json({
+          message: "비밀번호는 영문 대문자, 소문자, 숫자, 특수문자를 포함하여 10자 이상이어야 합니다."
+        });
+      }
+
+      // 현재 사용자 정보 가져오기
+      const currentUser = await storage.getUser(user.id);
+      if (!currentUser) {
+        return res.status(404).json({ message: "사용자를 찾을 수 없습니다." });
+      }
+
+      // 현재 비밀번호 확인
+      const isPasswordValid = await comparePasswords(currentPassword, currentUser.password);
+      if (!isPasswordValid) {
+        return res.status(400).json({ message: "현재 비밀번호가 일치하지 않습니다." });
+      }
+
+      // 새 비밀번호 해시화 및 저장
+      const hashedPassword = await hashPassword(newPassword);
+      await storage.updateUserPassword(user.id, hashedPassword);
+
+      res.json({ message: "비밀번호가 성공적으로 변경되었습니다." });
+    } catch (error) {
+      console.error('Password change error:', error);
+      res.status(500).json({ message: "비밀번호 변경 중 오류가 발생했습니다." });
+    }
+  });
+
   // 가맹점 등록 (pending 상태로 생성)
   app.post('/api/shops/register', async (req, res) => {
     try {
@@ -273,7 +314,7 @@ export async function registerRoutes(
 
   // 슈퍼관리자용 가맹점 정보 수정
   app.patch('/api/admin/shops/:id', requireSuperAdmin, async (req, res) => {
-    const { name, phone, address, businessHours, depositAmount, depositRequired, isApproved, subscriptionStatus, subscriptionTier, subscriptionEnd } = req.body;
+    const { name, phone, address, businessHours, depositAmount, depositRequired, isApproved, subscriptionStatus, subscriptionTier, subscriptionEnd, password } = req.body;
 
     console.log('[Admin Shop Update] Request body:', req.body);
     console.log('[Admin Shop Update] Subscription fields:', { subscriptionStatus, subscriptionTier, subscriptionEnd });
@@ -311,6 +352,13 @@ export async function registerRoutes(
     const shop = await storage.updateShop(Number(req.params.id), updates);
     if (!shop) {
       return res.status(404).json({ message: "가맹점을 찾을 수 없습니다." });
+    }
+
+    // 비밀번호 변경이 요청된 경우
+    if (password && password.trim()) {
+      const hashedPassword = await hashPassword(password);
+      await storage.updateUserPassword(currentShop.userId, hashedPassword);
+      console.log('[Admin Shop Update] Password updated for shop user');
     }
 
     console.log('[Admin Shop Update] Updated shop:', shop);

@@ -9,6 +9,7 @@ export interface IStorage {
   getPendingUsers(): Promise<User[]>;
   getPendingUsersCount(): Promise<number>;
   updateUserStatus(id: number, status: string): Promise<User | undefined>;
+  updateUserPassword(id: number, password: string): Promise<User | undefined>;
   
   getShops(): Promise<Shop[]>;
   getShop(id: number): Promise<Shop | undefined>;
@@ -92,6 +93,14 @@ export class DatabaseStorage implements IStorage {
   async updateUserStatus(id: number, status: string): Promise<User | undefined> {
     const [user] = await db.update(users)
       .set({ status })
+      .where(eq(users.id, id))
+      .returning();
+    return user;
+  }
+
+  async updateUserPassword(id: number, password: string): Promise<User | undefined> {
+    const [user] = await db.update(users)
+      .set({ password })
       .where(eq(users.id, id))
       .returning();
     return user;
