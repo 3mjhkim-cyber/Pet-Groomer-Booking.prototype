@@ -216,6 +216,76 @@ export async function registerRoutes(
     }
   });
 
+  // 토스페이먼츠 결제 승인
+  app.post('/api/payment/confirm', requireAuth, async (req, res) => {
+    try {
+      const { paymentKey, orderId, amount, tier } = req.body;
+      const user = req.user as any;
+
+      if (!user.shopId) {
+        return res.status(400).json({ message: "가맹점 정보가 없습니다." });
+      }
+
+      // 토스페이먼츠 API로 결제 승인
+      const tossSecretKey = process.env.TOSS_SECRET_KEY;
+      if (!tossSecretKey) {
+        return res.status(500).json({ message: "결제 시스템 설정 오류입니다." });
+      }
+
+      const response = await fetch('https://api.tosspayments.com/v1/payments/confirm', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Basic ${Buffer.from(tossSecretKey + ':').toString('base64')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ paymentKey, orderId, amount }),
+      });
+
+      const paymentData = await response.json();
+
+      if (!response.ok) {
+        console.error('Toss Payment Error:', paymentData);
+        return res.status(400).json({ message: paymentData.message || '결제 승인에 실패했습니다.' });
+      }
+
+      // 결제 성공 - 구독 활성화
+      const now = new Date();
+      const subscriptionEnd = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // 30일 후
+
+      await storage.updateShopSubscription(user.shopId, {
+        subscriptionStatus: 'active',
+        subscriptionTier: tier || 'basic',
+        subscriptionStart: now,
+        subscriptionEnd: subscriptionEnd,
+      });
+
+      // 결제 기록 저장 (선택사항)
+      await storage.createSubscription({
+        shopId: user.shopId,
+        tier: tier || 'basic',
+        status: 'active',
+        amount: parseInt(amount),
+        startDate: now,
+        endDate: subscriptionEnd,
+        autoRenew: true,
+        paymentMethod: 'card',
+      });
+
+      res.json({
+        success: true,
+        message: '결제가 완료되었습니다.',
+        subscription: {
+          status: 'active',
+          tier: tier || 'basic',
+          endDate: subscriptionEnd,
+        },
+      });
+    } catch (error: any) {
+      console.error('Payment confirm error:', error);
+      res.status(500).json({ message: error.message || '결제 처리 중 오류가 발생했습니다.' });
+    }
+  });
+
   // 가맹점 등록 (pending 상태로 생성)
   app.post('/api/shops/register', async (req, res) => {
     try {
