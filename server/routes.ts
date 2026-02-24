@@ -125,18 +125,9 @@ export async function registerRoutes(
       if (!isValid) {
         return res.status(401).json({ message: "이메일 또는 비밀번호가 올바르지 않습니다." });
       }
-      
-      // super_admin은 status 체크 없이 바로 로그인
-      if (user.role !== 'super_admin') {
-        // shop_owner는 status 체크
-        if (user.status === 'pending') {
-          return res.status(403).json({ message: "승인 대기 중입니다. 관리자 승인 후 이용 가능합니다." });
-        }
-        if (user.status === 'rejected') {
-          return res.status(403).json({ message: "계정이 거절되었습니다. 문의: admin@yeyakhagae.com" });
-        }
-      }
-      
+
+      // 승인 시스템 제거 - 모든 사용자 바로 로그인 가능
+
       let shop = null;
       if (user.shopId) {
         shop = await storage.getShop(user.shopId);
@@ -342,12 +333,12 @@ export async function registerRoutes(
       const shop = await storage.createShop(shopInput);
       const hashedPassword = await hashPassword(password);
       
-      // 사용자는 pending 상태로 생성
+      // 사용자는 active 상태로 생성 (자동 승인)
       const user = await storage.createUser({
         email,
         password: hashedPassword,
         role: 'shop_owner',
-        status: 'pending',
+        status: 'active',
         shopId: shop.id,
         shopName: shop.name,
         phone: shop.phone,
@@ -355,10 +346,10 @@ export async function registerRoutes(
         businessNumber,
       });
 
-      res.status(201).json({ 
-        message: "가입 신청이 완료되었습니다. 관리자 승인 후 로그인 가능합니다.",
-        shop, 
-        user: { ...user, password: undefined } 
+      res.status(201).json({
+        message: "가입이 완료되었습니다. 로그인 후 구독을 활성화하시면 바로 서비스를 이용하실 수 있습니다.",
+        shop,
+        user: { ...user, password: undefined }
       });
     } catch (err) {
       if (err instanceof z.ZodError) {
