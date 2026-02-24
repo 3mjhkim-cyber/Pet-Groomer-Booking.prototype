@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Check, CreditCard, Building, ArrowLeft } from "lucide-react";
 import type { Shop } from "@shared/schema";
+import { loadTossPayments } from '@tosspayments/payment-sdk';
 
 const SUBSCRIPTION_PLANS = [
   {
@@ -66,38 +67,39 @@ export default function Subscription() {
     enabled: !!user && user.role === 'shop_owner',
   });
 
-  const subscribeMutation = useMutation({
-    mutationFn: async (tier: string) => {
-      const res = await fetch('/api/subscriptions/subscribe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ tier, paymentMethod }),
-      });
-
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || "구독 신청에 실패했습니다.");
+  // 토스페이먼츠 결제 시작
+  const handlePayment = async (tier: string, price: number) => {
+    try {
+      const clientKey = import.meta.env.VITE_TOSS_CLIENT_KEY;
+      if (!clientKey) {
+        toast({
+          title: "설정 오류",
+          description: "결제 시스템이 설정되지 않았습니다.",
+          variant: "destructive",
+        });
+        return;
       }
 
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/shop/settings'] });
-      toast({
-        title: "구독 활성화 완료",
-        description: "이제 모든 서비스를 이용하실 수 있습니다!",
+      const tossPayments = await loadTossPayments(clientKey);
+      const orderId = `order-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const planName = SUBSCRIPTION_PLANS.find(p => p.tier === tier)?.name || tier;
+
+      await tossPayments.requestPayment('카드', {
+        amount: price,
+        orderId: orderId,
+        orderName: `구독 플랜: ${planName}`,
+        customerName: shop?.name || user?.username || '고객',
+        successUrl: `${window.location.origin}/payment/success?tier=${tier}`,
+        failUrl: `${window.location.origin}/payment/fail`,
       });
-      setLocation("/admin/dashboard");
-    },
-    onError: (error: Error) => {
+    } catch (error: any) {
       toast({
-        title: "구독 실패",
-        description: error.message,
+        title: "결제 오류",
+        description: error.message || "결제를 시작할 수 없습니다.",
         variant: "destructive",
       });
-    },
-  });
+    }
+  };
 
   if (isAuthLoading || isShopLoading) {
     return (
@@ -266,17 +268,15 @@ export default function Subscription() {
               <Button
                 className="w-full"
                 size="lg"
-                onClick={() => subscribeMutation.mutate(selectedTier)}
-                disabled={subscribeMutation.isPending}
+                onClick={() => {
+                  const plan = SUBSCRIPTION_PLANS.find(p => p.tier === selectedTier);
+                  if (plan) {
+                    handlePayment(selectedTier!, plan.price);
+                  }
+                }}
               >
-                {subscribeMutation.isPending ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                    처리 중...
-                  </>
-                ) : (
-                  "구독하기"
-                )}
+                <CreditCard className="w-4 h-4 mr-2" />
+                결제하기
               </Button>
             </CardContent>
           </Card>

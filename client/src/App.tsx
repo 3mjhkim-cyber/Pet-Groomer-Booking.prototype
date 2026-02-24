@@ -18,6 +18,8 @@ import ShopSettings from "@/pages/ShopSettings";
 import Approvals from "@/pages/Approvals";
 import Revenue from "@/pages/Revenue";
 import Subscription from "@/pages/Subscription";
+import PaymentSuccess from "@/pages/PaymentSuccess";
+import PaymentFail from "@/pages/PaymentFail";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -39,6 +41,8 @@ function Router() {
           <Route path="/admin/platform" component={PlatformAdmin} />
           <Route path="/admin/approvals" component={Approvals} />
           <Route path="/deposit/:id" component={Deposit} />
+          <Route path="/payment/success" component={PaymentSuccess} />
+          <Route path="/payment/fail" component={PaymentFail} />
           <Route component={NotFound} />
         </Switch>
       </main>
