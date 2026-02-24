@@ -35,7 +35,7 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
   role: text("role").default("shop_owner").notNull(),
-  status: text("status").default("pending").notNull(),
+  status: text("status").default("active").notNull(), // 자동 승인: pending -> active로 변경
   shopId: integer("shop_id").references(() => shops.id),
   shopName: text("shop_name"),
   phone: text("phone"),

@@ -286,7 +286,7 @@ export default function PlatformAdmin() {
                     <div className="flex justify-between items-start">
                       <div>
                         <CardTitle className="text-lg">{shop.name}</CardTitle>
-                        <CardDescription>/{shop.slug}</CardDescription>
+                        <CardDescription>샵 ID: {shop.id}</CardDescription>
                       </div>
                       <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
                         운영중
