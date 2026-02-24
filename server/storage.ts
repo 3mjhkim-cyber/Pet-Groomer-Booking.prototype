@@ -689,19 +689,19 @@ export class DatabaseStorage implements IStorage {
 
   // ===== 구독 관련 메서드 =====
   async createSubscription(data: any) {
-    const [subscription] = await this.db.insert(subscriptions).values(data).returning();
+    const [subscription] = await db.insert(subscriptions).values(data).returning();
     return subscription;
   }
 
   async getAllSubscriptions() {
-    return await this.db
+    return await db
       .select()
       .from(subscriptions)
       .orderBy(subscriptions.createdAt);
   }
 
   async getSubscriptionsByShop(shopId: number) {
-    return await this.db
+    return await db
       .select()
       .from(subscriptions)
       .where(eq(subscriptions.shopId, shopId))
@@ -714,7 +714,7 @@ export class DatabaseStorage implements IStorage {
     subscriptionStart?: Date;
     subscriptionEnd?: Date;
   }) {
-    await this.db
+    await db
       .update(shops)
       .set(data)
       .where(eq(shops.id, shopId));
