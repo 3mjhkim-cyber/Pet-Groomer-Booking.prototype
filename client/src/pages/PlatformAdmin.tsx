@@ -1,7 +1,7 @@
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useLocation, Link } from "wouter";
-import { Loader2, Store, Check, X, Users, Calendar, LogOut, Settings, Bell, UserCheck, Pencil, Trash2, CreditCard, Search } from "lucide-react";
+import { useLocation } from "wouter";
+import { Loader2, Store, Calendar, LogOut, Settings, Pencil, Trash2, CreditCard, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -21,10 +21,7 @@ export default function PlatformAdmin() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // 검색 상태
   const [searchQuery, setSearchQuery] = useState('');
-
-  // 편집/삭제 상태
   const [editingShop, setEditingShop] = useState<Shop | null>(null);
   const [deletingShop, setDeletingShop] = useState<Shop | null>(null);
   const [editForm, setEditForm] = useState({
@@ -34,11 +31,10 @@ export default function PlatformAdmin() {
     businessHours: '',
     depositAmount: 0,
     depositRequired: true,
-    isApproved: false,
     subscriptionStatus: 'none',
     subscriptionTier: 'basic',
     subscriptionEnd: '',
-    password: '', // 비밀번호 변경 (선택사항)
+    password: '',
   });
 
   const { data: shops, isLoading: isShopsLoading } = useQuery<Shop[]>({
@@ -46,35 +42,6 @@ export default function PlatformAdmin() {
     enabled: !!user && user.role === 'super_admin',
   });
 
-  const approveMutation = useMutation({
-    mutationFn: async (shopId: number) => {
-      const res = await apiRequest('PATCH', `/api/admin/shops/${shopId}/approve`);
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/admin/shops'] });
-      toast({ title: "승인 완료", description: "가맹점이 승인되었습니다." });
-    },
-    onError: (error: Error) => {
-      toast({ title: "승인 실패", description: error.message, variant: "destructive" });
-    },
-  });
-
-  const rejectMutation = useMutation({
-    mutationFn: async (shopId: number) => {
-      const res = await apiRequest('DELETE', `/api/admin/shops/${shopId}`);
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/admin/shops'] });
-      toast({ title: "거절 완료", description: "가맹점이 삭제되었습니다." });
-    },
-    onError: (error: Error) => {
-      toast({ title: "거절 실패", description: error.message, variant: "destructive" });
-    },
-  });
-
-  // 가맹점 정보 수정
   const editMutation = useMutation({
     mutationFn: async ({ shopId, data }: { shopId: number; data: typeof editForm }) => {
       const res = await apiRequest('PATCH', `/api/admin/shops/${shopId}`, data);
@@ -90,7 +57,6 @@ export default function PlatformAdmin() {
     },
   });
 
-  // 가맹점 삭제
   const deleteMutation = useMutation({
     mutationFn: async (shopId: number) => {
       const res = await apiRequest('DELETE', `/api/admin/shops/${shopId}`);
@@ -106,7 +72,6 @@ export default function PlatformAdmin() {
     },
   });
 
-  // 편집 모달 열기
   const openEditModal = (shop: Shop) => {
     setEditForm({
       name: shop.name,
@@ -115,11 +80,10 @@ export default function PlatformAdmin() {
       businessHours: shop.businessHours,
       depositAmount: shop.depositAmount,
       depositRequired: shop.depositRequired,
-      isApproved: shop.isApproved,
       subscriptionStatus: shop.subscriptionStatus || 'none',
       subscriptionTier: shop.subscriptionTier || 'basic',
       subscriptionEnd: shop.subscriptionEnd ? new Date(shop.subscriptionEnd).toISOString().split('T')[0] : '',
-      password: '', // 비밀번호는 빈 값으로 시작
+      password: '',
     });
     setEditingShop(shop);
   };
@@ -133,21 +97,19 @@ export default function PlatformAdmin() {
     return null;
   }
 
-  const pendingShops = shops?.filter(s => !s.isApproved) || [];
+  const allShops = shops || [];
+  const activeSubCount = allShops.filter(s => s.subscriptionStatus === 'active').length;
 
-  // 검색 필터링된 승인된 가맹점 목록
-  const approvedShops = useMemo(() => {
-    const approved = shops?.filter(s => s.isApproved) || [];
-    if (!searchQuery.trim()) return approved;
-
+  const filteredShops = useMemo(() => {
+    if (!searchQuery.trim()) return allShops;
     const query = searchQuery.toLowerCase();
-    return approved.filter(shop =>
+    return allShops.filter(shop =>
       shop.name.toLowerCase().includes(query) ||
       shop.phone.includes(query) ||
       shop.address.toLowerCase().includes(query) ||
       shop.slug.toLowerCase().includes(query)
     );
-  }, [shops, searchQuery]);
+  }, [allShops, searchQuery]);
 
   return (
     <div className="min-h-screen bg-secondary/30">
@@ -170,95 +132,32 @@ export default function PlatformAdmin() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">전체 가맹점</CardTitle>
               <Store className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{shops?.length || 0}</div>
+              <div className="text-2xl font-bold">{allShops.length}</div>
             </CardContent>
           </Card>
-          <Link href="/admin/approvals">
-            <Card className="hover-elevate cursor-pointer">
-              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">계정 승인 관리</CardTitle>
-                <UserCheck className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-orange-600 flex items-center gap-2">
-                  <Bell className="w-5 h-5" />
-                  <span>바로가기</span>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">운영 중</CardTitle>
+              <CardTitle className="text-sm font-medium">활성 구독</CardTitle>
               <Calendar className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-green-600">{approvedShops.length}</div>
+              <div className="text-2xl font-bold text-green-600">{activeSubCount}</div>
             </CardContent>
           </Card>
         </div>
-
-        {pendingShops.length > 0 && (
-          <section className="mb-8">
-            <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-              <Users className="w-5 h-5 text-orange-500" />
-              승인 대기 중인 가맹점 ({pendingShops.length})
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {pendingShops.map(shop => (
-                <Card key={shop.id} className="border-orange-200" data-testid={`card-pending-shop-${shop.id}`}>
-                  <CardHeader>
-                    <CardTitle className="text-lg">{shop.name}</CardTitle>
-                    <CardDescription>/{shop.slug}</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2 text-sm mb-4">
-                      <p><span className="text-muted-foreground">전화:</span> {shop.phone}</p>
-                      <p><span className="text-muted-foreground">주소:</span> {shop.address}</p>
-                      <p><span className="text-muted-foreground">예약금:</span> {shop.depositAmount.toLocaleString()}원</p>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button 
-                        size="sm" 
-                        className="flex-1 gap-1"
-                        onClick={() => approveMutation.mutate(shop.id)}
-                        disabled={approveMutation.isPending}
-                        data-testid={`button-approve-shop-${shop.id}`}
-                      >
-                        <Check className="w-4 h-4" />
-                        승인
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        variant="destructive" 
-                        className="flex-1 gap-1"
-                        onClick={() => rejectMutation.mutate(shop.id)}
-                        disabled={rejectMutation.isPending}
-                        data-testid={`button-reject-shop-${shop.id}`}
-                      >
-                        <X className="w-4 h-4" />
-                        거절
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </section>
-        )}
 
         <section>
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
             <h2 className="text-xl font-bold flex items-center gap-2">
               <Store className="w-5 h-5 text-primary" />
-              운영 중인 가맹점 ({approvedShops.length})
+              가맹점 목록 ({filteredShops.length})
             </h2>
             <div className="relative w-full sm:w-80">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -274,13 +173,13 @@ export default function PlatformAdmin() {
             <div className="text-center py-10">
               <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto" />
             </div>
-          ) : approvedShops.length === 0 ? (
+          ) : filteredShops.length === 0 ? (
             <div className="text-center py-10 bg-white rounded-2xl border border-dashed border-border">
               <p className="text-muted-foreground">등록된 가맹점이 없습니다</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {approvedShops.map(shop => (
+              {filteredShops.map(shop => (
                 <Card key={shop.id} data-testid={`card-approved-shop-${shop.id}`}>
                   <CardHeader>
                     <div className="flex justify-between items-start">
@@ -403,14 +302,6 @@ export default function PlatformAdmin() {
                 id="edit-deposit-required"
                 checked={editForm.depositRequired}
                 onCheckedChange={(checked) => setEditForm({ ...editForm, depositRequired: checked })}
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <Label htmlFor="edit-approved">승인 상태</Label>
-              <Switch
-                id="edit-approved"
-                checked={editForm.isApproved}
-                onCheckedChange={(checked) => setEditForm({ ...editForm, isApproved: checked })}
               />
             </div>
 

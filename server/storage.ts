@@ -77,27 +77,6 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async getPendingUsers(): Promise<User[]> {
-    return await db.select().from(users)
-      .where(and(eq(users.status, 'pending'), eq(users.role, 'shop_owner')))
-      .orderBy(desc(users.createdAt));
-  }
-
-  async getPendingUsersCount(): Promise<number> {
-    const [result] = await db.select({ count: count() })
-      .from(users)
-      .where(and(eq(users.status, 'pending'), eq(users.role, 'shop_owner')));
-    return result?.count || 0;
-  }
-
-  async updateUserStatus(id: number, status: string): Promise<User | undefined> {
-    const [user] = await db.update(users)
-      .set({ status })
-      .where(eq(users.id, id))
-      .returning();
-    return user;
-  }
-
   async updateUserPassword(id: number, password: string): Promise<User | undefined> {
     const [user] = await db.update(users)
       .set({ password })
@@ -127,11 +106,6 @@ export class DatabaseStorage implements IStorage {
 
   async updateShop(id: number, data: Partial<Shop>): Promise<Shop | undefined> {
     const [shop] = await db.update(shops).set(data).where(eq(shops.id, id)).returning();
-    return shop;
-  }
-
-  async approveShop(id: number): Promise<Shop | undefined> {
-    const [shop] = await db.update(shops).set({ isApproved: true }).where(eq(shops.id, id)).returning();
     return shop;
   }
 

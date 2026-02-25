@@ -378,20 +378,9 @@ export async function registerRoutes(
     res.json(shops);
   });
 
-  app.patch('/api/admin/shops/:id/approve', requireSuperAdmin, async (req, res) => {
-    const shop = await storage.approveShop(Number(req.params.id));
-    if (!shop) {
-      return res.status(404).json({ message: "Shop not found" });
-    }
-    res.json(shop);
-  });
-
   // 슈퍼관리자용 가맹점 정보 수정
   app.patch('/api/admin/shops/:id', requireSuperAdmin, async (req, res) => {
-    const { name, phone, address, businessHours, depositAmount, depositRequired, isApproved, subscriptionStatus, subscriptionTier, subscriptionEnd, password } = req.body;
-
-    console.log('[Admin Shop Update] Request body:', req.body);
-    console.log('[Admin Shop Update] Subscription fields:', { subscriptionStatus, subscriptionTier, subscriptionEnd });
+    const { name, phone, address, businessHours, depositAmount, depositRequired, subscriptionStatus, subscriptionTier, subscriptionEnd, password } = req.body;
 
     // 현재 shop 정보 가져오기
     const currentShop = await storage.getShop(Number(req.params.id));
@@ -400,7 +389,7 @@ export async function registerRoutes(
     }
 
     const updates: any = {
-      name, phone, address, businessHours, depositAmount, depositRequired, isApproved
+      name, phone, address, businessHours, depositAmount, depositRequired
     };
 
     // 구독 정보가 있으면 추가
@@ -421,8 +410,6 @@ export async function registerRoutes(
       updates.subscriptionEnd = subscriptionEnd ? new Date(subscriptionEnd) : null;
     }
 
-    console.log('[Admin Shop Update] Updates to apply:', updates);
-
     const shop = await storage.updateShop(Number(req.params.id), updates);
     if (!shop) {
       return res.status(404).json({ message: "가맹점을 찾을 수 없습니다." });
@@ -432,10 +419,8 @@ export async function registerRoutes(
     if (password && password.trim()) {
       const hashedPassword = await hashPassword(password);
       await storage.updateUserPassword(currentShop.userId, hashedPassword);
-      console.log('[Admin Shop Update] Password updated for shop user');
     }
 
-    console.log('[Admin Shop Update] Updated shop:', shop);
     res.json(shop);
   });
 
@@ -447,37 +432,6 @@ export async function registerRoutes(
     }
     await storage.deleteShop(Number(req.params.id));
     res.json({ message: "가맹점이 삭제되었습니다.", shop });
-  });
-
-  // 계정 승인 관리 API (Super Admin 전용)
-  app.get('/api/admin/pending-users', requireSuperAdmin, async (req, res) => {
-    const users = await storage.getPendingUsers();
-    res.json(users);
-  });
-
-  app.get('/api/admin/pending-users/count', requireSuperAdmin, async (req, res) => {
-    const count = await storage.getPendingUsersCount();
-    res.json({ count });
-  });
-
-  app.patch('/api/admin/users/:id/approve', requireSuperAdmin, async (req, res) => {
-    const user = await storage.updateUserStatus(Number(req.params.id), 'approved');
-    if (!user) {
-      return res.status(404).json({ message: "사용자를 찾을 수 없습니다." });
-    }
-    // 사용자의 가게도 승인
-    if (user.shopId) {
-      await storage.approveShop(user.shopId);
-    }
-    res.json(user);
-  });
-
-  app.patch('/api/admin/users/:id/reject', requireSuperAdmin, async (req, res) => {
-    const user = await storage.updateUserStatus(Number(req.params.id), 'rejected');
-    if (!user) {
-      return res.status(404).json({ message: "사용자를 찾을 수 없습니다." });
-    }
-    res.json(user);
   });
 
   // Shop Settings (for shop owners)
@@ -1020,6 +974,13 @@ export async function registerRoutes(
   });
 
   // ===== 구독 API =====
+  // 내 구독 내역 조회
+  app.get('/api/subscriptions/my', requireShopOwner, async (req, res) => {
+    const user = req.user as any;
+    const subscriptionList = await storage.getSubscriptionsByShop(user.shopId);
+    res.json(subscriptionList);
+  });
+
   // 구독 신청
   app.post('/api/subscriptions/subscribe', requireShopOwner, async (req, res) => {
     const user = req.user!;
