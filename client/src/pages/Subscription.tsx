@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -16,8 +16,8 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import type { Shop } from "@shared/schema";
-import PortOne from "@portone/browser-sdk/v2";
 import { apiRequest } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
 
 const SUBSCRIPTION_PLANS = [
   {
@@ -131,6 +131,43 @@ export default function Subscription() {
 
   const handlePayment = async (tier: string, price: number) => {
     try {
+      const res = await apiRequest('POST', '/api/payment/demo-confirm', {
+        tier: demoPaymentTier,
+        amount: demoPaymentPrice,
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || '결제 처리에 실패했습니다.');
+      }
+      setShowDemoDialog(false);
+      toast({
+        title: "결제 완료!",
+        description: "구독이 성공적으로 활성화되었습니다.",
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/shop/settings'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/user'] });
+      setTimeout(() => setLocation('/admin/dashboard'), 1500);
+    } catch (error: any) {
+      toast({
+        title: "결제 오류",
+        description: error.message || "결제를 처리할 수 없습니다.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDemoProcessing(false);
+    }
+  };
+
+  const handlePayment = async (tier: string, price: number) => {
+    if (!isPortOneConfigured) {
+      setDemoPaymentTier(tier);
+      setDemoPaymentPrice(price);
+      setShowDemoDialog(true);
+      return;
+    }
+
+    try {
+      const PortOne = (await import("@portone/browser-sdk/v2")).default;
       const storeId = import.meta.env.VITE_PORTONE_STORE_ID;
       const channelKey = import.meta.env.VITE_PORTONE_CHANNEL_KEY;
       if (!storeId || !channelKey) {
@@ -157,6 +194,14 @@ export default function Subscription() {
       toast({ title: "결제 오류", description: error.message || "결제를 시작할 수 없습니다.", variant: "destructive" });
     }
   };
+
+  const hasActiveSubscription = shop?.subscriptionStatus === 'active';
+
+  useEffect(() => {
+    if (!isAuthLoading && !isShopLoading && (!user || user.role !== 'shop_owner')) {
+      setLocation("/login");
+    }
+  }, [isAuthLoading, isShopLoading, user, setLocation]);
 
   if (isAuthLoading || isShopLoading) {
     return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;

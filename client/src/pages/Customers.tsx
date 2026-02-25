@@ -4,7 +4,7 @@ import { useLocation } from "wouter";
 import { Loader2, Users, Phone, Calendar, Award, Search, PawPrint, Clock, ChevronRight } from "lucide-react";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 
 export default function Customers() {
@@ -58,6 +58,21 @@ export default function Customers() {
 
     return { total: customers.length, vip: vipCount, thisMonth };
   }, [customers]);
+
+  useEffect(() => {
+    if (!isAuthLoading && !user) {
+      setLocation("/login");
+    }
+    if (!isAuthLoading && user?.role === 'shop_owner' && user.shop && user.shop.subscriptionStatus !== 'active') {
+      setLocation("/admin/subscription");
+    }
+  }, [isAuthLoading, user, setLocation]);
+
+  if (isAuthLoading) return <div className="h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
+
+  if (!user) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-secondary/10 pb-20">
