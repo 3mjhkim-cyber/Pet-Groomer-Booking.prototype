@@ -2,7 +2,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Calendar as CalendarIcon, Clock, Scissors, User, Phone, CheckCircle2, Loader2, MapPin, XCircle, PawPrint, Info, FileText } from "lucide-react";
+import { Calendar as CalendarIcon, Clock, Scissors, User, Phone, CheckCircle2, Loader2, MapPin, XCircle, PawPrint, Info, FileText, ChevronDown, ChevronUp } from "lucide-react";
 import { useState, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -66,20 +66,20 @@ function formatBusinessHoursCompact(businessDays: BusinessDays | null, defaultHo
     }
   });
 
-  // 시간대별로 요일 그룹화하여 표시
+  // 시간대별로 요일 그룹화하여 표시 (쉼표 추가)
   const parts: string[] = [];
   Object.entries(hourGroups).forEach(([hours, days]) => {
     if (days.length === 7) {
       parts.push(`매일 ${hours}`);
     } else if (days.length >= 5 && closedDays.length <= 2) {
-      parts.push(`${days.join('')} ${hours}`);
+      parts.push(`${days.join(',')} ${hours}`);
     } else {
-      parts.push(`${days.join('')} ${hours}`);
+      parts.push(`${days.join(',')} ${hours}`);
     }
   });
 
   if (closedDays.length > 0 && closedDays.length <= 2) {
-    parts.push(`${closedDays.join('')} 휴무`);
+    parts.push(`${closedDays.join(',')} 휴무`);
   }
 
   return parts.join(' | ') || defaultHours;
@@ -137,6 +137,7 @@ export default function Booking() {
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [existingCustomer, setExistingCustomer] = useState<Customer | null>(null);
   const [isCheckingCustomer, setIsCheckingCustomer] = useState(false);
+  const [isHoursExpanded, setIsHoursExpanded] = useState(false);
 
   const createBookingMutation = useMutation({
     mutationFn: async (data: BookingForm & { shopId: number }) => {
@@ -273,14 +274,34 @@ export default function Booking() {
           </div>
 
           {/* 중단: 핵심 정보 */}
-          <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-1 sm:gap-x-4 sm:gap-y-1 text-xs sm:text-sm text-white/90">
-            <span className="flex items-center gap-1.5">
-              <Clock className="w-3.5 h-3.5 flex-shrink-0" />
-              <span className="truncate">{formatBusinessHoursCompact(
-                (shop as any).businessDays ? JSON.parse((shop as any).businessDays) : null,
-                shop.businessHours
-              )}</span>
-            </span>
+          <div className="flex flex-col gap-1 text-xs sm:text-sm text-white/90">
+            <div className="flex items-start gap-1.5">
+              <Clock className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <span className={cn(!isHoursExpanded && "line-clamp-1")}>
+                  {formatBusinessHoursCompact(
+                    (shop as any).businessDays ? JSON.parse((shop as any).businessDays) : null,
+                    shop.businessHours
+                  )}
+                </span>
+                {formatBusinessHoursCompact(
+                  (shop as any).businessDays ? JSON.parse((shop as any).businessDays) : null,
+                  shop.businessHours
+                ).length > 50 && (
+                  <button
+                    type="button"
+                    onClick={() => setIsHoursExpanded(!isHoursExpanded)}
+                    className="text-white/80 hover:text-white underline ml-1 inline-flex items-center gap-0.5"
+                  >
+                    {isHoursExpanded ? (
+                      <>접기 <ChevronUp className="w-3 h-3" /></>
+                    ) : (
+                      <>더보기 <ChevronDown className="w-3 h-3" /></>
+                    )}
+                  </button>
+                )}
+              </div>
+            </div>
             <span className="flex items-center gap-1.5">
               <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
               <span className="truncate">{shop.address}</span>
