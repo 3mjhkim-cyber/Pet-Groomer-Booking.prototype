@@ -120,9 +120,11 @@ export default function Revenue() {
   }
 
   // 구독 상태 확인
-  if (user.shop && user.shop.subscriptionStatus !== 'active') {
-    navigate("/admin/subscription");
-    return null;
+  if (user.shop) {
+    const shop = user.shop as any;
+    const accessible = shop.subscriptionStatus === 'active' ||
+      (shop.subscriptionStatus === 'cancelled' && shop.subscriptionEnd && new Date(shop.subscriptionEnd) > new Date());
+    if (!accessible) { navigate("/admin/subscription"); return null; }
   }
 
   const { startDate, endDate } = getDateRange(period, refDate);

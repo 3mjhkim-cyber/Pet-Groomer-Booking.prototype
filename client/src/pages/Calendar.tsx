@@ -54,8 +54,11 @@ export default function Calendar() {
   }, [isAuthLoading, user, setLocation]);
 
   useEffect(() => {
-    if (user?.role === 'shop_owner' && user?.shop && (user.shop as any).subscriptionStatus !== 'active') {
-      setLocation("/admin/subscription");
+    if (user?.role === 'shop_owner' && user?.shop) {
+      const shop = user.shop as any;
+      const accessible = shop.subscriptionStatus === 'active' ||
+        (shop.subscriptionStatus === 'cancelled' && shop.subscriptionEnd && new Date(shop.subscriptionEnd) > new Date());
+      if (!accessible) setLocation("/admin/subscription");
     }
   }, [user, setLocation]);
 

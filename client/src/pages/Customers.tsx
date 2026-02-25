@@ -21,9 +21,11 @@ export default function Customers() {
   }
 
   // 구독 상태 확인
-  if (user.role === 'shop_owner' && user.shop && user.shop.subscriptionStatus !== 'active') {
-    setLocation("/admin/subscription");
-    return null;
+  if (user.role === 'shop_owner' && user.shop) {
+    const shop = user.shop as any;
+    const accessible = shop.subscriptionStatus === 'active' ||
+      (shop.subscriptionStatus === 'cancelled' && shop.subscriptionEnd && new Date(shop.subscriptionEnd) > new Date());
+    if (!accessible) { setLocation("/admin/subscription"); return null; }
   }
 
   // 검색 및 정렬
