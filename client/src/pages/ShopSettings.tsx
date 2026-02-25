@@ -403,8 +403,11 @@ export default function ShopSettings() {
   }, [isAuthLoading, user, setLocation]);
 
   useEffect(() => {
-    if (user?.shop && (user.shop as any).subscriptionStatus !== 'active') {
-      setLocation("/admin/subscription");
+    if (user?.shop) {
+      const shop = user.shop as any;
+      const accessible = shop.subscriptionStatus === 'active' ||
+        (shop.subscriptionStatus === 'cancelled' && shop.subscriptionEnd && new Date(shop.subscriptionEnd) > new Date());
+      if (!accessible) setLocation("/admin/subscription");
     }
   }, [user, setLocation]);
 

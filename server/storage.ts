@@ -6,17 +6,13 @@ export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
-  getPendingUsers(): Promise<User[]>;
-  getPendingUsersCount(): Promise<number>;
-  updateUserStatus(id: number, status: string): Promise<User | undefined>;
   updateUserPassword(id: number, password: string): Promise<User | undefined>;
-  
+
   getShops(): Promise<Shop[]>;
   getShop(id: number): Promise<Shop | undefined>;
   getShopBySlug(slug: string): Promise<Shop | undefined>;
   createShop(shop: InsertShop): Promise<Shop>;
   updateShop(id: number, data: Partial<Shop>): Promise<Shop | undefined>;
-  approveShop(id: number): Promise<Shop | undefined>;
   deleteShop(id: number): Promise<void>;
   
   getServices(shopId?: number | null): Promise<Service[]>;
@@ -59,6 +55,14 @@ export interface IStorage {
     byHour: { hour: number; revenue: number; count: number }[];
     byDayOfWeek: { dayOfWeek: number; revenue: number; count: number }[];
   }>;
+
+  // Subscription
+  createSubscription(data: any): Promise<Subscription>;
+  getAllSubscriptions(): Promise<Subscription[]>;
+  getSubscriptionsByShop(shopId: number): Promise<Subscription[]>;
+  updateShopSubscription(shopId: number, data: { subscriptionStatus?: string; subscriptionTier?: string; subscriptionStart?: Date; subscriptionEnd?: Date }): Promise<void>;
+  updateSubscriptionPaymentMethod(subscriptionId: number, paymentMethod: string): Promise<void>;
+  cancelLatestSubscription(shopId: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -692,6 +696,21 @@ export class DatabaseStorage implements IStorage {
       .update(shops)
       .set(data)
       .where(eq(shops.id, shopId));
+  }
+
+  async updateSubscriptionPaymentMethod(subscriptionId: number, paymentMethod: string) {
+    await db
+      .update(subscriptions)
+      .set({ paymentMethod })
+      .where(eq(subscriptions.id, subscriptionId));
+  }
+
+  async cancelLatestSubscription(shopId: number) {
+    const subs = await this.getSubscriptionsByShop(shopId);
+    if (subs.length > 0) {
+      const latest = subs[subs.length - 1];
+      await db.update(subscriptions).set({ autoRenew: false }).where(eq(subscriptions.id, latest.id));
+    }
   }
 }
 

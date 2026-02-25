@@ -13,6 +13,22 @@ export default function Customers() {
   const [_, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState('');
 
+  if (isAuthLoading) return <div className="h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
+
+  if (!user) {
+    setLocation("/login");
+    return null;
+  }
+
+  // 구독 상태 확인
+  if (user.role === 'shop_owner' && user.shop) {
+    const shop = user.shop as any;
+    const accessible = shop.subscriptionStatus === 'active' ||
+      (shop.subscriptionStatus === 'cancelled' && shop.subscriptionEnd && new Date(shop.subscriptionEnd) > new Date());
+    if (!accessible) { setLocation("/admin/subscription"); return null; }
+  }
+
+  // 검색 및 정렬
   const filteredCustomers = useMemo(() => {
     let result = customers || [];
 

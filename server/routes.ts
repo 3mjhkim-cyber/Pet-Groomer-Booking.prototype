@@ -1093,13 +1093,40 @@ export async function registerRoutes(
     res.json({ success: true, subscription });
   });
 
-  // 구독 취소
+  // 구독 취소 (갱신 중단, subscriptionEnd까지 이용 가능)
   app.post('/api/subscriptions/cancel', requireShopOwner, async (req, res) => {
-    const user = req.user!;
+    const user = req.user as any;
+    const { reason } = req.body;
 
+    if (reason) {
+      console.log(`[Subscription Cancel] shopId=${user.shopId} reason="${reason}"`);
+    }
+
+    // 최근 구독 레코드의 autoRenew를 false로
+    await storage.cancelLatestSubscription(user.shopId);
+
+    // 상태를 'cancelled'로 변경 (subscriptionEnd는 유지 → 만료일까지 접근 허용)
     await storage.updateShopSubscription(user.shopId, {
       subscriptionStatus: 'cancelled',
     });
+
+    res.json({ success: true });
+  });
+
+  // 결제 수단 업데이트
+  app.post('/api/subscriptions/update-payment-method', requireShopOwner, async (req, res) => {
+    const user = req.user as any;
+    const { paymentMethod } = req.body;
+
+    if (!paymentMethod) {
+      return res.status(400).json({ message: '결제 수단을 선택해주세요.' });
+    }
+
+    const subs = await storage.getSubscriptionsByShop(user.shopId);
+    if (subs.length > 0) {
+      const latest = subs[subs.length - 1];
+      await storage.updateSubscriptionPaymentMethod(latest.id, paymentMethod);
+    }
 
     res.json({ success: true });
   });
