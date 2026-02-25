@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -56,10 +56,18 @@ const SUBSCRIPTION_PLANS = [
   },
 ];
 
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  CARD: "신용/체크카드",
+  TRANSFER: "계좌이체",
+  card: "신용/체크카드",
+  bank_transfer: "계좌이체",
+};
+
 export default function Subscription() {
   const { user, isLoading: isAuthLoading } = useAuth();
   const [_, setLocation] = useLocation();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [selectedTier, setSelectedTier] = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<"card" | "bank_transfer">("card");
   const [showDemoDialog, setShowDemoDialog] = useState(false);
@@ -182,30 +190,87 @@ export default function Subscription() {
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <div>
-            <h1 className="text-3xl font-bold">구독 플랜 선택</h1>
+            <h1 className="text-3xl font-bold">구독 관리</h1>
             <p className="text-muted-foreground mt-2">
               {hasActiveSubscription
-                ? "현재 구독 중인 플랜을 변경하거나 업그레이드하세요."
+                ? "현재 구독 중인 플랜을 관리하거나 변경하세요."
                 : "서비스를 이용하려면 구독 플랜을 선택해주세요."}
             </p>
           </div>
         </div>
 
+        {/* 현재 구독 정보 */}
         {shop && hasActiveSubscription && (
           <Card className="mb-8 border-primary">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Check className="w-5 h-5 text-green-600" />
                 현재 구독 중
+                <Badge className="ml-2">{currentPlan?.name || shop.subscriptionTier}</Badge>
               </CardTitle>
-              <CardDescription>
-                {SUBSCRIPTION_PLANS.find(p => p.tier === shop.subscriptionTier)?.name} 플랜 |
-                만료일: {shop.subscriptionEnd ? new Date(shop.subscriptionEnd).toLocaleDateString('ko-KR') : '-'}
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+                <div className="flex items-start gap-3">
+                  <CreditCard className="w-5 h-5 text-muted-foreground mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">결제 금액</p>
+                    <p className="font-semibold">{currentPlan?.price.toLocaleString()}원/월</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <CalendarDays className="w-5 h-5 text-muted-foreground mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">다음 갱신일</p>
+                    <p className="font-semibold">
+                      {shop.subscriptionEnd
+                        ? new Date(shop.subscriptionEnd).toLocaleDateString('ko-KR')
+                        : '-'}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Receipt className="w-5 h-5 text-muted-foreground mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">결제 수단</p>
+                    <p className="font-semibold">
+                      {latestSubscription?.paymentMethod
+                        ? (PAYMENT_METHOD_LABELS[latestSubscription.paymentMethod] || latestSubscription.paymentMethod)
+                        : '-'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                className="text-destructive border-destructive hover:bg-destructive hover:text-white"
+                onClick={() => setShowCancelDialog(true)}
+              >
+                구독 해지
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* 해지된/만료된 구독 안내 */}
+        {shop && !hasActiveSubscription && shop.subscriptionStatus !== 'none' && (
+          <Card className="mb-8 border-orange-200 bg-orange-50">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-orange-700">
+                <AlertTriangle className="w-5 h-5" />
+                {shop.subscriptionStatus === 'cancelled' ? '구독이 해지되었습니다' : '구독이 만료되었습니다'}
+              </CardTitle>
+              <CardDescription className="text-orange-600">
+                아래에서 새 플랜을 선택하여 서비스를 다시 이용하세요.
               </CardDescription>
             </CardHeader>
           </Card>
         )}
 
+        {/* 플랜 선택 */}
+        <h2 className="text-xl font-semibold mb-4">
+          {hasActiveSubscription ? "플랜 변경" : "플랜 선택"}
+        </h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           {SUBSCRIPTION_PLANS.map((plan) => (
             <Card
@@ -250,6 +315,7 @@ export default function Subscription() {
           ))}
         </div>
 
+        {/* 결제 정보 */}
         {selectedTier && (
           <Card>
             <CardHeader>

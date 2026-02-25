@@ -15,7 +15,6 @@ import Calendar from "@/pages/Calendar";
 import Deposit from "@/pages/Deposit";
 import PlatformAdmin from "@/pages/PlatformAdmin";
 import ShopSettings from "@/pages/ShopSettings";
-import Approvals from "@/pages/Approvals";
 import Revenue from "@/pages/Revenue";
 import Subscription from "@/pages/Subscription";
 import PaymentSuccess from "@/pages/PaymentSuccess";
@@ -39,7 +38,6 @@ function Router() {
           <Route path="/admin/revenue" component={Revenue} />
           <Route path="/admin/subscription" component={Subscription} />
           <Route path="/admin/platform" component={PlatformAdmin} />
-          <Route path="/admin/approvals" component={Approvals} />
           <Route path="/deposit/:id" component={Deposit} />
           <Route path="/payment/success" component={PaymentSuccess} />
           <Route path="/payment/fail" component={PaymentFail} />
