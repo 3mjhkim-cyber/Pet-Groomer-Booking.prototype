@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { Scissors, Calendar, BarChart3, Users, Clock, Shield, MessageSquare } from "lucide-react";
+import { Scissors, Calendar, BarChart3, Users, Clock, Shield } from "lucide-react";
 import { motion } from "framer-motion";
 
 export default function Home() {
@@ -43,16 +43,6 @@ export default function Home() {
                   관리자 로그인
                 </button>
               </Link>
-              <a 
-                href="https://docs.google.com/forms/d/e/1FAIpQLSeLJFT5GtJ-6WGrUPxkTMe5xa78FA8fgee5usEtOUS4AVkTwg/viewform?usp=dialog" 
-                target="_blank" 
-                rel="noopener noreferrer"
-              >
-                <button className="px-8 py-4 bg-green-500 hover:bg-green-600 text-white rounded-2xl text-lg font-bold shadow-xl shadow-green-500/25 hover:-translate-y-1 transition-all duration-200 flex items-center justify-center gap-2" data-testid="button-feedback">
-                  <MessageSquare className="w-5 h-5" />
-                  의견 남기기
-                </button>
-              </a>
             </div>
           </motion.div>
         </div>
