@@ -12,7 +12,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import type { Shop } from "@shared/schema";
 
 export default function PlatformAdmin() {
@@ -119,23 +119,13 @@ export default function PlatformAdmin() {
       subscriptionStatus: shop.subscriptionStatus || 'none',
       subscriptionTier: shop.subscriptionTier || 'basic',
       subscriptionEnd: shop.subscriptionEnd ? new Date(shop.subscriptionEnd).toISOString().split('T')[0] : '',
-      password: '', // 비밀번호는 빈 값으로 시작
+      password: '',
     });
     setEditingShop(shop);
   };
 
-  if (isAuthLoading) {
-    return <div className="h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
-  }
-
-  if (!user || user.role !== 'super_admin') {
-    setLocation("/login");
-    return null;
-  }
-
   const pendingShops = shops?.filter(s => !s.isApproved) || [];
 
-  // 검색 필터링된 승인된 가맹점 목록
   const approvedShops = useMemo(() => {
     const approved = shops?.filter(s => s.isApproved) || [];
     if (!searchQuery.trim()) return approved;
@@ -148,6 +138,20 @@ export default function PlatformAdmin() {
       shop.slug.toLowerCase().includes(query)
     );
   }, [shops, searchQuery]);
+
+  useEffect(() => {
+    if (!isAuthLoading && (!user || user.role !== 'super_admin')) {
+      setLocation("/login");
+    }
+  }, [isAuthLoading, user, setLocation]);
+
+  if (isAuthLoading) {
+    return <div className="h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
+  }
+
+  if (!user || user.role !== 'super_admin') {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-secondary/30">

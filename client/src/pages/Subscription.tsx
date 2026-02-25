@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
@@ -113,6 +113,14 @@ export default function Subscription() {
     }
   };
 
+  const hasActiveSubscription = shop?.subscriptionStatus === 'active';
+
+  useEffect(() => {
+    if (!isAuthLoading && !isShopLoading && (!user || user.role !== 'shop_owner')) {
+      setLocation("/login");
+    }
+  }, [isAuthLoading, isShopLoading, user, setLocation]);
+
   if (isAuthLoading || isShopLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -122,11 +130,8 @@ export default function Subscription() {
   }
 
   if (!user || user.role !== 'shop_owner') {
-    setLocation("/login");
     return null;
   }
-
-  const hasActiveSubscription = shop?.subscriptionStatus === 'active';
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-primary/5 to-background py-12 px-4">
