@@ -1,14 +1,14 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Check, CreditCard, Building, ArrowLeft } from "lucide-react";
 import type { Shop } from "@shared/schema";
-import { loadTossPayments } from '@tosspayments/payment-sdk';
+import PortOne from "@portone/browser-sdk/v2";
 
 const SUBSCRIPTION_PLANS = [
   {
@@ -58,7 +58,6 @@ export default function Subscription() {
   const { user, isLoading: isAuthLoading } = useAuth();
   const [_, setLocation] = useLocation();
   const { toast } = useToast();
-  const queryClient = useQueryClient();
   const [selectedTier, setSelectedTier] = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<"card" | "bank_transfer">("card");
 
@@ -67,11 +66,12 @@ export default function Subscription() {
     enabled: !!user && user.role === 'shop_owner',
   });
 
-  // 토스페이먼츠 결제 시작
+  // 포트원 결제 시작
   const handlePayment = async (tier: string, price: number) => {
     try {
-      const clientKey = import.meta.env.VITE_TOSS_CLIENT_KEY;
-      if (!clientKey) {
+      const storeId = import.meta.env.VITE_PORTONE_STORE_ID;
+      const channelKey = import.meta.env.VITE_PORTONE_CHANNEL_KEY;
+      if (!storeId || !channelKey) {
         toast({
           title: "설정 오류",
           description: "결제 시스템이 설정되지 않았습니다.",
@@ -80,18 +80,30 @@ export default function Subscription() {
         return;
       }
 
-      const tossPayments = await loadTossPayments(clientKey);
-      const orderId = `order-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       const planName = SUBSCRIPTION_PLANS.find(p => p.tier === tier)?.name || tier;
+      const paymentId = `payment-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-      await tossPayments.requestPayment('카드', {
-        amount: price,
-        orderId: orderId,
+      const response = await PortOne.requestPayment({
+        storeId,
+        paymentId,
         orderName: `구독 플랜: ${planName}`,
-        customerName: shop?.name || user?.username || '고객',
-        successUrl: `${window.location.origin}/payment/success?tier=${tier}`,
-        failUrl: `${window.location.origin}/payment/fail`,
+        totalAmount: price,
+        currency: "CURRENCY_KRW",
+        channelKey,
+        payMethod: paymentMethod === "card" ? "CARD" : "TRANSFER",
+        customer: {
+          fullName: shop?.name || user?.username || '고객',
+        },
+        redirectUrl: `${window.location.origin}/payment/success?tier=${tier}`,
       });
+
+      if (response?.code) {
+        toast({
+          title: "결제 실패",
+          description: response.message || "결제가 취소되었습니다.",
+          variant: "destructive",
+        });
+      }
     } catch (error: any) {
       toast({
         title: "결제 오류",

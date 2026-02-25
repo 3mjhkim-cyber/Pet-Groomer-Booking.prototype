@@ -15,26 +15,25 @@ export default function PaymentSuccess() {
     const confirmPayment = async () => {
       try {
         const urlParams = new URLSearchParams(window.location.search);
-        const paymentKey = urlParams.get('paymentKey');
-        const orderId = urlParams.get('orderId');
-        const amount = urlParams.get('amount');
+        const paymentId = urlParams.get('paymentId');
+        const txId = urlParams.get('txId');
         const tier = urlParams.get('tier');
 
-        if (!paymentKey || !orderId || !amount) {
+        if (!paymentId) {
           throw new Error('결제 정보가 올바르지 않습니다.');
         }
 
-        // 백엔드에서 결제 승인
+        // 백엔드에서 결제 검증
         const response = await fetch('/api/payment/confirm', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify({ paymentKey, orderId, amount, tier }),
+          body: JSON.stringify({ paymentId, txId, tier }),
         });
 
         if (!response.ok) {
           const error = await response.json();
-          throw new Error(error.message || '결제 승인에 실패했습니다.');
+          throw new Error(error.message || '결제 검증에 실패했습니다.');
         }
 
         setIsProcessing(false);

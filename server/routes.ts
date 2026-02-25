@@ -207,36 +207,49 @@ export async function registerRoutes(
     }
   });
 
-  // 토스페이먼츠 결제 승인
+  // 포트원 결제 검증
   app.post('/api/payment/confirm', requireAuth, async (req, res) => {
     try {
-      const { paymentKey, orderId, amount, tier } = req.body;
+      const { paymentId, txId, tier } = req.body;
       const user = req.user as any;
 
       if (!user.shopId) {
         return res.status(400).json({ message: "가맹점 정보가 없습니다." });
       }
 
-      // 토스페이먼츠 API로 결제 승인
-      const tossSecretKey = process.env.TOSS_SECRET_KEY;
-      if (!tossSecretKey) {
+      if (!paymentId) {
+        return res.status(400).json({ message: "결제 정보가 올바르지 않습니다." });
+      }
+
+      // 포트원 API로 결제 검증
+      const portoneApiSecret = process.env.PORTONE_API_SECRET;
+      if (!portoneApiSecret) {
         return res.status(500).json({ message: "결제 시스템 설정 오류입니다." });
       }
 
-      const response = await fetch('https://api.tosspayments.com/v1/payments/confirm', {
-        method: 'POST',
+      const response = await fetch(`https://api.portone.io/payments/${encodeURIComponent(paymentId)}`, {
         headers: {
-          'Authorization': `Basic ${Buffer.from(tossSecretKey + ':').toString('base64')}`,
-          'Content-Type': 'application/json',
+          'Authorization': `PortOne ${portoneApiSecret}`,
         },
-        body: JSON.stringify({ paymentKey, orderId, amount }),
       });
 
       const paymentData = await response.json();
 
-      if (!response.ok) {
-        console.error('Toss Payment Error:', paymentData);
-        return res.status(400).json({ message: paymentData.message || '결제 승인에 실패했습니다.' });
+      if (!response.ok || paymentData.status !== 'PAID') {
+        console.error('PortOne Payment Error:', paymentData);
+        return res.status(400).json({ message: '결제 검증에 실패했습니다.' });
+      }
+
+      // 플랜별 금액 검증
+      const PLAN_PRICES: Record<string, number> = {
+        basic: 29000,
+        premium: 49000,
+        enterprise: 99000,
+      };
+      const expectedAmount = PLAN_PRICES[tier || 'basic'];
+      if (paymentData.amount?.total !== expectedAmount) {
+        console.error('PortOne Amount Mismatch:', paymentData.amount?.total, expectedAmount);
+        return res.status(400).json({ message: '결제 금액이 일치하지 않습니다.' });
       }
 
       // 결제 성공 - 구독 활성화
@@ -250,16 +263,16 @@ export async function registerRoutes(
         subscriptionEnd: subscriptionEnd,
       });
 
-      // 결제 기록 저장 (선택사항)
+      // 결제 기록 저장
       await storage.createSubscription({
         shopId: user.shopId,
         tier: tier || 'basic',
         status: 'active',
-        amount: parseInt(amount),
+        amount: expectedAmount,
         startDate: now,
         endDate: subscriptionEnd,
         autoRenew: true,
-        paymentMethod: 'card',
+        paymentMethod: paymentData.method?.type || 'card',
       });
 
       res.json({
