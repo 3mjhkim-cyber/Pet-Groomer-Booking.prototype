@@ -290,6 +290,64 @@ export async function registerRoutes(
     }
   });
 
+  app.post('/api/payment/demo-confirm', requireAuth, async (req, res) => {
+    try {
+      const { tier, amount } = req.body;
+      const user = req.user as any;
+
+      if (!user.shopId) {
+        return res.status(400).json({ message: "가맹점 정보가 없습니다." });
+      }
+
+      const PLAN_PRICES: Record<string, number> = {
+        basic: 29000,
+        premium: 49000,
+        enterprise: 99000,
+      };
+
+      const validTier = tier && PLAN_PRICES[tier] ? tier : 'basic';
+      const expectedAmount = PLAN_PRICES[validTier];
+
+      if (amount !== expectedAmount) {
+        return res.status(400).json({ message: '결제 금액이 일치하지 않습니다.' });
+      }
+
+      const now = new Date();
+      const subscriptionEnd = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+      await storage.updateShopSubscription(user.shopId, {
+        subscriptionStatus: 'active',
+        subscriptionTier: validTier,
+        subscriptionStart: now,
+        subscriptionEnd: subscriptionEnd,
+      });
+
+      await storage.createSubscription({
+        shopId: user.shopId,
+        tier: validTier,
+        status: 'active',
+        amount: expectedAmount,
+        startDate: now,
+        endDate: subscriptionEnd,
+        autoRenew: true,
+        paymentMethod: 'demo',
+      });
+
+      res.json({
+        success: true,
+        message: '데모 결제가 완료되었습니다.',
+        subscription: {
+          status: 'active',
+          tier: validTier,
+          endDate: subscriptionEnd,
+        },
+      });
+    } catch (error: any) {
+      console.error('Demo payment error:', error);
+      res.status(500).json({ message: error.message || '결제 처리 중 오류가 발생했습니다.' });
+    }
+  });
+
   // 가맹점 등록 (pending 상태로 생성)
   app.post('/api/shops/register', async (req, res) => {
     try {

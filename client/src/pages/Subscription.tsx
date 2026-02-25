@@ -6,9 +6,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Check, CreditCard, Building, ArrowLeft } from "lucide-react";
+import { Loader2, Check, CreditCard, Building, ArrowLeft, AlertTriangle } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { Shop } from "@shared/schema";
-import PortOne from "@portone/browser-sdk/v2";
+import { apiRequest } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
 
 const SUBSCRIPTION_PLANS = [
   {
@@ -60,26 +62,61 @@ export default function Subscription() {
   const { toast } = useToast();
   const [selectedTier, setSelectedTier] = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<"card" | "bank_transfer">("card");
+  const [showDemoDialog, setShowDemoDialog] = useState(false);
+  const [demoPaymentTier, setDemoPaymentTier] = useState<string | null>(null);
+  const [demoPaymentPrice, setDemoPaymentPrice] = useState<number>(0);
+  const [isDemoProcessing, setIsDemoProcessing] = useState(false);
 
   const { data: shop, isLoading: isShopLoading } = useQuery<Shop>({
     queryKey: ['/api/shop/settings'],
     enabled: !!user && user.role === 'shop_owner',
   });
 
-  // 포트원 결제 시작
-  const handlePayment = async (tier: string, price: number) => {
+  const isPortOneConfigured = !!(import.meta.env.VITE_PORTONE_STORE_ID && import.meta.env.VITE_PORTONE_CHANNEL_KEY);
+
+  const handleDemoPayment = async () => {
+    if (!demoPaymentTier) return;
+    setIsDemoProcessing(true);
     try {
+      const res = await apiRequest('POST', '/api/payment/demo-confirm', {
+        tier: demoPaymentTier,
+        amount: demoPaymentPrice,
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || '결제 처리에 실패했습니다.');
+      }
+      setShowDemoDialog(false);
+      toast({
+        title: "결제 완료!",
+        description: "구독이 성공적으로 활성화되었습니다.",
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/shop/settings'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/user'] });
+      setTimeout(() => setLocation('/admin/dashboard'), 1500);
+    } catch (error: any) {
+      toast({
+        title: "결제 오류",
+        description: error.message || "결제를 처리할 수 없습니다.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDemoProcessing(false);
+    }
+  };
+
+  const handlePayment = async (tier: string, price: number) => {
+    if (!isPortOneConfigured) {
+      setDemoPaymentTier(tier);
+      setDemoPaymentPrice(price);
+      setShowDemoDialog(true);
+      return;
+    }
+
+    try {
+      const PortOne = (await import("@portone/browser-sdk/v2")).default;
       const storeId = import.meta.env.VITE_PORTONE_STORE_ID;
       const channelKey = import.meta.env.VITE_PORTONE_CHANNEL_KEY;
-      if (!storeId || !channelKey) {
-        toast({
-          title: "설정 오류",
-          description: "결제 시스템이 설정되지 않았습니다.",
-          variant: "destructive",
-        });
-        return;
-      }
-
       const planName = SUBSCRIPTION_PLANS.find(p => p.tier === tier)?.name || tier;
       const paymentId = `payment-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
@@ -299,6 +336,67 @@ export default function Subscription() {
           </Card>
         )}
       </div>
+
+      <Dialog open={showDemoDialog} onOpenChange={setShowDemoDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-amber-500" />
+              데모 결제 모드
+            </DialogTitle>
+            <DialogDescription>
+              현재 PG사(포트원) 연동 전이므로 데모 모드로 결제가 진행됩니다.
+              실제 결제는 이루어지지 않으며, 구독이 즉시 활성화됩니다.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="bg-secondary/30 rounded-lg p-4 space-y-2">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">플랜</span>
+              <span className="font-medium">
+                {SUBSCRIPTION_PLANS.find(p => p.tier === demoPaymentTier)?.name}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">결제 금액</span>
+              <span className="font-bold text-primary">
+                {demoPaymentPrice.toLocaleString()}원
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">결제 방법</span>
+              <span className="font-medium">
+                {paymentMethod === "card" ? "신용/체크카드" : "계좌이체"} (데모)
+              </span>
+            </div>
+          </div>
+          <DialogFooter className="flex gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setShowDemoDialog(false)}
+              disabled={isDemoProcessing}
+            >
+              취소
+            </Button>
+            <Button
+              onClick={handleDemoPayment}
+              disabled={isDemoProcessing}
+              data-testid="button-demo-payment-confirm"
+            >
+              {isDemoProcessing ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  처리 중...
+                </>
+              ) : (
+                <>
+                  <CreditCard className="w-4 h-4 mr-2" />
+                  결제 확인 (데모)
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
