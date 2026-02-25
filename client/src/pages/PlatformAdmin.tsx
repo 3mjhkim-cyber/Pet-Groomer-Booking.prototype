@@ -93,17 +93,14 @@ export default function PlatformAdmin() {
   const approvedShops = useMemo(() => {
     const approved = shops?.filter(s => s.isApproved) || [];
     if (!searchQuery.trim()) return approved;
-
-  const filteredShops = useMemo(() => {
-    if (!searchQuery.trim()) return allShops;
     const query = searchQuery.toLowerCase();
-    return allShops.filter(shop =>
+    return approved.filter(shop =>
       shop.name.toLowerCase().includes(query) ||
       shop.phone.includes(query) ||
       shop.address.toLowerCase().includes(query) ||
       shop.slug.toLowerCase().includes(query)
     );
-  }, [allShops, searchQuery]);
+  }, [shops, searchQuery]);
 
   useEffect(() => {
     if (!isAuthLoading && (!user || user.role !== 'super_admin')) {
