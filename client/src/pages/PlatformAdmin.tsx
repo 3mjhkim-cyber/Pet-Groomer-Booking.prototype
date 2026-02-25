@@ -12,7 +12,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import type { Shop } from "@shared/schema";
 
 export default function PlatformAdmin() {
@@ -88,17 +88,11 @@ export default function PlatformAdmin() {
     setEditingShop(shop);
   };
 
-  if (isAuthLoading) {
-    return <div className="h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
-  }
+  const pendingShops = shops?.filter(s => !s.isApproved) || [];
 
-  if (!user || user.role !== 'super_admin') {
-    setLocation("/login");
-    return null;
-  }
-
-  const allShops = shops || [];
-  const activeSubCount = allShops.filter(s => s.subscriptionStatus === 'active').length;
+  const approvedShops = useMemo(() => {
+    const approved = shops?.filter(s => s.isApproved) || [];
+    if (!searchQuery.trim()) return approved;
 
   const filteredShops = useMemo(() => {
     if (!searchQuery.trim()) return allShops;
@@ -110,6 +104,20 @@ export default function PlatformAdmin() {
       shop.slug.toLowerCase().includes(query)
     );
   }, [allShops, searchQuery]);
+
+  useEffect(() => {
+    if (!isAuthLoading && (!user || user.role !== 'super_admin')) {
+      setLocation("/login");
+    }
+  }, [isAuthLoading, user, setLocation]);
+
+  if (isAuthLoading) {
+    return <div className="h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
+  }
+
+  if (!user || user.role !== 'super_admin') {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-secondary/30">

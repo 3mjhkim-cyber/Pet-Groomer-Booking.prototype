@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -6,11 +6,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Check, CreditCard, Building, ArrowLeft, AlertTriangle, CalendarDays, Receipt } from "lucide-react";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Loader2, Check, CreditCard, Building, ArrowLeft, AlertTriangle } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { Shop } from "@shared/schema";
-import PortOne from "@portone/browser-sdk/v2";
 import { apiRequest } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
 
 const SUBSCRIPTION_PLANS = [
   {
@@ -70,48 +70,61 @@ export default function Subscription() {
   const queryClient = useQueryClient();
   const [selectedTier, setSelectedTier] = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<"card" | "bank_transfer">("card");
-  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [showDemoDialog, setShowDemoDialog] = useState(false);
+  const [demoPaymentTier, setDemoPaymentTier] = useState<string | null>(null);
+  const [demoPaymentPrice, setDemoPaymentPrice] = useState<number>(0);
+  const [isDemoProcessing, setIsDemoProcessing] = useState(false);
 
   const { data: shop, isLoading: isShopLoading } = useQuery<Shop>({
     queryKey: ['/api/shop/settings'],
     enabled: !!user && user.role === 'shop_owner',
   });
 
-  const { data: subscriptionHistory } = useQuery<any[]>({
-    queryKey: ['/api/subscriptions/my'],
-    enabled: !!user && user.role === 'shop_owner',
-  });
+  const isPortOneConfigured = !!(import.meta.env.VITE_PORTONE_STORE_ID && import.meta.env.VITE_PORTONE_CHANNEL_KEY);
 
-  const cancelMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest('POST', '/api/subscriptions/cancel');
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/shop/settings'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/subscriptions/my'] });
-      toast({ title: "구독 해지 완료", description: "구독이 해지되었습니다. 현재 기간 만료 후 서비스가 종료됩니다." });
-      setShowCancelDialog(false);
-    },
-    onError: () => {
-      toast({ title: "해지 실패", description: "구독 해지 중 오류가 발생했습니다.", variant: "destructive" });
-    },
-  });
-
-  // 포트원 결제 시작
-  const handlePayment = async (tier: string, price: number) => {
+  const handleDemoPayment = async () => {
+    if (!demoPaymentTier) return;
+    setIsDemoProcessing(true);
     try {
+      const res = await apiRequest('POST', '/api/payment/demo-confirm', {
+        tier: demoPaymentTier,
+        amount: demoPaymentPrice,
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || '결제 처리에 실패했습니다.');
+      }
+      setShowDemoDialog(false);
+      toast({
+        title: "결제 완료!",
+        description: "구독이 성공적으로 활성화되었습니다.",
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/shop/settings'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/user'] });
+      setTimeout(() => setLocation('/admin/dashboard'), 1500);
+    } catch (error: any) {
+      toast({
+        title: "결제 오류",
+        description: error.message || "결제를 처리할 수 없습니다.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDemoProcessing(false);
+    }
+  };
+
+  const handlePayment = async (tier: string, price: number) => {
+    if (!isPortOneConfigured) {
+      setDemoPaymentTier(tier);
+      setDemoPaymentPrice(price);
+      setShowDemoDialog(true);
+      return;
+    }
+
+    try {
+      const PortOne = (await import("@portone/browser-sdk/v2")).default;
       const storeId = import.meta.env.VITE_PORTONE_STORE_ID;
       const channelKey = import.meta.env.VITE_PORTONE_CHANNEL_KEY;
-      if (!storeId || !channelKey) {
-        toast({
-          title: "설정 오류",
-          description: "결제 시스템이 설정되지 않았습니다.",
-          variant: "destructive",
-        });
-        return;
-      }
-
       const planName = SUBSCRIPTION_PLANS.find(p => p.tier === tier)?.name || tier;
       const paymentId = `payment-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
@@ -145,6 +158,14 @@ export default function Subscription() {
     }
   };
 
+  const hasActiveSubscription = shop?.subscriptionStatus === 'active';
+
+  useEffect(() => {
+    if (!isAuthLoading && !isShopLoading && (!user || user.role !== 'shop_owner')) {
+      setLocation("/login");
+    }
+  }, [isAuthLoading, isShopLoading, user, setLocation]);
+
   if (isAuthLoading || isShopLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -154,15 +175,8 @@ export default function Subscription() {
   }
 
   if (!user || user.role !== 'shop_owner') {
-    setLocation("/login");
     return null;
   }
-
-  const hasActiveSubscription = shop?.subscriptionStatus === 'active';
-  const latestSubscription = subscriptionHistory && subscriptionHistory.length > 0
-    ? subscriptionHistory[subscriptionHistory.length - 1]
-    : null;
-  const currentPlan = SUBSCRIPTION_PLANS.find(p => p.tier === shop?.subscriptionTier);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-primary/5 to-background py-12 px-4">
@@ -389,30 +403,66 @@ export default function Subscription() {
         )}
       </div>
 
-      {/* 구독 해지 확인 다이얼로그 */}
-      <AlertDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>구독을 해지하시겠습니까?</AlertDialogTitle>
-            <AlertDialogDescription>
-              구독을 해지하면 현재 구독 기간({shop?.subscriptionEnd ? new Date(shop.subscriptionEnd).toLocaleDateString('ko-KR') : ''}) 만료 후 서비스 이용이 중단됩니다.
-              <br /><br />
-              해지 후에도 만료일까지는 계속 사용하실 수 있습니다.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>취소</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive hover:bg-destructive/90"
-              onClick={() => cancelMutation.mutate()}
-              disabled={cancelMutation.isPending}
+      <Dialog open={showDemoDialog} onOpenChange={setShowDemoDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-amber-500" />
+              데모 결제 모드
+            </DialogTitle>
+            <DialogDescription>
+              현재 PG사(포트원) 연동 전이므로 데모 모드로 결제가 진행됩니다.
+              실제 결제는 이루어지지 않으며, 구독이 즉시 활성화됩니다.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="bg-secondary/30 rounded-lg p-4 space-y-2">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">플랜</span>
+              <span className="font-medium">
+                {SUBSCRIPTION_PLANS.find(p => p.tier === demoPaymentTier)?.name}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">결제 금액</span>
+              <span className="font-bold text-primary">
+                {demoPaymentPrice.toLocaleString()}원
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">결제 방법</span>
+              <span className="font-medium">
+                {paymentMethod === "card" ? "신용/체크카드" : "계좌이체"} (데모)
+              </span>
+            </div>
+          </div>
+          <DialogFooter className="flex gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setShowDemoDialog(false)}
+              disabled={isDemoProcessing}
             >
-              {cancelMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-              해지하기
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+              취소
+            </Button>
+            <Button
+              onClick={handleDemoPayment}
+              disabled={isDemoProcessing}
+              data-testid="button-demo-payment-confirm"
+            >
+              {isDemoProcessing ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  처리 중...
+                </>
+              ) : (
+                <>
+                  <CreditCard className="w-4 h-4 mr-2" />
+                  결제 확인 (데모)
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
