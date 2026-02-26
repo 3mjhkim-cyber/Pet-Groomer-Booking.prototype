@@ -37,8 +37,10 @@ export function useAuth() {
       return await res.json() as UserWithShop;
     },
     onSuccess: (data) => {
+      // 이전 계정의 캐시 데이터를 모두 제거하고 새 계정 정보만 설정
+      queryClient.clear();
       queryClient.setQueryData([api.auth.me.path], data);
-      
+
       // localStorage에 로그인 정보 저장
       localStorage.setItem('user', JSON.stringify({
         userId: data.id,
@@ -79,7 +81,7 @@ export function useAuth() {
       if (!res.ok) throw new Error("로그아웃 실패");
     },
     onSuccess: () => {
-      queryClient.setQueryData([api.auth.me.path], null);
+      queryClient.clear();
       localStorage.removeItem('user');
       setLocation("/login");
       toast({
