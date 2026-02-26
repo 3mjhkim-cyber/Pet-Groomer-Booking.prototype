@@ -51,6 +51,10 @@ export interface IStorage {
   getRevenueStats(shopId: number, startDate: string, endDate: string): Promise<{
     totalRevenue: number;
     bookingCount: number;
+    newVisitCount: number;
+    returningVisitCount: number;
+    newRevenue: number;
+    returningRevenue: number;
     byService: { serviceName: string; revenue: number; count: number }[];
     byDate: { date: string; revenue: number; count: number }[];
     byHour: { hour: number; revenue: number; count: number }[];
@@ -601,6 +605,10 @@ export class DatabaseStorage implements IStorage {
   async getRevenueStats(shopId: number, startDate: string, endDate: string): Promise<{
     totalRevenue: number;
     bookingCount: number;
+    newVisitCount: number;
+    returningVisitCount: number;
+    newRevenue: number;
+    returningRevenue: number;
     byService: { serviceName: string; revenue: number; count: number }[];
     byDate: { date: string; revenue: number; count: number }[];
     byHour: { hour: number; revenue: number; count: number }[];
@@ -612,6 +620,7 @@ export class DatabaseStorage implements IStorage {
       time: bookings.time,
       serviceName: services.name,
       price: services.price,
+      isFirstVisit: bookings.isFirstVisit,
     })
     .from(bookings)
     .innerJoin(services, eq(bookings.serviceId, services.id))
@@ -627,6 +636,12 @@ export class DatabaseStorage implements IStorage {
     // 총 매출 및 예약 수
     const totalRevenue = confirmedBookings.reduce((sum, b) => sum + (b.price || 0), 0);
     const bookingCount = confirmedBookings.length;
+
+    // 신규/재방문 집계
+    const newVisitCount = confirmedBookings.filter(b => b.isFirstVisit).length;
+    const returningVisitCount = bookingCount - newVisitCount;
+    const newRevenue = confirmedBookings.filter(b => b.isFirstVisit).reduce((s, b) => s + (b.price || 0), 0);
+    const returningRevenue = totalRevenue - newRevenue;
 
     // 서비스별 매출
     const serviceMap = new Map<string, { revenue: number; count: number }>();
@@ -686,6 +701,10 @@ export class DatabaseStorage implements IStorage {
     return {
       totalRevenue,
       bookingCount,
+      newVisitCount,
+      returningVisitCount,
+      newRevenue,
+      returningRevenue,
       byService,
       byDate,
       byHour,
