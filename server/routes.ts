@@ -348,7 +348,7 @@ export async function registerRoutes(
     }
   });
 
-  // 가맹점 등록 (pending 상태로 생성)
+  // 가맹점 등록 (등록 즉시 활성화 — 승인 절차 없음)
   app.post('/api/shops/register', async (req, res) => {
     try {
       const { email, password, shop: shopData } = req.body;
@@ -521,7 +521,7 @@ export async function registerRoutes(
   // Public shop info
   app.get('/api/shops/:slug', async (req, res) => {
     const shop = await storage.getShopBySlug(req.params.slug);
-    if (!shop || !shop.isApproved) {
+    if (!shop) {
       return res.status(404).json({ message: "Shop not found" });
     }
     res.json({
@@ -548,7 +548,7 @@ export async function registerRoutes(
 
   app.get('/api/shops/:slug/services', async (req, res) => {
     const shop = await storage.getShopBySlug(req.params.slug);
-    if (!shop || !shop.isApproved) {
+    if (!shop) {
       return res.status(404).json({ message: "Shop not found" });
     }
     const services = await storage.getServicesByShop(shop.id);
@@ -638,7 +638,7 @@ export async function registerRoutes(
   // 고객 전화번호로 기존 고객 조회 (공개 API)
   app.get('/api/shops/:slug/customers/check', async (req, res) => {
     const shop = await storage.getShopBySlug(req.params.slug);
-    if (!shop || !shop.isApproved) {
+    if (!shop) {
       return res.status(404).json({ message: "가맹점을 찾을 수 없습니다." });
     }
     const phone = req.query.phone as string;
@@ -868,7 +868,7 @@ export async function registerRoutes(
   // 예약 가능 시간 조회 (서비스 소요시간 고려)
   app.get('/api/shops/:slug/available-times/:date', async (req, res) => {
     const shop = await storage.getShopBySlug(req.params.slug);
-    if (!shop || !shop.isApproved) {
+    if (!shop) {
       return res.status(404).json({ message: "가맹점을 찾을 수 없습니다." });
     }
 
@@ -1192,10 +1192,7 @@ export async function registerRoutes(
       depositRequired: true,
     });
   }
-  if (!demoShop.isApproved) {
-    await storage.approveShop(demoShop.id);
-    demoShop = await storage.getShop(demoShop.id) as Shop;
-  }
+  // 가맹점은 생성 시 isApproved=true 기본값이므로 별도 승인 불필요
 
   // Seed Data - 테스트 Shop Owner (새 이메일)
   if (await storage.getUserByUsername("test@shop.com") === undefined) {

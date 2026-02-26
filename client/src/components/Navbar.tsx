@@ -1,9 +1,9 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
-import { useQuery } from "@tanstack/react-query";
-import { Scissors, User, LogOut, LayoutDashboard, Users, CalendarDays, Bell, Settings, Shield, TrendingUp } from "lucide-react";
+// useQuery 제거: 승인 대기 수 조회 API(/api/admin/pending-users/count) 사용 안 함
+import { Scissors, User, LogOut, LayoutDashboard, Users, CalendarDays, Settings, Shield, TrendingUp } from "lucide-react";
+// Bell·Badge 제거: 승인 관리 아이콘·배지 사용 안 함
 import { cn } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge";
 
 export function Navbar() {
   const { user, logout } = useAuth();
@@ -11,13 +11,6 @@ export function Navbar() {
 
   // 예약 페이지에서는 로그인 버튼 숨김
   const isBookingPage = location.startsWith('/book/');
-
-  // Super Admin인 경우 승인 대기 수 조회
-  const { data: pendingCount } = useQuery<{ count: number }>({
-    queryKey: ['/api/admin/pending-users/count'],
-    enabled: !!user && user.role === 'super_admin',
-    refetchInterval: 30000, // 30초마다 갱신
-  });
 
   return (
     <nav className="sticky top-0 z-50 w-full border-b border-border/50 bg-white/80 backdrop-blur-md">
@@ -32,40 +25,19 @@ export function Navbar() {
         <div className="flex items-center gap-2">
           {user ? (
             <div className="flex items-center gap-1">
-              {/* Super Admin 메뉴 */}
+              {/* 슈퍼 어드민 메뉴 — "플랫폼 관리"만 표시 (승인 관리 메뉴 제거) */}
               {user.role === 'super_admin' && (
-                <>
-                  <Link href="/admin/platform">
-                    <button className={cn(
-                      "flex items-center gap-2 px-3 py-2 rounded-full font-medium transition-all",
-                      location === "/admin/platform" 
-                        ? "bg-secondary text-secondary-foreground" 
-                        : "text-foreground/70 hover:bg-secondary/30"
-                    )} data-testid="link-platform">
-                      <Shield className="h-4 w-4" />
-                      <span className="hidden sm:inline">플랫폼 관리</span>
-                    </button>
-                  </Link>
-                  <Link href="/admin/approvals">
-                    <button className={cn(
-                      "relative flex items-center gap-2 px-3 py-2 rounded-full font-medium transition-all",
-                      location === "/admin/approvals" 
-                        ? "bg-secondary text-secondary-foreground" 
-                        : "text-foreground/70 hover:bg-secondary/30"
-                    )} data-testid="link-approvals">
-                      <Bell className="h-4 w-4" />
-                      <span className="hidden sm:inline">승인 관리</span>
-                      {pendingCount && pendingCount.count > 0 && (
-                        <Badge 
-                          variant="destructive" 
-                          className="absolute -top-1 -right-1 h-5 min-w-5 px-1 flex items-center justify-center text-xs"
-                        >
-                          {pendingCount.count}
-                        </Badge>
-                      )}
-                    </button>
-                  </Link>
-                </>
+                <Link href="/admin/platform">
+                  <button className={cn(
+                    "flex items-center gap-2 px-3 py-2 rounded-full font-medium transition-all",
+                    location === "/admin/platform"
+                      ? "bg-secondary text-secondary-foreground"
+                      : "text-foreground/70 hover:bg-secondary/30"
+                  )} data-testid="link-platform">
+                    <Shield className="h-4 w-4" />
+                    <span className="hidden sm:inline">플랫폼 관리</span>
+                  </button>
+                </Link>
               )}
 
               {/* Shop Owner 메뉴 - 데스크탑만 표시 (모바일은 하단 네비게이션) */}
@@ -130,7 +102,7 @@ export function Navbar() {
               )}
 
               {/* 로그아웃 버튼 */}
-              <button 
+              <button
                 onClick={() => logout()}
                 className="p-2 text-muted-foreground hover:text-destructive transition-colors"
                 title="로그아웃"
