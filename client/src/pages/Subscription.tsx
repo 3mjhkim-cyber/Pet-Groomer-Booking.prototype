@@ -158,8 +158,15 @@ export default function Subscription() {
     },
   });
 
-  // ── 데모 결제 확인 (PortOne 미설정 환경) ─────────────────────────────
-  const handleDemoConfirm = async () => {
+  const [showDemoDialog, setShowDemoDialog] = useState(false);
+  const [demoPaymentTier, setDemoPaymentTier] = useState<string | null>(null);
+  const [demoPaymentPrice, setDemoPaymentPrice] = useState<number>(0);
+  const [isDemoProcessing, setIsDemoProcessing] = useState(false);
+
+  const isPortOneConfigured = !!(import.meta.env.VITE_PORTONE_STORE_ID && import.meta.env.VITE_PORTONE_CHANNEL_KEY);
+
+  const handleDemoPayment = async () => {
+    if (!demoPaymentTier) return;
     setIsDemoProcessing(true);
     try {
       const res = await apiRequest("POST", "/api/payment/demo-confirm", {
@@ -171,10 +178,14 @@ export default function Subscription() {
         throw new Error(err.message || "결제 처리에 실패했습니다.");
       }
       setShowDemoDialog(false);
-      toast({ title: "결제 완료!", description: "구독이 성공적으로 활성화되었습니다." });
-      queryClient.invalidateQueries({ queryKey: ["/api/shop/settings"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
-      setTimeout(() => setLocation("/admin/dashboard"), 1500);
+      toast({
+        title: "결제 완료!",
+        description: "구독이 성공적으로 활성화되었습니다.",
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/shop/settings'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/user'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/subscriptions/my'] });
+      setTimeout(() => setLocation('/admin/dashboard'), 1500);
     } catch (error: any) {
       toast({ title: "결제 오류", description: error.message || "결제를 처리할 수 없습니다.", variant: "destructive" });
     } finally {
@@ -291,7 +302,6 @@ export default function Subscription() {
   }
 
   if (!user || user.role !== "shop_owner") {
-    setLocation("/login");
     return null;
   }
 
@@ -789,6 +799,47 @@ export default function Subscription() {
             >
               {cancelMutation.isPending && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
               요금제 취소
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showDemoDialog} onOpenChange={setShowDemoDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-amber-500" />
+              데모 결제 모드
+            </DialogTitle>
+            <DialogDescription>
+              현재 PG사(포트원) 연동 전이므로 데모 모드로 결제가 진행됩니다.
+              실제 결제는 이루어지지 않으며, 구독이 즉시 활성화됩니다.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="bg-secondary/30 rounded-lg p-4 space-y-2">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">플랜</span>
+              <span className="font-medium">
+                {SUBSCRIPTION_PLANS.find(p => p.tier === demoPaymentTier)?.name}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">결제 금액</span>
+              <span className="font-bold text-primary">
+                {demoPaymentPrice.toLocaleString()}원
+              </span>
+            </div>
+          </div>
+          <DialogFooter className="flex gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setShowDemoDialog(false)} disabled={isDemoProcessing}>
+              취소
+            </Button>
+            <Button onClick={handleDemoPayment} disabled={isDemoProcessing} data-testid="button-demo-payment-confirm">
+              {isDemoProcessing ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" />처리 중...</>
+              ) : (
+                <><CreditCard className="w-4 h-4 mr-2" />결제 확인 (데모)</>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
