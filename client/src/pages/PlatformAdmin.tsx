@@ -1,10 +1,20 @@
+/**
+ * PlatformAdmin.tsx — 슈퍼관리자 가맹점 관리 페이지
+ *
+ * [변경 이력]
+ * - 가맹점 승인/거절 기능 완전 제거 (approveShop, rejectShop, 승인대기 탭 등)
+ * - 가맹점은 등록 즉시 시스템에 포함되는 구조로 전환
+ * - 가맹점 관리 박스 컴포넌트 추가 (탭·검색·스크롤 목록)
+ * - 카드 행 레이아웃: 왼쪽(가맹점명·고유아이디·상태배지) / 오른쪽(가입일)
+ * - 가맹점 클릭 시 상세 패널(모달)
+ */
+
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import {
   Loader2, Store, Calendar, LogOut, Settings, Pencil, Trash2,
-  CreditCard, Search, RefreshCw, ChevronRight, User, MapPin,
-  Phone, Clock, Building2, BadgeCheck, XCircle,
+  CreditCard, Search, RefreshCw, ChevronRight, Building2, Phone, Clock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,16 +36,43 @@ import { useState, useMemo, useEffect } from "react";
 import type { Shop } from "@shared/schema";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 타입: /api/admin/shops 응답 (ownerEmail 포함)
+// 타입 정의
 // ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * /api/admin/shops 응답 타입
+ * ownerEmail: 가맹점 소유자의 로그인 이메일 (users 테이블에서 JOIN)
+ *
+ * 주의: shop.id 는 DB 내부 일련번호(숫자)이며 UI에 노출하지 않는다.
+ *       사용자에게 보여주는 가맹점 식별자는 shop.slug(문자열) 이다.
+ */
 type ShopWithOwner = Shop & { ownerEmail: string | null };
 
+/** 탭 필터 — 승인 관련 탭(pendingApproval 등)은 제거됨 */
 type ShopFilter = "all" | "active" | "inactive";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 헬퍼: 구독 상태 배지
+// 서브 컴포넌트: 상태 배지
 // ─────────────────────────────────────────────────────────────────────────────
-function SubBadge({ status }: { status: string | null }) {
+
+/** 카드 행에 표시하는 단순 활성/비활성 배지 */
+function StatusBadge({ status }: { status: string | null }) {
+  if (status === "active") {
+    return (
+      <Badge className="bg-green-100 text-green-700 border-green-200 hover:bg-green-100 text-xs">
+        활성
+      </Badge>
+    );
+  }
+  return (
+    <Badge variant="secondary" className="text-xs">
+      비활성
+    </Badge>
+  );
+}
+
+/** 상세 패널에 표시하는 구체적인 구독 상태 배지 */
+function SubDetailBadge({ status }: { status: string | null }) {
   switch (status) {
     case "active":
       return <Badge className="bg-green-100 text-green-700 border-green-200 hover:bg-green-100">활성</Badge>;
@@ -48,7 +85,10 @@ function SubBadge({ status }: { status: string | null }) {
   }
 }
 
-function TierLabel({ tier }: { tier: string | null | undefined }) {
+// ─────────────────────────────────────────────────────────────────────────────
+// 서브 컴포넌트: 구독 플랜 텍스트
+// ─────────────────────────────────────────────────────────────────────────────
+function tierLabel(tier: string | null | undefined): string {
   switch (tier) {
     case "basic":      return "베이직";
     case "premium":    return "프리미엄";
@@ -57,27 +97,36 @@ function TierLabel({ tier }: { tier: string | null | undefined }) {
   }
 }
 
-function fmtDate(d: Date | string | null | undefined) {
+// ─────────────────────────────────────────────────────────────────────────────
+// 헬퍼: 날짜 포맷 (YYYY-MM-DD)
+// ─────────────────────────────────────────────────────────────────────────────
+function fmtDate(d: Date | string | null | undefined): string {
   if (!d) return "-";
-  return new Date(d).toLocaleDateString("ko-KR", { year: "numeric", month: "2-digit", day: "2-digit" });
+  const dt = new Date(d);
+  const y = dt.getFullYear();
+  const m = String(dt.getMonth() + 1).padStart(2, "0");
+  const day = String(dt.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// 메인 컴포넌트
+// ─────────────────────────────────────────────────────────────────────────────
 export default function PlatformAdmin() {
   const { user, isLoading: isAuthLoading, logout } = useAuth();
   const [_, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // ── 필터/검색 상태 ─────────────────────────────────────────────────────────
-  const [filter, setFilter]       = useState<ShopFilter>("all");
-  const [searchQuery, setSearch]  = useState("");
+  // ── 탭·검색 상태 ──────────────────────────────────────────────────────────
+  const [filter, setFilter]  = useState<ShopFilter>("all");
+  const [search, setSearch]  = useState("");
 
-  // ── 선택된 가맹점 (상세 모달) ────────────────────────────────────────────
-  const [detailShop, setDetailShop]   = useState<ShopWithOwner | null>(null);
+  // ── 상세 패널·편집·삭제 모달 상태 ─────────────────────────────────────────
+  const [detailShop,  setDetailShop]  = useState<ShopWithOwner | null>(null);
+  const [editingShop, setEditingShop] = useState<ShopWithOwner | null>(null);
+  const [deletingShop,setDeletingShop]= useState<ShopWithOwner | null>(null);
 
-  // ── 편집/삭제 모달 ──────────────────────────────────────────────────────
-  const [editingShop,  setEditingShop]  = useState<ShopWithOwner | null>(null);
-  const [deletingShop, setDeletingShop] = useState<ShopWithOwner | null>(null);
   const [editForm, setEditForm] = useState({
     name: "", phone: "", address: "", businessHours: "",
     depositAmount: 0, depositRequired: true,
@@ -85,14 +134,15 @@ export default function PlatformAdmin() {
     subscriptionEnd: "", password: "",
   });
 
-  // ── API ─────────────────────────────────────────────────────────────────
+  // ── 가맹점 목록 조회 ──────────────────────────────────────────────────────
+  // refetchOnWindowFocus: 다른 탭에서 등록 후 돌아왔을 때 자동 갱신
   const { data: shops, isLoading, refetch, isFetching } = useQuery<ShopWithOwner[]>({
     queryKey: ["/api/admin/shops"],
     enabled: !!user && user.role === "super_admin",
     refetchOnWindowFocus: true,
   });
 
-  // ── Mutation: 편집 ────────────────────────────────────────────────────────
+  // ── Mutation: 가맹점 정보 수정 ────────────────────────────────────────────
   const editMutation = useMutation({
     mutationFn: async ({ shopId, data }: { shopId: number; data: typeof editForm }) => {
       const res = await apiRequest("PATCH", `/api/admin/shops/${shopId}`, data);
@@ -104,10 +154,11 @@ export default function PlatformAdmin() {
       setEditingShop(null);
       setDetailShop(null);
     },
-    onError: (e: Error) => toast({ title: "수정 실패", description: e.message, variant: "destructive" }),
+    onError: (e: Error) =>
+      toast({ title: "수정 실패", description: e.message, variant: "destructive" }),
   });
 
-  // ── Mutation: 삭제 ────────────────────────────────────────────────────────
+  // ── Mutation: 가맹점 삭제 ────────────────────────────────────────────────
   const deleteMutation = useMutation({
     mutationFn: async (shopId: number) => {
       const res = await apiRequest("DELETE", `/api/admin/shops/${shopId}`);
@@ -119,69 +170,74 @@ export default function PlatformAdmin() {
       setDeletingShop(null);
       setDetailShop(null);
     },
-    onError: (e: Error) => toast({ title: "삭제 실패", description: e.message, variant: "destructive" }),
+    onError: (e: Error) =>
+      toast({ title: "삭제 실패", description: e.message, variant: "destructive" }),
   });
 
+  // ── 편집 모달 열기 ────────────────────────────────────────────────────────
   const openEditModal = (shop: ShopWithOwner) => {
     setEditForm({
-      name: shop.name,
-      phone: shop.phone,
-      address: shop.address,
-      businessHours: shop.businessHours,
-      depositAmount: shop.depositAmount,
-      depositRequired: shop.depositRequired,
+      name:               shop.name,
+      phone:              shop.phone,
+      address:            shop.address,
+      businessHours:      shop.businessHours,
+      depositAmount:      shop.depositAmount,
+      depositRequired:    shop.depositRequired,
       subscriptionStatus: shop.subscriptionStatus || "none",
-      subscriptionTier: shop.subscriptionTier || "basic",
-      subscriptionEnd: shop.subscriptionEnd
+      subscriptionTier:   shop.subscriptionTier   || "basic",
+      subscriptionEnd:    shop.subscriptionEnd
         ? new Date(shop.subscriptionEnd).toISOString().split("T")[0] : "",
       password: "",
     });
     setEditingShop(shop);
-    setDetailShop(null);
+    setDetailShop(null); // 상세 패널 닫기
   };
 
-  // ── 인증 가드 ──────────────────────────────────────────────────────────────
+  // ── 인증 가드 ────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!isAuthLoading && (!user || user.role !== "super_admin")) setLocation("/login");
   }, [isAuthLoading, user, setLocation]);
 
-  const approvedShops = useMemo(() => {
-    const approved = shops?.filter(s => s.isApproved) || [];
-    if (!searchQuery.trim()) return approved;
-    const query = searchQuery.toLowerCase();
-    return approved.filter(shop =>
-      shop.name.toLowerCase().includes(query) ||
-      shop.phone.includes(query) ||
-      shop.address.toLowerCase().includes(query) ||
-      shop.slug.toLowerCase().includes(query)
+  if (isAuthLoading) {
+    return (
+      <div className="h-screen flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
     );
-  }, [shops, searchQuery]);
+  }
+  if (!user || user.role !== "super_admin") return null;
 
-  // 현재 탭 기준 목록
+  // ── 파생 데이터 ────────────────────────────────────────────────────────────
+  const allShops     = shops ?? [];
+  // "활성 가맹점" = 구독 상태가 active인 가맹점
+  const activeShops  = allShops.filter(s => s.subscriptionStatus === "active");
+  // "비활성 가맹점" = 구독 미설정·만료·취소 등 active가 아닌 모든 가맹점 (신규 등록 포함)
+  const inactiveShops = allShops.filter(s => s.subscriptionStatus !== "active");
+
+  // 현재 탭에 맞는 기본 목록
   const baseList: ShopWithOwner[] =
-    filter === "active"   ? activeShops  :
+    filter === "active"   ? activeShops   :
     filter === "inactive" ? inactiveShops : allShops;
 
-  // 검색 필터
+  // 검색어 필터 — 가맹점명 / 전화번호 / 고유아이디(slug) 기준
   const filtered = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
+    const q = search.trim().toLowerCase();
     if (!q) return baseList;
     return baseList.filter(s =>
       s.name.toLowerCase().includes(q) ||
       s.phone.includes(q) ||
-      s.address.toLowerCase().includes(q) ||
-      s.slug.toLowerCase().includes(q) ||
-      (s.ownerEmail ?? "").toLowerCase().includes(q)
+      s.slug.toLowerCase().includes(q)
     );
-  }, [baseList, searchQuery]);
+  }, [baseList, search]);
 
-  // ── 탭 정의 ────────────────────────────────────────────────────────────────
+  // ── 탭 정의 ─────────────────────────────────────────────────────────────
   const TABS: { key: ShopFilter; label: string; count: number }[] = [
     { key: "all",      label: "전체 가맹점",  count: allShops.length },
-    { key: "active",   label: "활성",         count: activeShops.length },
-    { key: "inactive", label: "미활성/신규",  count: inactiveShops.length },
+    { key: "active",   label: "활성 가맹점",  count: activeShops.length },
+    { key: "inactive", label: "비활성 가맹점", count: inactiveShops.length },
   ];
 
+  // ── 렌더 ─────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-secondary/30">
 
@@ -197,7 +253,7 @@ export default function PlatformAdmin() {
               <p className="text-sm text-muted-foreground">총 관리자</p>
             </div>
           </div>
-          <Button variant="outline" onClick={() => logout()}>
+          <Button variant="outline" onClick={() => logout()} data-testid="button-logout">
             <LogOut className="w-4 h-4 mr-2" />
             로그아웃
           </Button>
@@ -213,109 +269,138 @@ export default function PlatformAdmin() {
               <CardTitle className="text-sm font-medium text-muted-foreground">전체 가맹점</CardTitle>
               <Store className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{shops?.length || 0}</div>
+            <CardContent className="px-5 pb-4">
+              <div className="text-3xl font-bold">{allShops.length}</div>
             </CardContent>
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2 pt-4 px-5">
-              <CardTitle className="text-sm font-medium text-muted-foreground">활성 구독</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">활성 가맹점</CardTitle>
               <Calendar className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">{shops?.filter(s => s.subscriptionStatus === 'active').length || 0}</div>
+            <CardContent className="px-5 pb-4">
+              <div className="text-3xl font-bold text-green-600">{activeShops.length}</div>
             </CardContent>
           </Card>
         </div>
 
-        {/* ── 가맹점 관리 박스 ────────────────────────────────────────────────
-             - 탭: 전체 / 활성 / 미활성
-             - 검색
-             - 스크롤 가능한 목록
-        ──────────────────────────────────────────────────────────────────── */}
+        {/* ══════════════════════════════════════════════════════════════════
+            가맹점 관리 박스 컴포넌트
+            ┌─────────────────────────────────────────┐
+            │ 가맹점 관리              [새로고침]       │
+            ├──────────┬──────────┬───────────────────┤
+            │ 전체(N)  │ 활성(N)  │ 비활성(N)          │
+            ├──────────────────────────────────────────┤
+            │ 🔍 가맹점명·전화번호·고유아이디 검색...   │
+            ├──────────────────────────────────────────┤
+            │ [가맹점명]          [활성]    2024-01-01 │
+            │  slug-id (회색)                          │
+            │─────────────────────────────────────────│
+            │ ...                                      │
+            └──────────────────────────────────────────┘
+        ════════════════════════════════════════════════════════════════════ */}
         <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
 
           {/* 박스 헤더 */}
           <div className="flex items-center justify-between px-5 py-4 border-b">
             <div className="flex items-center gap-2">
               <Store className="w-5 h-5 text-primary" />
-              가맹점 목록 ({approvedShops.length})
-            </h2>
-            <div className="relative w-full sm:w-80">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <h2 className="font-bold text-base">가맹점 관리</h2>
+              <span className="text-sm text-muted-foreground">({filtered.length}개)</span>
+            </div>
+            <Button
+              variant="ghost" size="sm"
+              onClick={() => refetch()}
+              disabled={isFetching}
+              className="text-muted-foreground gap-1.5"
+            >
+              <RefreshCw className={`w-4 h-4 ${isFetching ? "animate-spin" : ""}`} />
+              새로고침
+            </Button>
+          </div>
+
+          {/* 탭: 전체 / 활성 / 비활성 — 승인대기 탭 없음 */}
+          <div className="flex border-b px-5 gap-1">
+            {TABS.map(t => (
+              <button
+                key={t.key}
+                onClick={() => { setFilter(t.key); setSearch(""); }}
+                className={[
+                  "flex items-center gap-1.5 px-3 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
+                  filter === t.key
+                    ? "border-primary text-primary"
+                    : "border-transparent text-muted-foreground hover:text-foreground",
+                ].join(" ")}
+              >
+                {t.label}
+                <span className={[
+                  "text-xs rounded-full px-1.5 py-0.5 font-semibold",
+                  filter === t.key
+                    ? "bg-primary/10 text-primary"
+                    : "bg-secondary text-muted-foreground",
+                ].join(" ")}>
+                  {t.count}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          {/* 검색 — 가맹점명·전화번호·고유아이디(slug) */}
+          <div className="px-5 py-3 border-b bg-secondary/20">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
-                placeholder="가맹점명, 전화번호, 주소, 아이디(이메일), 슬러그 검색..."
-                value={searchQuery}
+                placeholder="가맹점명, 전화번호, 고유아이디(shopId) 검색..."
+                value={search}
                 onChange={e => setSearch(e.target.value)}
                 className="pl-9 bg-white"
               />
             </div>
           </div>
-          {isShopsLoading ? (
-            <div className="text-center py-10">
-              <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto" />
-            </div>
-          ) : approvedShops.length === 0 ? (
-            <div className="text-center py-10 bg-white rounded-2xl border border-dashed border-border">
-              <p className="text-muted-foreground">등록된 가맹점이 없습니다</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {approvedShops.map(shop => (
-                <Card key={shop.id} data-testid={`card-approved-shop-${shop.id}`}>
-                  <CardHeader>
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <CardTitle className="text-lg">{shop.name}</CardTitle>
-                        <CardDescription>샵 ID: {shop.id}</CardDescription>
-                      </div>
-                      <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                        운영중
-                      </Badge>
+
+          {/* ── 목록 (스크롤) ── */}
+          <div className="overflow-y-auto max-h-[560px] divide-y">
+            {isLoading ? (
+              <div className="flex justify-center py-16">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-2">
+                <Store className="w-10 h-10 opacity-30" />
+                <p className="text-sm">해당하는 가맹점이 없습니다</p>
+              </div>
+            ) : (
+              filtered.map(shop => (
+                /*
+                 * 가맹점 행 카드
+                 * ┌──────────────────────────────────┬─────────────┐
+                 * │ 가맹점명         [활성] 배지       │ 2024-01-01 │
+                 * │ slug-id (작은 회색 텍스트)         │            │
+                 * └──────────────────────────────────┴─────────────┘
+                 */
+                <button
+                  key={shop.id}
+                  className="w-full text-left px-5 py-4 hover:bg-secondary/30 transition-colors flex items-center justify-between group"
+                  onClick={() => setDetailShop(shop)}
+                  data-testid={`row-shop-${shop.id}`}
+                >
+                  {/* 왼쪽: 가맹점명 · 고유아이디(slug) · 상태배지 */}
+                  <div className="flex flex-col gap-0.5 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-sm truncate">{shop.name}</span>
+                      <StatusBadge status={shop.subscriptionStatus} />
                     </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2 text-sm mb-4">
-                      <p><span className="text-muted-foreground">전화:</span> {shop.phone}</p>
-                      <p><span className="text-muted-foreground">주소:</span> {shop.address}</p>
-                      <p><span className="text-muted-foreground">영업시간:</span> {shop.businessHours}</p>
-                      <p><span className="text-muted-foreground">예약금:</span> {shop.depositAmount.toLocaleString()}원</p>
-                      <div className="flex items-center gap-2 pt-2 border-t">
-                        <CreditCard className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-muted-foreground">구독:</span>
-                        <Badge variant={shop.subscriptionStatus === 'active' ? 'default' : 'secondary'}>
-                          {shop.subscriptionStatus === 'active' ? '활성' :
-                           shop.subscriptionStatus === 'expired' ? '만료' :
-                           shop.subscriptionStatus === 'cancelled' ? '취소' : '미구독'}
-                        </Badge>
-                        {shop.subscriptionStatus === 'active' && (
-                          <span className="text-xs text-muted-foreground">
-                            ({shop.subscriptionTier === 'basic' ? '베이직' :
-                              shop.subscriptionTier === 'premium' ? '프리미엄' : '엔터프라이즈'})
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                      {/* 로그인 아이디(이메일) */}
-                      <span className="flex items-center gap-1">
-                        <User className="w-3 h-3" />
-                        {shop.ownerEmail ?? "-"}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Phone className="w-3 h-3" />
-                        {shop.phone}
-                      </span>
-                    </div>
+                    {/* shop.slug: URL에서 사용하는 가맹점 고유 문자열 식별자 */}
+                    <span className="text-xs text-muted-foreground">{shop.slug}</span>
                   </div>
 
-                  {/* 가입일 */}
-                  <div className="text-xs text-muted-foreground hidden sm:block flex-shrink-0">
-                    {fmtDate(shop.createdAt)}
+                  {/* 오른쪽: 가입일 + 화살표 */}
+                  <div className="flex items-center gap-3 flex-shrink-0">
+                    <span className="text-xs text-muted-foreground hidden sm:block">
+                      {fmtDate(shop.createdAt)}
+                    </span>
+                    <ChevronRight className="w-4 h-4 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors" />
                   </div>
-
-                  {/* 화살표 */}
-                  <ChevronRight className="w-4 h-4 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors flex-shrink-0" />
                 </button>
               ))
             )}
@@ -323,39 +408,56 @@ export default function PlatformAdmin() {
         </div>
       </main>
 
-      {/* ─────────────────────────────────────────────────────────────────────
-          가맹점 상세 모달
-          클릭한 가맹점의 모든 정보 + 편집/삭제 버튼
-      ───────────────────────────────────────────────────────────────────── */}
+      {/* ══════════════════════════════════════════════════════════════════════
+          가맹점 상세 패널 (클릭 시 오픈)
+          포함 항목: 가맹점명·고유아이디·가입일·상태·전화번호·구독정보
+          승인 관련 UI 없음
+      ══════════════════════════════════════════════════════════════════════ */}
       <Dialog open={!!detailShop} onOpenChange={open => !open && setDetailShop(null)}>
-        <DialogContent className="sm:max-w-[540px] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-lg">
               <Building2 className="w-5 h-5 text-primary" />
               {detailShop?.name}
             </DialogTitle>
-            <DialogDescription>
-              가맹점 상세 정보
-            </DialogDescription>
+            <DialogDescription>가맹점 상세 정보</DialogDescription>
           </DialogHeader>
 
           {detailShop && (
             <div className="space-y-4 py-2">
+
               {/* ── 기본 정보 ── */}
               <section className="rounded-xl border p-4 space-y-3">
-                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">기본 정보</h3>
-                <div className="grid grid-cols-2 gap-3 text-sm">
+                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  기본 정보
+                </h3>
+                <div className="grid grid-cols-2 gap-y-3 gap-x-4 text-sm">
+
                   <div>
-                    <p className="text-muted-foreground text-xs mb-0.5">로그인 아이디</p>
-                    <p className="font-medium flex items-center gap-1">
-                      <User className="w-3.5 h-3.5 text-muted-foreground" />
-                      {detailShop.ownerEmail ?? "-"}
-                    </p>
+                    <p className="text-muted-foreground text-xs mb-0.5">가맹점명</p>
+                    <p className="font-semibold">{detailShop.name}</p>
                   </div>
+
                   <div>
-                    <p className="text-muted-foreground text-xs mb-0.5">슬러그 (URL)</p>
+                    {/*
+                     * 고유아이디(shopId)
+                     * shop.id 는 DB 내부 일련번호로 노출하지 않는다.
+                     * shop.slug 가 실제 서비스에서 사용하는 가맹점 고유 식별자이다.
+                     */}
+                    <p className="text-muted-foreground text-xs mb-0.5">고유아이디 (shopId)</p>
                     <p className="font-medium font-mono text-xs">{detailShop.slug}</p>
                   </div>
+
+                  <div>
+                    <p className="text-muted-foreground text-xs mb-0.5">가입일</p>
+                    <p className="font-medium">{fmtDate(detailShop.createdAt)}</p>
+                  </div>
+
+                  <div>
+                    <p className="text-muted-foreground text-xs mb-1">상태</p>
+                    <StatusBadge status={detailShop.subscriptionStatus} />
+                  </div>
+
                   <div>
                     <p className="text-muted-foreground text-xs mb-0.5">전화번호</p>
                     <p className="font-medium flex items-center gap-1">
@@ -363,17 +465,7 @@ export default function PlatformAdmin() {
                       {detailShop.phone}
                     </p>
                   </div>
-                  <div>
-                    <p className="text-muted-foreground text-xs mb-0.5">가입일</p>
-                    <p className="font-medium">{fmtDate(detailShop.createdAt)}</p>
-                  </div>
-                  <div className="col-span-2">
-                    <p className="text-muted-foreground text-xs mb-0.5">주소</p>
-                    <p className="font-medium flex items-center gap-1">
-                      <MapPin className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
-                      {detailShop.address}
-                    </p>
-                  </div>
+
                   <div>
                     <p className="text-muted-foreground text-xs mb-0.5">영업시간</p>
                     <p className="font-medium flex items-center gap-1">
@@ -381,14 +473,13 @@ export default function PlatformAdmin() {
                       {detailShop.businessHours}
                     </p>
                   </div>
+
+                  {/* 마지막 활동일: 현재 스키마에 별도 필드 없음 — 추후 추가 가능 */}
                   <div>
-                    <p className="text-muted-foreground text-xs mb-0.5">예약금</p>
-                    <p className="font-medium">
-                      {detailShop.depositRequired
-                        ? `${detailShop.depositAmount.toLocaleString()}원`
-                        : "미사용"}
-                    </p>
+                    <p className="text-muted-foreground text-xs mb-0.5">마지막 활동일</p>
+                    <p className="font-medium text-muted-foreground">-</p>
                   </div>
+
                 </div>
               </section>
 
@@ -398,14 +489,14 @@ export default function PlatformAdmin() {
                   <CreditCard className="w-3.5 h-3.5" />
                   구독 정보
                 </h3>
-                <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="grid grid-cols-2 gap-y-3 gap-x-4 text-sm">
                   <div>
-                    <p className="text-muted-foreground text-xs mb-1">상태</p>
-                    <SubBadge status={detailShop.subscriptionStatus} />
+                    <p className="text-muted-foreground text-xs mb-1">구독 상태</p>
+                    <SubDetailBadge status={detailShop.subscriptionStatus} />
                   </div>
                   <div>
                     <p className="text-muted-foreground text-xs mb-0.5">플랜</p>
-                    <p className="font-medium">{TierLabel({ tier: detailShop.subscriptionTier })}</p>
+                    <p className="font-medium">{tierLabel(detailShop.subscriptionTier)}</p>
                   </div>
                   <div>
                     <p className="text-muted-foreground text-xs mb-0.5">구독 시작</p>
@@ -417,6 +508,7 @@ export default function PlatformAdmin() {
                   </div>
                 </div>
               </section>
+
             </div>
           )}
 
@@ -439,9 +531,9 @@ export default function PlatformAdmin() {
         </DialogContent>
       </Dialog>
 
-      {/* ─────────────────────────────────────────────────────────────────────
+      {/* ══════════════════════════════════════════════════════════════════════
           가맹점 편집 모달
-      ───────────────────────────────────────────────────────────────────── */}
+      ══════════════════════════════════════════════════════════════════════ */}
       <Dialog open={!!editingShop} onOpenChange={open => !open && setEditingShop(null)}>
         <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -533,7 +625,8 @@ export default function PlatformAdmin() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditingShop(null)}>취소</Button>
             <Button
-              onClick={() => editingShop && editMutation.mutate({ shopId: editingShop.id, data: editForm })}
+              onClick={() =>
+                editingShop && editMutation.mutate({ shopId: editingShop.id, data: editForm })}
               disabled={editMutation.isPending}
             >
               {editMutation.isPending && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
@@ -543,9 +636,9 @@ export default function PlatformAdmin() {
         </DialogContent>
       </Dialog>
 
-      {/* ─────────────────────────────────────────────────────────────────────
+      {/* ══════════════════════════════════════════════════════════════════════
           가맹점 삭제 확인 다이얼로그
-      ───────────────────────────────────────────────────────────────────── */}
+      ══════════════════════════════════════════════════════════════════════ */}
       <AlertDialog open={!!deletingShop} onOpenChange={open => !open && setDeletingShop(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>

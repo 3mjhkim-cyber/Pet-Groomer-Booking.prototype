@@ -268,31 +268,26 @@ export default function Dashboard() {
             >
               <Scissors className="w-4 h-4" />
             </Button>
-            {user.shop?.isApproved ? (
-              <Button
-                variant="outline"
-                className="gap-2"
-                onClick={() => {
-                  const slug = user.shop?.slug || 'gangnam';
-                  const link = `${window.location.origin}/book/${slug}`;
-                  navigator.clipboard.writeText(link).then(() => {
-                    toast({
-                      title: "예약 링크 복사됨",
-                      description: "고객에게 공유할 수 있는 예약 페이지 링크가 복사되었습니다.",
-                    });
+            {/* 가맹점은 등록 즉시 활성화되므로 isApproved 조건 제거 — 항상 예약 링크 복사 버튼 표시 */}
+            <Button
+              variant="outline"
+              className="gap-2"
+              onClick={() => {
+                const slug = user.shop?.slug || 'gangnam';
+                const link = `${window.location.origin}/book/${slug}`;
+                navigator.clipboard.writeText(link).then(() => {
+                  toast({
+                    title: "예약 링크 복사됨",
+                    description: "고객에게 공유할 수 있는 예약 페이지 링크가 복사되었습니다.",
                   });
-                }}
-                data-testid="button-copy-booking-link"
-              >
-                <Link className="w-4 h-4" />
-                <span className="hidden sm:inline">예약 링크 복사</span>
-                <span className="sm:hidden">링크</span>
-              </Button>
-            ) : (
-              <span className="text-sm text-muted-foreground bg-yellow-100 px-3 py-1.5 rounded-lg whitespace-nowrap">
-                승인 대기중
-              </span>
-            )}
+                });
+              }}
+              data-testid="button-copy-booking-link"
+            >
+              <Link className="w-4 h-4" />
+              <span className="hidden sm:inline">예약 링크 복사</span>
+              <span className="sm:hidden">링크</span>
+            </Button>
           <Dialog open={isManualDialogOpen} onOpenChange={setIsManualDialogOpen}>
             <DialogTrigger asChild>
               <Button className="gap-2" data-testid="button-manual-booking">
