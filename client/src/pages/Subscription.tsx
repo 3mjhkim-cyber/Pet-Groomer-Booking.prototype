@@ -19,6 +19,9 @@ import type { Shop } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 
+// ─────────────────────────────────────────────────────────────────
+// 요금제 정의
+// ─────────────────────────────────────────────────────────────────
 const SUBSCRIPTION_PLANS = [
   {
     tier: "basic",
@@ -45,10 +48,10 @@ const SUBSCRIPTION_PLANS = [
 ];
 
 const PAYMENT_METHOD_LABELS: Record<string, { label: string; icon: React.ReactNode }> = {
-  CARD: { label: "신용/체크카드", icon: <CreditCard className="w-4 h-4" /> },
-  TRANSFER: { label: "계좌이체", icon: <Building className="w-4 h-4" /> },
-  card: { label: "신용/체크카드", icon: <CreditCard className="w-4 h-4" /> },
-  bank_transfer: { label: "계좌이체", icon: <Building className="w-4 h-4" /> },
+  CARD:          { label: "신용/체크카드", icon: <CreditCard className="w-4 h-4" /> },
+  TRANSFER:      { label: "계좌이체",      icon: <Building   className="w-4 h-4" /> },
+  card:          { label: "신용/체크카드", icon: <CreditCard className="w-4 h-4" /> },
+  bank_transfer: { label: "계좌이체",      icon: <Building   className="w-4 h-4" /> },
 };
 
 const CANCEL_REASONS = [
@@ -58,6 +61,12 @@ const CANCEL_REASONS = [
   "해당 서비스가 더 이상 필요 없습니다",
 ];
 
+// ─────────────────────────────────────────────────────────────────
+// [헬퍼] 구독 이용 가능 여부
+//  - active: 항상 이용 가능
+//  - cancelled + 만료일이 오늘 이후: 아직 이용 가능
+//  - 그 외(만료·없음): 이용 불가 → 요금제 선택 화면으로 이동
+// ─────────────────────────────────────────────────────────────────
 function isSubscriptionAccessible(shop: any): boolean {
   if (!shop) return false;
   if (shop.subscriptionStatus === "active") return true;
@@ -73,20 +82,35 @@ export default function Subscription() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // 뷰 모드: 'manage' | 'plans'
+  // ── 뷰: 'plans' = 요금제 선택, 'manage' = 구독 관리 ────────────────────
+  // 기본값은 'manage' 이지만, 구독이 없거나 만료된 경우에는
+  // accessible === false 로 판정되어 자동으로 'plans' 뷰가 렌더된다.
   const [view, setView] = useState<"manage" | "plans">("manage");
   const [selectedTier, setSelectedTier] = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<"card" | "bank_transfer">("card");
 
-  // 결제수단 업데이트 모달
+  // ── 데모 결제 상태 (PortOne 키가 없을 때 사용) ────────────────────────
+  const [showDemoDialog,    setShowDemoDialog]    = useState(false);
+  const [demoPaymentTier,   setDemoPaymentTier]   = useState<string>("");
+  const [demoPaymentPrice,  setDemoPaymentPrice]  = useState<number>(0);
+  const [isDemoProcessing,  setIsDemoProcessing]  = useState(false);
+
+  // ── 결제수단 업데이트 모달 ──────────────────────────────────────────────
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [newPaymentMethod, setNewPaymentMethod] = useState<string | null>(null);
 
-  // 취소 모달
+  // ── 취소 모달 ──────────────────────────────────────────────────────────
   const [showCancelModal, setShowCancelModal] = useState(false);
-  const [cancelReason, setCancelReason] = useState("");
-  const [cancelNote, setCancelNote] = useState("");
+  const [cancelReason,    setCancelReason]    = useState("");
+  const [cancelNote,      setCancelNote]      = useState("");
 
+  // ── PortOne 설정 여부 (환경 변수로 판단) ──────────────────────────────
+  const isPortOneConfigured = !!(
+    import.meta.env.VITE_PORTONE_STORE_ID &&
+    import.meta.env.VITE_PORTONE_CHANNEL_KEY
+  );
+
+  // ── API ──────────────────────────────────────────────────────────────
   const { data: shop, isLoading: isShopLoading } = useQuery<Shop>({
     queryKey: ["/api/shop/settings"],
     enabled: !!user && user.role === "shop_owner",
@@ -97,6 +121,7 @@ export default function Subscription() {
     enabled: !!user && user.role === "shop_owner",
   });
 
+  // ── Mutation: 구독 취소 ────────────────────────────────────────────────
   const cancelMutation = useMutation({
     mutationFn: async (reason: string) => {
       const res = await apiRequest("POST", "/api/subscriptions/cancel", { reason });
@@ -113,6 +138,7 @@ export default function Subscription() {
     },
   });
 
+  // ── Mutation: 결제수단 변경 ────────────────────────────────────────────
   const updatePaymentMethodMutation = useMutation({
     mutationFn: async (pm: string) => {
       const res = await apiRequest("POST", "/api/subscriptions/update-payment-method", { paymentMethod: pm });
@@ -129,35 +155,33 @@ export default function Subscription() {
     },
   });
 
-  const handlePayment = async (tier: string, price: number) => {
+  // ── 데모 결제 확인 (PortOne 미설정 환경) ─────────────────────────────
+  const handleDemoConfirm = async () => {
+    setIsDemoProcessing(true);
     try {
-      const res = await apiRequest('POST', '/api/payment/demo-confirm', {
-        tier: demoPaymentTier,
+      const res = await apiRequest("POST", "/api/payment/demo-confirm", {
+        tier:   demoPaymentTier,
         amount: demoPaymentPrice,
       });
       if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.message || '결제 처리에 실패했습니다.');
+        throw new Error(err.message || "결제 처리에 실패했습니다.");
       }
       setShowDemoDialog(false);
-      toast({
-        title: "결제 완료!",
-        description: "구독이 성공적으로 활성화되었습니다.",
-      });
-      queryClient.invalidateQueries({ queryKey: ['/api/shop/settings'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/user'] });
-      setTimeout(() => setLocation('/admin/dashboard'), 1500);
+      toast({ title: "결제 완료!", description: "구독이 성공적으로 활성화되었습니다." });
+      queryClient.invalidateQueries({ queryKey: ["/api/shop/settings"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      setTimeout(() => setLocation("/admin/dashboard"), 1500);
     } catch (error: any) {
-      toast({
-        title: "결제 오류",
-        description: error.message || "결제를 처리할 수 없습니다.",
-        variant: "destructive",
-      });
+      toast({ title: "결제 오류", description: error.message || "결제를 처리할 수 없습니다.", variant: "destructive" });
     } finally {
       setIsDemoProcessing(false);
     }
   };
 
+  // ── 결제 시작 ─────────────────────────────────────────────────────────
+  // PortOne 키가 없으면 데모 다이얼로그를 띄우고,
+  // 키가 있으면 PortOne SDK를 통해 실제 결제를 진행한다.
   const handlePayment = async (tier: string, price: number) => {
     if (!isPortOneConfigured) {
       setDemoPaymentTier(tier);
@@ -165,26 +189,25 @@ export default function Subscription() {
       setShowDemoDialog(true);
       return;
     }
-
     try {
       const PortOne = (await import("@portone/browser-sdk/v2")).default;
-      const storeId = import.meta.env.VITE_PORTONE_STORE_ID;
+      const storeId    = import.meta.env.VITE_PORTONE_STORE_ID;
       const channelKey = import.meta.env.VITE_PORTONE_CHANNEL_KEY;
       if (!storeId || !channelKey) {
         toast({ title: "설정 오류", description: "결제 시스템이 설정되지 않았습니다.", variant: "destructive" });
         return;
       }
-      const planName = SUBSCRIPTION_PLANS.find((p) => p.tier === tier)?.name || tier;
+      const planName  = SUBSCRIPTION_PLANS.find((p) => p.tier === tier)?.name || tier;
       const paymentId = `payment-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      const response = await PortOne.requestPayment({
+      const response  = await PortOne.requestPayment({
         storeId,
         paymentId,
-        orderName: `구독 플랜: ${planName}`,
+        orderName:   `구독 플랜: ${planName}`,
         totalAmount: price,
-        currency: "CURRENCY_KRW",
+        currency:    "CURRENCY_KRW",
         channelKey,
-        payMethod: paymentMethod === "card" ? "CARD" : "TRANSFER",
-        customer: { fullName: shop?.name || user?.username || "고객" },
+        payMethod:   paymentMethod === "card" ? "CARD" : "TRANSFER",
+        customer:    { fullName: shop?.name || user?.username || "고객" },
         redirectUrl: `${window.location.origin}/payment/success?tier=${tier}`,
       });
       if (response?.code) {
@@ -195,16 +218,19 @@ export default function Subscription() {
     }
   };
 
-  const hasActiveSubscription = shop?.subscriptionStatus === 'active';
-
+  // ── 인증 가드 ──────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!isAuthLoading && !isShopLoading && (!user || user.role !== 'shop_owner')) {
+    if (!isAuthLoading && !isShopLoading && (!user || user.role !== "shop_owner")) {
       setLocation("/login");
     }
   }, [isAuthLoading, isShopLoading, user, setLocation]);
 
   if (isAuthLoading || isShopLoading) {
-    return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
   }
 
   if (!user || user.role !== "shop_owner") {
@@ -212,20 +238,28 @@ export default function Subscription() {
     return null;
   }
 
-  const accessible = isSubscriptionAccessible(shop);
-  const hasActive = shop?.subscriptionStatus === "active";
-  const isCancelledButValid = shop?.subscriptionStatus === "cancelled" && accessible;
-  const latestSub = subscriptionHistory && subscriptionHistory.length > 0
+  // ── 구독 상태 파생값 ──────────────────────────────────────────────────
+  const accessible           = isSubscriptionAccessible(shop);
+  const hasActive            = shop?.subscriptionStatus === "active";
+  const isCancelledButValid  = shop?.subscriptionStatus === "cancelled" && accessible;
+  const latestSub            = subscriptionHistory && subscriptionHistory.length > 0
     ? subscriptionHistory[subscriptionHistory.length - 1] : null;
   const currentPlan = SUBSCRIPTION_PLANS.find((p) => p.tier === shop?.subscriptionTier);
-  const renewDate = shop?.subscriptionEnd ? new Date(shop.subscriptionEnd).toLocaleDateString("ko-KR") : "-";
+  const renewDate   = shop?.subscriptionEnd
+    ? new Date(shop.subscriptionEnd).toLocaleDateString("ko-KR") : "-";
 
-  // ───── 플랜 선택 뷰 ─────
+  // ─────────────────────────────────────────────────────────────────────
+  // [요금제 선택 뷰]
+  //   진입 조건:
+  //   1) 구독이 없거나 만료된 경우 (!accessible) — 신규·만료 사용자
+  //   2) 기존 구독자가 '요금제 조정' 버튼을 눌렀을 때 (view === "plans")
+  // ─────────────────────────────────────────────────────────────────────
   if (view === "plans" || !accessible) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-primary/5 to-background py-12 px-4">
         <div className="max-w-5xl mx-auto">
           <div className="flex items-center gap-3 mb-8">
+            {/* 기존 구독자만 '뒤로 가기' 표시 */}
             {accessible && (
               <Button variant="ghost" size="icon" onClick={() => setView("manage")}>
                 <ArrowLeft className="w-5 h-5" />
@@ -234,14 +268,24 @@ export default function Subscription() {
             <div>
               <h1 className="text-2xl font-bold">요금제 선택</h1>
               <p className="text-sm text-muted-foreground mt-1">
-                {accessible ? "현재 플랜을 변경하거나 업그레이드하세요." : "서비스를 이용하려면 구독 플랜을 선택해주세요."}
+                {accessible
+                  ? "현재 플랜을 변경하거나 업그레이드하세요."
+                  : "서비스를 이용하려면 구독 플랜을 선택해주세요."}
               </p>
             </div>
           </div>
 
+          {/* 플랜 카드 */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             {SUBSCRIPTION_PLANS.map((plan) => (
-              <Card key={plan.tier} className={`relative ${plan.popular ? "border-primary shadow-lg" : ""} ${selectedTier === plan.tier ? "ring-2 ring-primary" : ""}`}>
+              <Card
+                key={plan.tier}
+                className={[
+                  "relative",
+                  plan.popular ? "border-primary shadow-lg" : "",
+                  selectedTier === plan.tier ? "ring-2 ring-primary" : "",
+                ].join(" ")}
+              >
                 {plan.popular && (
                   <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary">인기</Badge>
                 )}
@@ -274,11 +318,14 @@ export default function Subscription() {
             ))}
           </div>
 
+          {/* 결제 정보 (플랜 선택 후 노출) */}
           {selectedTier && (
             <Card>
               <CardHeader>
                 <CardTitle>결제 정보</CardTitle>
-                <CardDescription>{SUBSCRIPTION_PLANS.find((p) => p.tier === selectedTier)?.name} 플랜을 선택하셨습니다.</CardDescription>
+                <CardDescription>
+                  {SUBSCRIPTION_PLANS.find((p) => p.tier === selectedTier)?.name} 플랜을 선택하셨습니다.
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div>
@@ -288,7 +335,10 @@ export default function Subscription() {
                       <button
                         key={m}
                         onClick={() => setPaymentMethod(m)}
-                        className={`p-4 border-2 rounded-lg flex items-center gap-3 transition-colors ${paymentMethod === m ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"}`}
+                        className={[
+                          "p-4 border-2 rounded-lg flex items-center gap-3 transition-colors",
+                          paymentMethod === m ? "border-primary bg-primary/5" : "border-border hover:border-primary/50",
+                        ].join(" ")}
                       >
                         {m === "card" ? <CreditCard className="w-5 h-5" /> : <Building className="w-5 h-5" />}
                         <div className="text-left">
@@ -299,6 +349,7 @@ export default function Subscription() {
                     ))}
                   </div>
                 </div>
+
                 <div className="bg-secondary/30 rounded-lg p-4 space-y-2">
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">플랜</span>
@@ -315,12 +366,21 @@ export default function Subscription() {
                     </span>
                   </div>
                 </div>
+
                 <div className="text-xs text-muted-foreground space-y-1">
                   <p>• 구독은 매월 자동으로 갱신됩니다.</p>
                   <p>• 구독 취소는 언제든지 가능하며, 다음 결제일부터 적용됩니다.</p>
                   <p>• 환불 정책은 이용약관을 참고해주세요.</p>
                 </div>
-                <Button className="w-full" size="lg" onClick={() => { const plan = SUBSCRIPTION_PLANS.find((p) => p.tier === selectedTier); if (plan) handlePayment(selectedTier!, plan.price); }}>
+
+                <Button
+                  className="w-full"
+                  size="lg"
+                  onClick={() => {
+                    const plan = SUBSCRIPTION_PLANS.find((p) => p.tier === selectedTier);
+                    if (plan) handlePayment(selectedTier!, plan.price);
+                  }}
+                >
                   <CreditCard className="w-4 h-4 mr-2" />
                   결제하기
                 </Button>
@@ -328,11 +388,36 @@ export default function Subscription() {
             </Card>
           )}
         </div>
+
+        {/* ── 데모 결제 다이얼로그 (PortOne 미설정 시) ── */}
+        <Dialog open={showDemoDialog} onOpenChange={setShowDemoDialog}>
+          <DialogContent className="sm:max-w-sm">
+            <DialogHeader>
+              <DialogTitle>결제 확인 (테스트)</DialogTitle>
+              <DialogDescription>
+                {SUBSCRIPTION_PLANS.find((p) => p.tier === demoPaymentTier)?.name} 플랜을{" "}
+                <strong>{demoPaymentPrice.toLocaleString()}원</strong>에 구독하시겠습니까?
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => setShowDemoDialog(false)} disabled={isDemoProcessing}>
+                취소
+              </Button>
+              <Button onClick={handleDemoConfirm} disabled={isDemoProcessing}>
+                {isDemoProcessing ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                결제 완료
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     );
   }
 
-  // ───── 구독 관리 뷰 (메인, 스크린샷 1 기준) ─────
+  // ─────────────────────────────────────────────────────────────────────
+  // [구독 관리 뷰]
+  //   진입 조건: accessible === true (active 또는 cancelled + 유효 기간 내)
+  // ─────────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-background py-10 px-4">
       <div className="max-w-2xl mx-auto space-y-6">
@@ -348,7 +433,10 @@ export default function Subscription() {
         {isCancelledButValid && (
           <div className="flex items-start gap-3 rounded-lg border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-700">
             <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-            <span>갱신 취소가 예약됨. <strong>{renewDate}</strong>까지 {currentPlan?.name} 요금제를 계속 이용하실 수 있습니다.</span>
+            <span>
+              갱신 취소가 예약됨.{" "}
+              <strong>{renewDate}</strong>까지 {currentPlan?.name} 요금제를 계속 이용하실 수 있습니다.
+            </span>
           </div>
         )}
 
@@ -361,10 +449,15 @@ export default function Subscription() {
                 <div className="flex items-center gap-2">
                   <span className="text-xl font-bold">{currentPlan?.name || "-"} 요금제</span>
                   <Badge variant="secondary">월간</Badge>
-                  {isCancelledButValid && <Badge variant="outline" className="text-orange-600 border-orange-300">취소 예정</Badge>}
+                  {isCancelledButValid && (
+                    <Badge variant="outline" className="text-orange-600 border-orange-300">취소 예정</Badge>
+                  )}
                 </div>
               </div>
-              <span className="text-lg font-bold text-primary">{currentPlan?.price.toLocaleString()}원<span className="text-sm font-normal text-muted-foreground">/월</span></span>
+              <span className="text-lg font-bold text-primary">
+                {currentPlan?.price.toLocaleString()}원
+                <span className="text-sm font-normal text-muted-foreground">/월</span>
+              </span>
             </div>
             {hasActive && (
               <p className="text-sm text-muted-foreground flex items-center gap-1 mt-2">
@@ -401,7 +494,10 @@ export default function Subscription() {
                 </span>
               </div>
               {hasActive && (
-                <Button variant="outline" size="sm" onClick={() => { setNewPaymentMethod(latestSub?.paymentMethod || null); setShowPaymentModal(true); }}>
+                <Button
+                  variant="outline" size="sm"
+                  onClick={() => { setNewPaymentMethod(latestSub?.paymentMethod || null); setShowPaymentModal(true); }}
+                >
                   업데이트
                 </Button>
               )}
@@ -425,9 +521,9 @@ export default function Subscription() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b bg-muted/40">
-                      <th className="text-left px-6 py-2 text-xs text-muted-foreground font-medium">날짜</th>
-                      <th className="text-left px-4 py-2 text-xs text-muted-foreground font-medium">총계</th>
-                      <th className="text-left px-4 py-2 text-xs text-muted-foreground font-medium">상태</th>
+                      <th className="text-left  px-6 py-2 text-xs text-muted-foreground font-medium">날짜</th>
+                      <th className="text-left  px-4 py-2 text-xs text-muted-foreground font-medium">총계</th>
+                      <th className="text-left  px-4 py-2 text-xs text-muted-foreground font-medium">상태</th>
                       <th className="text-right px-6 py-2 text-xs text-muted-foreground font-medium">작업</th>
                     </tr>
                   </thead>
@@ -441,18 +537,33 @@ export default function Subscription() {
                         <td className="px-4 py-3">
                           <Badge
                             variant="outline"
-                            className={sub.status === "active" || sub.status === "cancelled"
-                              ? "text-green-700 border-green-200 bg-green-50"
-                              : "text-muted-foreground"}
+                            className={
+                              sub.status === "active" || sub.status === "cancelled"
+                                ? "text-green-700 border-green-200 bg-green-50"
+                                : "text-muted-foreground"
+                            }
                           >
-                            {sub.status === "active" || sub.status === "cancelled" ? "결제됨" : sub.status === "expired" ? "만료" : sub.status}
+                            {sub.status === "active" || sub.status === "cancelled"
+                              ? "결제됨"
+                              : sub.status === "expired"
+                              ? "만료"
+                              : sub.status}
                           </Badge>
                         </td>
                         <td className="px-6 py-3 text-right">
-                          <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={() => {
-                            const info = `청구서\n날짜: ${new Date(sub.createdAt || sub.startDate).toLocaleDateString("ko-KR")}\n플랜: ${SUBSCRIPTION_PLANS.find(p => p.tier === sub.tier)?.name || sub.tier}\n금액: ₩${(sub.amount || 0).toLocaleString()}\n기간: ${new Date(sub.startDate).toLocaleDateString("ko-KR")} ~ ${new Date(sub.endDate).toLocaleDateString("ko-KR")}`;
-                            alert(info);
-                          }}>
+                          <Button
+                            variant="ghost" size="sm" className="h-7 text-xs gap-1"
+                            onClick={() => {
+                              const info = [
+                                "청구서",
+                                `날짜: ${new Date(sub.createdAt || sub.startDate).toLocaleDateString("ko-KR")}`,
+                                `플랜: ${SUBSCRIPTION_PLANS.find(p => p.tier === sub.tier)?.name || sub.tier}`,
+                                `금액: ₩${(sub.amount || 0).toLocaleString()}`,
+                                `기간: ${new Date(sub.startDate).toLocaleDateString("ko-KR")} ~ ${new Date(sub.endDate).toLocaleDateString("ko-KR")}`,
+                              ].join("\n");
+                              alert(info);
+                            }}
+                          >
                             <FileText className="w-3 h-3" />
                             청구서 보기
                           </Button>
@@ -488,7 +599,7 @@ export default function Subscription() {
         )}
       </div>
 
-      {/* ── 결제수단 업데이트 모달 (스크린샷 2) ── */}
+      {/* ── 결제수단 업데이트 모달 ── */}
       <Dialog open={showPaymentModal} onOpenChange={setShowPaymentModal}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
@@ -496,9 +607,11 @@ export default function Subscription() {
             <DialogDescription>해당 방식으로 계속 결제 하시겠습니까?</DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
-            {/* 현재 수단 유지 */}
             <button
-              className={`w-full flex items-center gap-3 p-3 rounded-lg border-2 transition-colors ${newPaymentMethod === latestSub?.paymentMethod ? "border-primary bg-primary/5" : "border-border hover:border-primary/40"}`}
+              className={[
+                "w-full flex items-center gap-3 p-3 rounded-lg border-2 transition-colors",
+                newPaymentMethod === latestSub?.paymentMethod ? "border-primary bg-primary/5" : "border-border hover:border-primary/40",
+              ].join(" ")}
               onClick={() => setNewPaymentMethod(latestSub?.paymentMethod || "CARD")}
             >
               <div className="w-8 h-6 rounded bg-muted flex items-center justify-center">
@@ -512,9 +625,11 @@ export default function Subscription() {
                   : "기존 수단 사용"}
               </span>
             </button>
-            {/* 다른 방식 */}
             <button
-              className={`w-full flex items-center gap-3 p-3 rounded-lg border-2 transition-colors ${newPaymentMethod === "other" ? "border-primary bg-primary/5" : "border-border hover:border-primary/40"}`}
+              className={[
+                "w-full flex items-center gap-3 p-3 rounded-lg border-2 transition-colors",
+                newPaymentMethod === "other" ? "border-primary bg-primary/5" : "border-border hover:border-primary/40",
+              ].join(" ")}
               onClick={() => setNewPaymentMethod("other")}
             >
               <div className="w-8 h-6 rounded bg-muted flex items-center justify-center">
@@ -525,8 +640,18 @@ export default function Subscription() {
             {newPaymentMethod === "other" && (
               <div className="pl-11 space-y-2">
                 {(["CARD", "TRANSFER"] as const).map((m) => (
-                  <label key={m} className={`flex items-center gap-2 p-2 rounded-md border cursor-pointer ${newPaymentMethod === m ? "border-primary bg-primary/5" : "border-border hover:border-primary/30"}`}>
-                    <input type="radio" name="altMethod" value={m} onChange={() => setNewPaymentMethod(m)} className="accent-primary" />
+                  <label
+                    key={m}
+                    className={[
+                      "flex items-center gap-2 p-2 rounded-md border cursor-pointer",
+                      newPaymentMethod === m ? "border-primary bg-primary/5" : "border-border hover:border-primary/30",
+                    ].join(" ")}
+                  >
+                    <input
+                      type="radio" name="altMethod" value={m}
+                      onChange={() => setNewPaymentMethod(m)}
+                      className="accent-primary"
+                    />
                     <span className="text-sm">{m === "CARD" ? "신용/체크카드" : "계좌이체"}</span>
                   </label>
                 ))}
@@ -539,14 +664,14 @@ export default function Subscription() {
               disabled={!newPaymentMethod || newPaymentMethod === "other" || updatePaymentMethodMutation.isPending}
               onClick={() => newPaymentMethod && newPaymentMethod !== "other" && updatePaymentMethodMutation.mutate(newPaymentMethod)}
             >
-              {updatePaymentMethodMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              {updatePaymentMethodMutation.isPending && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
               계속
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* ── 구독 취소 모달 (스크린샷 3) ── */}
+      {/* ── 구독 취소 모달 ── */}
       <Dialog open={showCancelModal} onOpenChange={setShowCancelModal}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -560,11 +685,15 @@ export default function Subscription() {
           <div className="space-y-4 py-2">
             <div className="space-y-2">
               {CANCEL_REASONS.map((reason) => (
-                <label key={reason} className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${cancelReason === reason ? "border-primary bg-primary/5" : "border-border hover:border-primary/30"}`}>
+                <label
+                  key={reason}
+                  className={[
+                    "flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors",
+                    cancelReason === reason ? "border-primary bg-primary/5" : "border-border hover:border-primary/30",
+                  ].join(" ")}
+                >
                   <input
-                    type="radio"
-                    name="cancelReason"
-                    value={reason}
+                    type="radio" name="cancelReason" value={reason}
                     checked={cancelReason === reason}
                     onChange={() => setCancelReason(reason)}
                     className="accent-primary w-4 h-4 flex-shrink-0"
@@ -589,9 +718,15 @@ export default function Subscription() {
             <Button
               variant="destructive"
               disabled={cancelMutation.isPending}
-              onClick={() => cancelMutation.mutate(cancelReason ? `${cancelReason}${cancelNote ? ` / ${cancelNote}` : ""}` : cancelNote)}
+              onClick={() =>
+                cancelMutation.mutate(
+                  cancelReason
+                    ? `${cancelReason}${cancelNote ? ` / ${cancelNote}` : ""}`
+                    : cancelNote
+                )
+              }
             >
-              {cancelMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              {cancelMutation.isPending && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
               요금제 취소
             </Button>
           </DialogFooter>
