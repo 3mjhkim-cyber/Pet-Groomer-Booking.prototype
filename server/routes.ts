@@ -1200,6 +1200,20 @@ export async function registerRoutes(
   }
   // 가맹점은 생성 시 isApproved=true 기본값이므로 별도 승인 불필요
 
+  // 데모 샵 구독을 'active'로 유지
+  // Dashboard·Revenue·Customers 페이지는 subscriptionStatus !== 'active' 이면
+  // /admin/subscription 으로 리다이렉트하므로, 테스트 계정이 항상 기능에 접근할 수 있도록
+  // 서버 시작 시마다 구독 상태를 확인해서 없으면 강제로 활성화한다.
+  if (demoShop.subscriptionStatus !== 'active') {
+    await storage.updateShop(demoShop.id, {
+      subscriptionStatus: 'active',
+      subscriptionTier: 'premium',
+      subscriptionStart: new Date(),
+      subscriptionEnd: new Date(Date.now() + 1000 * 60 * 60 * 24 * 3650), // 10년
+    });
+    demoShop = await storage.getShop(demoShop.id) as Shop;
+  }
+
   // Seed Data - 테스트 Shop Owner (새 이메일)
   if (await storage.getUserByUsername("test@shop.com") === undefined) {
     const hashedPassword = await hashPassword("test1234");

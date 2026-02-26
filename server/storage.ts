@@ -189,13 +189,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getCustomers(shopId?: number | null): Promise<Customer[]> {
-    if (shopId) {
-      return await db.select().from(customers).where(eq(customers.shopId, shopId)).orderBy(desc(customers.lastVisit));
-    }
-    return await db.select().from(customers).orderBy(desc(customers.lastVisit));
+    if (!shopId) return [];
+    return await db.select().from(customers).where(eq(customers.shopId, shopId)).orderBy(desc(customers.lastVisit));
   }
 
   async getCustomersWithRevenue(shopId?: number | null): Promise<(Customer & { totalRevenue: number })[]> {
+    if (!shopId) return [];
     const allCustomers = await this.getCustomers(shopId);
 
     const confirmedBookings = await db.select({
@@ -204,11 +203,7 @@ export class DatabaseStorage implements IStorage {
     })
     .from(bookings)
     .innerJoin(services, eq(bookings.serviceId, services.id))
-    .where(
-      shopId
-        ? and(eq(bookings.shopId, shopId), eq(bookings.status, 'confirmed'))
-        : eq(bookings.status, 'confirmed')
-    );
+    .where(and(eq(bookings.shopId, shopId), eq(bookings.status, 'confirmed')));
 
     const revenueMap = new Map<string, number>();
     confirmedBookings.forEach(b => {
@@ -240,30 +235,22 @@ export class DatabaseStorage implements IStorage {
 
   async searchCustomers(query: string, shopId?: number | null): Promise<Customer[]> {
     if (!query || query.length < 1) return [];
+    if (!shopId) return [];
     const searchPattern = `%${query}%`;
-    
-    if (shopId) {
-      return await db.select().from(customers).where(
-        and(
-          eq(customers.shopId, shopId),
-          or(
-            ilike(customers.name, searchPattern),
-            ilike(customers.phone, searchPattern)
-          )
-        )
-      ).limit(10);
-    }
-    
     return await db.select().from(customers).where(
-      or(
-        ilike(customers.name, searchPattern),
-        ilike(customers.phone, searchPattern)
+      and(
+        eq(customers.shopId, shopId),
+        or(
+          ilike(customers.name, searchPattern),
+          ilike(customers.phone, searchPattern)
+        )
       )
     ).limit(10);
   }
 
   async getCustomerHistory(phone: string, shopId?: number | null): Promise<(Booking & { serviceName: string })[]> {
-    let query = db.select({
+    if (!shopId) return [];
+    return await db.select({
       id: bookings.id,
       shopId: bookings.shopId,
       customerId: bookings.customerId,
@@ -288,13 +275,8 @@ export class DatabaseStorage implements IStorage {
     })
     .from(bookings)
     .innerJoin(services, eq(bookings.serviceId, services.id))
-    .where(shopId
-      ? and(eq(bookings.customerPhone, phone), eq(bookings.shopId, shopId))
-      : eq(bookings.customerPhone, phone)
-    )
+    .where(and(eq(bookings.customerPhone, phone), eq(bookings.shopId, shopId)))
     .orderBy(desc(bookings.date));
-    
-    return await query;
   }
 
   async createCustomer(insertCustomer: InsertCustomer): Promise<Customer> {
@@ -428,7 +410,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getBookings(shopId?: number | null): Promise<(Booking & { serviceName: string })[]> {
-    const baseSelect = {
+    if (!shopId) return [];
+    return await db.select({
       id: bookings.id,
       shopId: bookings.shopId,
       customerId: bookings.customerId,
@@ -450,18 +433,10 @@ export class DatabaseStorage implements IStorage {
       createdAt: bookings.createdAt,
       updatedAt: bookings.updatedAt,
       serviceName: services.name,
-    };
-
-    if (shopId) {
-      return await db.select(baseSelect)
-        .from(bookings)
-        .innerJoin(services, eq(bookings.serviceId, services.id))
-        .where(eq(bookings.shopId, shopId));
-    }
-
-    return await db.select(baseSelect)
-      .from(bookings)
-      .innerJoin(services, eq(bookings.serviceId, services.id));
+    })
+    .from(bookings)
+    .innerJoin(services, eq(bookings.serviceId, services.id))
+    .where(eq(bookings.shopId, shopId));
   }
 
   async getBooking(id: number): Promise<(Booking & { serviceName: string }) | undefined> {
