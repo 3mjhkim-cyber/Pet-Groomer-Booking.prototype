@@ -14,6 +14,7 @@ import Customers from "@/pages/Customers";
 import Calendar from "@/pages/Calendar";
 import Deposit from "@/pages/Deposit";
 import PlatformAdmin from "@/pages/PlatformAdmin";
+import ShopsAdmin from "@/pages/ShopsAdmin";
 import ShopSettings from "@/pages/ShopSettings";
 import Revenue from "@/pages/Revenue";
 import Subscription from "@/pages/Subscription";
@@ -38,6 +39,8 @@ function Router() {
           <Route path="/admin/revenue" component={Revenue} />
           <Route path="/admin/subscription" component={Subscription} />
           <Route path="/admin/platform" component={PlatformAdmin} />
+          {/* 가맹점 관리 전용 페이지 — 전체 목록/검색/페이지네이션 */}
+          <Route path="/admin/shops" component={ShopsAdmin} />
           <Route path="/deposit/:id" component={Deposit} />
           <Route path="/payment/success" component={PaymentSuccess} />
           <Route path="/payment/fail" component={PaymentFail} />
