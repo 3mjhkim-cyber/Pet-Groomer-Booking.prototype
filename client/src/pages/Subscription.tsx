@@ -158,13 +158,6 @@ export default function Subscription() {
     },
   });
 
-  const [showDemoDialog, setShowDemoDialog] = useState(false);
-  const [demoPaymentTier, setDemoPaymentTier] = useState<string | null>(null);
-  const [demoPaymentPrice, setDemoPaymentPrice] = useState<number>(0);
-  const [isDemoProcessing, setIsDemoProcessing] = useState(false);
-
-  const isPortOneConfigured = !!(import.meta.env.VITE_PORTONE_STORE_ID && import.meta.env.VITE_PORTONE_CHANNEL_KEY);
-
   const handleDemoPayment = async () => {
     if (!demoPaymentTier) return;
     setIsDemoProcessing(true);
@@ -474,7 +467,7 @@ export default function Subscription() {
               <Button variant="outline" onClick={() => setShowDemoDialog(false)} disabled={isDemoProcessing}>
                 취소
               </Button>
-              <Button onClick={handleDemoConfirm} disabled={isDemoProcessing}>
+              <Button onClick={handleDemoPayment} disabled={isDemoProcessing}>
                 {isDemoProcessing ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
                 결제 완료
               </Button>
