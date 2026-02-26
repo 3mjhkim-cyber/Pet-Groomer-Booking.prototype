@@ -478,9 +478,15 @@ export async function registerRoutes(
     }
 
     // 비밀번호 변경이 요청된 경우
+    // 주의: Shop 테이블에는 userId 컬럼이 없다.
+    //        users.shopId → shops.id 방향으로 관계가 맺어져 있으므로
+    //        getUserByShopId 로 소유자를 조회 후 비밀번호를 업데이트한다.
     if (password && password.trim()) {
       const hashedPassword = await hashPassword(password);
-      await storage.updateUserPassword(currentShop.userId, hashedPassword);
+      const owner = await storage.getUserByShopId(currentShop.id);
+      if (owner) {
+        await storage.updateUserPassword(owner.id, hashedPassword);
+      }
     }
 
     res.json(shop);

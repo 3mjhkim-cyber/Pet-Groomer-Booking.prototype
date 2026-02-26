@@ -10,6 +10,8 @@ export interface IStorage {
 
   getShops(): Promise<Shop[]>;
   getOwnerEmailsByShopIds(shopIds: number[]): Promise<Record<number, string>>;
+  /** 가맹점 ID로 소유자 유저를 조회 (비밀번호 변경 등에 사용) */
+  getUserByShopId(shopId: number): Promise<User | undefined>;
   getShop(id: number): Promise<Shop | undefined>;
   getShopBySlug(slug: string): Promise<Shop | undefined>;
   createShop(shop: InsertShop): Promise<Shop>;
@@ -114,6 +116,15 @@ export class DatabaseStorage implements IStorage {
       if (o.shopId != null) map[o.shopId] = o.email;
     }
     return map;
+  }
+
+  /** 가맹점 ID(shop.id)로 해당 가맹점을 소유한 유저를 반환 */
+  async getUserByShopId(shopId: number): Promise<User | undefined> {
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(and(eq(users.shopId, shopId), eq(users.role, "shop_owner")));
+    return user;
   }
 
   async getShop(id: number): Promise<Shop | undefined> {
