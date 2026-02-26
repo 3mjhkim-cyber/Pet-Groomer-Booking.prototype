@@ -23,6 +23,7 @@ export interface IStorage {
   deleteService(id: number): Promise<void>;
   
   getCustomers(shopId?: number | null): Promise<Customer[]>;
+  getCustomersWithRevenue(shopId?: number | null): Promise<(Customer & { totalRevenue: number })[]>;
   getCustomer(id: number): Promise<Customer | undefined>;
   getCustomerByPhone(phone: string, shopId?: number | null): Promise<Customer | undefined>;
   searchCustomers(query: string, shopId?: number | null): Promise<Customer[]>;
@@ -159,6 +160,33 @@ export class DatabaseStorage implements IStorage {
       return await db.select().from(customers).where(eq(customers.shopId, shopId)).orderBy(desc(customers.lastVisit));
     }
     return await db.select().from(customers).orderBy(desc(customers.lastVisit));
+  }
+
+  async getCustomersWithRevenue(shopId?: number | null): Promise<(Customer & { totalRevenue: number })[]> {
+    const allCustomers = await this.getCustomers(shopId);
+
+    const confirmedBookings = await db.select({
+      customerPhone: bookings.customerPhone,
+      price: services.price,
+    })
+    .from(bookings)
+    .innerJoin(services, eq(bookings.serviceId, services.id))
+    .where(
+      shopId
+        ? and(eq(bookings.shopId, shopId), eq(bookings.status, 'confirmed'))
+        : eq(bookings.status, 'confirmed')
+    );
+
+    const revenueMap = new Map<string, number>();
+    confirmedBookings.forEach(b => {
+      const current = revenueMap.get(b.customerPhone) || 0;
+      revenueMap.set(b.customerPhone, current + (b.price || 0));
+    });
+
+    return allCustomers.map(c => ({
+      ...c,
+      totalRevenue: revenueMap.get(c.phone) || 0,
+    }));
   }
 
   async getCustomer(id: number): Promise<Customer | undefined> {
