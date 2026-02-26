@@ -1,6 +1,6 @@
 import { users, services, bookings, customers, shops, subscriptions, type User, type InsertUser, type Service, type InsertService, type Booking, type InsertBooking, type Customer, type InsertCustomer, type Shop, type InsertShop, type Subscription, type InsertSubscription } from "@shared/schema";
 import { db } from "./db";
-import { eq, ilike, or, desc, and, count, gte, lte, sql } from "drizzle-orm";
+import { eq, ilike, or, desc, and, count, gte, lte, sql, inArray } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
@@ -9,6 +9,7 @@ export interface IStorage {
   updateUserPassword(id: number, password: string): Promise<User | undefined>;
 
   getShops(): Promise<Shop[]>;
+  getOwnerEmailsByShopIds(shopIds: number[]): Promise<Record<number, string>>;
   getShop(id: number): Promise<Shop | undefined>;
   getShopBySlug(slug: string): Promise<Shop | undefined>;
   createShop(shop: InsertShop): Promise<Shop>;
@@ -96,6 +97,23 @@ export class DatabaseStorage implements IStorage {
 
   async getShops(): Promise<Shop[]> {
     return await db.select().from(shops).orderBy(desc(shops.createdAt));
+  }
+
+  // shopId → 소유자 이메일(로그인 아이디) 매핑을 한 번의 쿼리로 반환
+  async getOwnerEmailsByShopIds(shopIds: number[]): Promise<Record<number, string>> {
+    if (shopIds.length === 0) return {};
+    const owners = await db
+      .select({ shopId: users.shopId, email: users.email })
+      .from(users)
+      .where(and(
+        inArray(users.shopId, shopIds),
+        eq(users.role, "shop_owner")
+      ));
+    const map: Record<number, string> = {};
+    for (const o of owners) {
+      if (o.shopId != null) map[o.shopId] = o.email;
+    }
+    return map;
   }
 
   async getShop(id: number): Promise<Shop | undefined> {
