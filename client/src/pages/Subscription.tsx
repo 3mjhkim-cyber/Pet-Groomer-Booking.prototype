@@ -95,6 +95,9 @@ export default function Subscription() {
   const [demoPaymentPrice,  setDemoPaymentPrice]  = useState<number>(0);
   const [isDemoProcessing,  setIsDemoProcessing]  = useState(false);
 
+  // PortOne 실결제 처리 중 상태 (버튼 중복 클릭 방지)
+  const [isPaying, setIsPaying] = useState(false);
+
   // ── 결제수단 업데이트 모달 ──────────────────────────────────────────────
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [newPaymentMethod, setNewPaymentMethod] = useState<string | null>(null);
@@ -180,8 +183,15 @@ export default function Subscription() {
   };
 
   // ── 결제 시작 ─────────────────────────────────────────────────────────
-  // PortOne 키가 없으면 데모 다이얼로그를 띄우고,
-  // 키가 있으면 PortOne SDK를 통해 실제 결제를 진행한다.
+  // [흐름]
+  //  1) PortOne 키 미설정 → 데모 다이얼로그 표시
+  //  2) PortOne requestPayment() 호출
+  //     a) response === undefined  : 리다이렉트 결제 (카카오페이 등)
+  //                                  → 브라우저가 redirectUrl로 이동
+  //                                  → PaymentSuccess.tsx 가 /api/payment/confirm 처리
+  //     b) response.code 있음      : 결제 실패/취소 → 에러 토스트
+  //     c) response.code 없음      : 인앱 결제 성공 (카드 등)
+  //                                  → 직접 /api/payment/confirm 호출해 구독 활성화  ← 핵심
   const handlePayment = async (tier: string, price: number) => {
     if (!isPortOneConfigured) {
       setDemoPaymentTier(tier);
@@ -189,6 +199,8 @@ export default function Subscription() {
       setShowDemoDialog(true);
       return;
     }
+
+    setIsPaying(true);
     try {
       const PortOne = (await import("@portone/browser-sdk/v2")).default;
       const storeId    = import.meta.env.VITE_PORTONE_STORE_ID;
@@ -197,9 +209,12 @@ export default function Subscription() {
         toast({ title: "설정 오류", description: "결제 시스템이 설정되지 않았습니다.", variant: "destructive" });
         return;
       }
+
       const planName  = SUBSCRIPTION_PLANS.find((p) => p.tier === tier)?.name || tier;
+      // 결제 ID는 클라이언트에서 생성해 요청하고, 서버 검증 시 동일한 ID를 사용한다
       const paymentId = `payment-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      const response  = await PortOne.requestPayment({
+
+      const response = await PortOne.requestPayment({
         storeId,
         paymentId,
         orderName:   `구독 플랜: ${planName}`,
@@ -208,13 +223,55 @@ export default function Subscription() {
         channelKey,
         payMethod:   paymentMethod === "card" ? "CARD" : "TRANSFER",
         customer:    { fullName: shop?.name || user?.username || "고객" },
+        // 리다이렉트 결제(카카오페이 등)는 이 URL로 돌아온 뒤 PaymentSuccess.tsx 가 처리
         redirectUrl: `${window.location.origin}/payment/success?tier=${tier}`,
       });
-      if (response?.code) {
-        toast({ title: "결제 실패", description: response.message || "결제가 취소되었습니다.", variant: "destructive" });
+
+      // [케이스 1] response === undefined → 리다이렉트 결제가 진행 중
+      //            브라우저가 이미 redirectUrl로 이동했으므로 여기서는 아무것도 하지 않는다
+      if (!response) return;
+
+      // [케이스 2] response.code 있음 → 결제 실패 또는 사용자 취소
+      if (response.code) {
+        toast({
+          title: "결제 실패",
+          description: response.message || "결제가 취소되었습니다.",
+          variant: "destructive",
+        });
+        return;
       }
+
+      // [케이스 3] 인앱(팝업/iframe) 결제 성공 → 서버에서 결제 검증 후 구독 활성화
+      const confirmRes = await fetch("/api/payment/confirm", {
+        method:      "POST",
+        headers:     { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          paymentId: response.paymentId ?? paymentId, // 응답에 포함된 ID 우선, 없으면 생성한 ID 사용
+          txId:      response.txId,
+          tier,
+        }),
+      });
+
+      if (!confirmRes.ok) {
+        const err = await confirmRes.json();
+        toast({
+          title: "결제 검증 실패",
+          description: err.message || "서버 검증 중 오류가 발생했습니다.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      toast({ title: "결제 완료!", description: "구독이 성공적으로 활성화되었습니다." });
+      queryClient.invalidateQueries({ queryKey: ["/api/shop/settings"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      setTimeout(() => setLocation("/admin/dashboard"), 1500);
+
     } catch (error: any) {
       toast({ title: "결제 오류", description: error.message || "결제를 시작할 수 없습니다.", variant: "destructive" });
+    } finally {
+      setIsPaying(false);
     }
   };
 
@@ -376,13 +433,17 @@ export default function Subscription() {
                 <Button
                   className="w-full"
                   size="lg"
+                  disabled={isPaying}
                   onClick={() => {
                     const plan = SUBSCRIPTION_PLANS.find((p) => p.tier === selectedTier);
                     if (plan) handlePayment(selectedTier!, plan.price);
                   }}
                 >
-                  <CreditCard className="w-4 h-4 mr-2" />
-                  결제하기
+                  {isPaying
+                    ? <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    : <CreditCard className="w-4 h-4 mr-2" />
+                  }
+                  {isPaying ? "결제 처리 중..." : "결제하기"}
                 </Button>
               </CardContent>
             </Card>
