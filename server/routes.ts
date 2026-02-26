@@ -431,9 +431,13 @@ export async function registerRoutes(
   });
 
   // Super Admin Routes
+  // 가맹점 목록 — shops + 소유자 이메일(로그인 아이디) 포함
   app.get('/api/admin/shops', requireSuperAdmin, async (req, res) => {
     const shops = await storage.getShops();
-    res.json(shops);
+    // 각 가맹점 소유자의 이메일을 users 테이블에서 가져와 ownerEmail 필드로 첨부
+    const ownerMap = await storage.getOwnerEmailsByShopIds(shops.map(s => s.id));
+    const result = shops.map(s => ({ ...s, ownerEmail: ownerMap[s.id] ?? null }));
+    res.json(result);
   });
 
   // 슈퍼관리자용 가맹점 정보 수정
