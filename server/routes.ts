@@ -589,6 +589,12 @@ export async function registerRoutes(
     res.json(customers);
   });
 
+  app.get('/api/customers/with-revenue', requireAuth, async (req, res) => {
+    const user = req.user as any;
+    const customers = await storage.getCustomersWithRevenue(user.shopId);
+    res.json(customers);
+  });
+
   app.get('/api/customers/search', requireAuth, async (req, res) => {
     const user = req.user as any;
     const query = req.query.q as string || '';

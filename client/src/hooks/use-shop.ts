@@ -51,6 +51,45 @@ export function useCustomers() {
   });
 }
 
+export function useCustomersWithRevenue() {
+  return useQuery({
+    queryKey: ['/api/customers/with-revenue'],
+    queryFn: async () => {
+      const res = await fetch('/api/customers/with-revenue');
+      if (res.status === 401) throw new Error("Unauthorized");
+      if (!res.ok) throw new Error("Failed to fetch customers");
+      return res.json() as Promise<(import('@shared/schema').Customer & { totalRevenue: number })[]>;
+    },
+    retry: false,
+  });
+}
+
+export function useUpdateCustomer() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: Partial<import('@shared/schema').Customer> }) => {
+      const res = await fetch(`/api/customers/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error("고객 정보 수정에 실패했습니다.");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.customers.list.path] });
+      queryClient.invalidateQueries({ queryKey: ['/api/customers/with-revenue'] });
+      toast({ title: "고객 정보 수정됨", description: "고객 정보가 수정되었습니다." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "수정 실패", description: error.message, variant: "destructive" });
+    },
+  });
+}
+
 export function useCreateBooking() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
