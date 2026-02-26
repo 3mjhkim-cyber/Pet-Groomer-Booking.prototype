@@ -29,19 +29,20 @@ export default function Customers() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState<EnrichedCustomer | null>(null);
 
+  const needsSubscription = useMemo(() => {
+    if (user?.role === 'shop_owner' && user.shop) {
+      const shop = user.shop as any;
+      const accessible = shop.subscriptionStatus === 'active' ||
+        (shop.subscriptionStatus === 'cancelled' && shop.subscriptionEnd && new Date(shop.subscriptionEnd) > new Date());
+      return !accessible;
+    }
+    return false;
+  }, [user]);
+
   useEffect(() => {
     if (!isAuthLoading && !user) setLocation("/login");
-  }, [isAuthLoading, user, setLocation]);
-
-  if (isAuthLoading) return <div className="h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
-  if (!user) return null;
-
-  if (user.role === 'shop_owner' && user.shop) {
-    const shop = user.shop as any;
-    const accessible = shop.subscriptionStatus === 'active' ||
-      (shop.subscriptionStatus === 'cancelled' && shop.subscriptionEnd && new Date(shop.subscriptionEnd) > new Date());
-    if (!accessible) { setLocation("/admin/subscription"); return null; }
-  }
+    if (!isAuthLoading && needsSubscription) setLocation("/admin/subscription");
+  }, [isAuthLoading, user, needsSubscription, setLocation]);
 
   // VIP 임계값: 누적 매출 상위 20%
   const vipThreshold = useMemo(() => {
@@ -113,6 +114,9 @@ export default function Customers() {
     atRisk: enrichedCustomers.filter(c => c.isAtRisk).length,
     returnSoon: enrichedCustomers.filter(c => c.isReturnSoon).length,
   }), [enrichedCustomers]);
+
+  if (isAuthLoading) return <div className="h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
+  if (!user || needsSubscription) return null;
 
   return (
     <div className="min-h-screen bg-secondary/10 pb-20">
