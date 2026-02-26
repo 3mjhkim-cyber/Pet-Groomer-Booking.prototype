@@ -155,6 +155,9 @@ export function useAdminCreateBooking() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.bookings.list.path] });
+      queryClient.invalidateQueries({ queryKey: ['/api/customers/with-revenue'] });
+      queryClient.invalidateQueries({ queryKey: [api.customers.list.path] });
+      queryClient.invalidateQueries({ queryKey: ['/api/revenue/stats'] });
       toast({
         title: "예약 추가 완료",
         description: "수동 예약이 추가되었습니다.",
@@ -184,6 +187,9 @@ export function useApproveBooking() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.bookings.list.path] });
+      queryClient.invalidateQueries({ queryKey: ['/api/customers/with-revenue'] });
+      queryClient.invalidateQueries({ queryKey: [api.customers.list.path] });
+      queryClient.invalidateQueries({ queryKey: ['/api/revenue/stats'] });
       toast({ title: "예약 승인됨", description: "예약이 승인되었습니다." });
     },
   });
@@ -203,6 +209,9 @@ export function useRejectBooking() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.bookings.list.path] });
+      queryClient.invalidateQueries({ queryKey: ['/api/customers/with-revenue'] });
+      queryClient.invalidateQueries({ queryKey: [api.customers.list.path] });
+      queryClient.invalidateQueries({ queryKey: ['/api/revenue/stats'] });
       toast({ title: "예약 거절됨", description: "예약이 거절되었습니다.", variant: "destructive" });
     },
   });
@@ -241,6 +250,9 @@ export function useConfirmDeposit() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/bookings'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/customers/with-revenue'] });
+      queryClient.invalidateQueries({ queryKey: [api.customers.list.path] });
+      queryClient.invalidateQueries({ queryKey: ['/api/revenue/stats'] });
       toast({ title: "입금 확인됨", description: "예약금 입금이 확인되었습니다." });
     },
   });
@@ -262,6 +274,9 @@ export function useAdminConfirmDeposit() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.bookings.list.path] });
+      queryClient.invalidateQueries({ queryKey: ['/api/customers/with-revenue'] });
+      queryClient.invalidateQueries({ queryKey: [api.customers.list.path] });
+      queryClient.invalidateQueries({ queryKey: ['/api/revenue/stats'] });
       toast({ title: "입금 확인 완료", description: "예약금 입금이 확인되고 예약이 확정되었습니다." });
     },
     onError: (error: Error) => {
@@ -312,6 +327,9 @@ export function useCancelBooking() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.bookings.list.path] });
+      queryClient.invalidateQueries({ queryKey: ['/api/customers/with-revenue'] });
+      queryClient.invalidateQueries({ queryKey: [api.customers.list.path] });
+      queryClient.invalidateQueries({ queryKey: ['/api/revenue/stats'] });
       toast({ title: "예약 취소됨", description: "예약이 취소되었습니다." });
     },
     onError: (error: Error) => {
@@ -341,6 +359,9 @@ export function useUpdateBooking() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.bookings.list.path] });
+      queryClient.invalidateQueries({ queryKey: ['/api/customers/with-revenue'] });
+      queryClient.invalidateQueries({ queryKey: [api.customers.list.path] });
+      queryClient.invalidateQueries({ queryKey: ['/api/revenue/stats'] });
       toast({ title: "예약 수정됨", description: "예약 정보가 수정되었습니다." });
     },
     onError: (error: Error) => {
@@ -367,6 +388,9 @@ export function useUpdateBookingCustomer() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.bookings.list.path] });
+      queryClient.invalidateQueries({ queryKey: ['/api/customers/with-revenue'] });
+      queryClient.invalidateQueries({ queryKey: [api.customers.list.path] });
+      queryClient.invalidateQueries({ queryKey: ['/api/revenue/stats'] });
       toast({ title: "고객 정보 수정됨", description: "고객 정보가 수정되었습니다." });
     },
     onError: (error: Error) => {
