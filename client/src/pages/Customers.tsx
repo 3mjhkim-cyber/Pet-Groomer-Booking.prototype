@@ -241,6 +241,15 @@ function CustomerList({
   );
 }
 
+// 경과일 색상 및 아이콘 결정
+function getDaysSinceStyle(days: number | null): { className: string; icon: string } {
+  if (days === null) return { className: 'text-muted-foreground', icon: '' };
+  if (days >= 60) return { className: 'text-red-500 font-semibold', icon: '🔥' };
+  if (days >= 45) return { className: 'text-orange-500 font-semibold', icon: '' };
+  if (days >= 30) return { className: 'text-yellow-500', icon: '' };
+  return { className: 'text-muted-foreground', icon: '' };
+}
+
 // 고객 행 컴포넌트 (컴팩트)
 function CustomerRow({
   customer,
@@ -249,6 +258,8 @@ function CustomerRow({
   customer: EnrichedCustomer;
   onSelect: (c: EnrichedCustomer) => void;
 }) {
+  const dayStyle = getDaysSinceStyle(customer.daysSinceVisit);
+
   return (
     <button
       className="w-full bg-white rounded-xl border border-border px-4 py-3 hover:shadow-sm active:bg-secondary/20 transition-all text-left"
@@ -300,12 +311,18 @@ function CustomerRow({
           </div>
         </div>
 
-        {/* 매출 + 방문 횟수 */}
+        {/* 매출 + 방문 횟수 + 경과일 */}
         <div className="flex-shrink-0 text-right">
           <div className="text-xs font-bold text-primary">
             {customer.totalRevenue > 0 ? `${customer.totalRevenue.toLocaleString()}원` : '-'}
           </div>
           <div className="text-[10px] text-muted-foreground">{customer.visitCount}회 방문</div>
+          {customer.daysSinceVisit !== null && (
+            <div className={`text-[10px] mt-0.5 ${dayStyle.className}`}>
+              {dayStyle.icon && <span className="mr-0.5">{dayStyle.icon}</span>}
+              {customer.daysSinceVisit}일 경과
+            </div>
+          )}
         </div>
 
         <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
