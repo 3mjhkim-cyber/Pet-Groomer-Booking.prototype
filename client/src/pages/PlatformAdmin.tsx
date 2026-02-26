@@ -144,7 +144,7 @@ export default function PlatformAdmin() {
               <Store className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{allShops.length}</div>
+              <div className="text-2xl font-bold">{shops?.length || 0}</div>
             </CardContent>
           </Card>
           <Card>
@@ -153,7 +153,7 @@ export default function PlatformAdmin() {
               <Calendar className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-green-600">{activeSubCount}</div>
+              <div className="text-2xl font-bold text-green-600">{shops?.filter(s => s.subscriptionStatus === 'active').length || 0}</div>
             </CardContent>
           </Card>
         </div>
@@ -162,7 +162,7 @@ export default function PlatformAdmin() {
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
             <h2 className="text-xl font-bold flex items-center gap-2">
               <Store className="w-5 h-5 text-primary" />
-              가맹점 목록 ({filteredShops.length})
+              가맹점 목록 ({approvedShops.length})
             </h2>
             <div className="relative w-full sm:w-80">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -178,13 +178,13 @@ export default function PlatformAdmin() {
             <div className="text-center py-10">
               <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto" />
             </div>
-          ) : filteredShops.length === 0 ? (
+          ) : approvedShops.length === 0 ? (
             <div className="text-center py-10 bg-white rounded-2xl border border-dashed border-border">
               <p className="text-muted-foreground">등록된 가맹점이 없습니다</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredShops.map(shop => (
+              {approvedShops.map(shop => (
                 <Card key={shop.id} data-testid={`card-approved-shop-${shop.id}`}>
                   <CardHeader>
                     <div className="flex justify-between items-start">
