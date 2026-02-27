@@ -29,7 +29,7 @@ type BusinessDays = {
   mon: DaySchedule; tue: DaySchedule; wed: DaySchedule; thu: DaySchedule;
   fri: DaySchedule; sat: DaySchedule; sun: DaySchedule;
 };
-type NotificationConfig = { enabled: boolean; template: string; extraMessage: string };
+type NotificationConfig = { enabled: boolean; template: string };
 type NotificationSettings = {
   bookingConfirmed: NotificationConfig;
   reminderBefore: NotificationConfig;
@@ -82,10 +82,10 @@ const NOTIFICATION_TYPES = [
 type NotifKey = typeof NOTIFICATION_TYPES[number]['key'];
 
 const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
-  bookingConfirmed: { enabled: false, template: NOTIFICATION_TYPES[0].defaultTemplate, extraMessage: '' },
-  reminderBefore:   { enabled: false, template: NOTIFICATION_TYPES[1].defaultTemplate, extraMessage: '' },
-  depositReceived:  { enabled: false, template: NOTIFICATION_TYPES[2].defaultTemplate, extraMessage: '' },
-  returnVisit:      { enabled: false, template: NOTIFICATION_TYPES[3].defaultTemplate, extraMessage: '' },
+  bookingConfirmed: { enabled: false, template: NOTIFICATION_TYPES[0].defaultTemplate },
+  reminderBefore:   { enabled: false, template: NOTIFICATION_TYPES[1].defaultTemplate },
+  depositReceived:  { enabled: false, template: NOTIFICATION_TYPES[2].defaultTemplate },
+  returnVisit:      { enabled: false, template: NOTIFICATION_TYPES[3].defaultTemplate },
 };
 
 const VARIABLES = ['{매장명}', '{고객명}', '{반려동물이름}', '{예약일시}', '{예약금액}'];
@@ -94,10 +94,9 @@ const SAMPLE_VALUES: Record<string, string> = {
   '{반려동물이름}': '몽이', '{예약일시}': '2월 28일 오후 2시', '{예약금액}': '10,000',
 };
 
-function previewTemplate(template: string, extra: string): string {
+function previewTemplate(template: string): string {
   let result = template;
   for (const [k, v] of Object.entries(SAMPLE_VALUES)) result = result.split(k).join(v);
-  if (extra) result += '\n' + extra;
   return result;
 }
 
@@ -684,17 +683,6 @@ export default function Operations() {
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">추가 메시지 <span className="font-normal text-muted-foreground">(선택)</span></Label>
-                  <Textarea
-                    value={config.extraMessage}
-                    onChange={e => updateNotif(notif.key, 'extraMessage', e.target.value)}
-                    placeholder="템플릿 하단에 추가할 메시지를 입력하세요"
-                    rows={2}
-                    className="resize-none text-sm bg-white"
-                  />
-                </div>
-
                 <div className="bg-white border rounded-lg p-3 space-y-2">
                   <p className="text-xs font-medium text-muted-foreground">사용 가능한 변수</p>
                   <div className="flex flex-wrap gap-1.5">
@@ -706,7 +694,7 @@ export default function Operations() {
 
                 <div className="bg-blue-50 border border-blue-100 rounded-lg p-3">
                   <p className="text-xs font-semibold text-blue-700 mb-2">미리보기 (샘플 데이터)</p>
-                  <p className="text-sm text-blue-900 whitespace-pre-wrap leading-relaxed">{previewTemplate(config.template, config.extraMessage)}</p>
+                  <p className="text-sm text-blue-900 whitespace-pre-wrap leading-relaxed">{previewTemplate(config.template)}</p>
                 </div>
 
                 <Button size="sm" onClick={saveNotif} disabled={updateShopMutation.isPending}>
