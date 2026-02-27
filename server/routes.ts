@@ -15,7 +15,7 @@ const scryptAsync = promisify(scrypt);
 
 // ─── 알림 템플릿 변수 치환 ─────────────────────────────────────────────────────
 
-type NotifConfig = { enabled: boolean; template: string; extraMessage: string };
+type NotifConfig = { enabled: boolean; template: string };
 type NotifSettings = {
   bookingConfirmed?: NotifConfig;
   reminderBefore?: NotifConfig;
@@ -77,10 +77,6 @@ function buildMessage(
   for (const [key, value] of Object.entries(values)) {
     // split/join 방식으로 전역 치환 (replaceAll 대신 호환성 보장)
     message = message.split(key).join(value);
-  }
-
-  if (config.extraMessage) {
-    message = `${message}\n${config.extraMessage}`;
   }
 
   return message;
