@@ -1,15 +1,12 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
-// useQuery 제거: 승인 대기 수 조회 API(/api/admin/pending-users/count) 사용 안 함
-import { Scissors, User, LogOut, LayoutDashboard, Users, CalendarDays, Settings, Shield, TrendingUp } from "lucide-react";
-// Bell·Badge 제거: 승인 관리 아이콘·배지 사용 안 함
+import { Scissors, User, LogOut, LayoutDashboard, Users, CalendarDays, Settings, Shield, TrendingUp, Wrench } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function Navbar() {
   const { user, logout } = useAuth();
   const [location] = useLocation();
 
-  // 예약 페이지에서는 로그인 버튼 숨김
   const isBookingPage = location.startsWith('/book/');
 
   return (
@@ -25,7 +22,7 @@ export function Navbar() {
         <div className="flex items-center gap-2">
           {user ? (
             <div className="flex items-center gap-1">
-              {/* 슈퍼 어드민 메뉴 — "플랫폼 관리"만 표시 (승인 관리 메뉴 제거) */}
+              {/* 슈퍼 어드민 메뉴 */}
               {user.role === 'super_admin' && (
                 <Link href="/admin/platform">
                   <button className={cn(
@@ -40,7 +37,7 @@ export function Navbar() {
                 </Link>
               )}
 
-              {/* Shop Owner 메뉴 - 데스크탑만 표시 (모바일은 하단 네비게이션) */}
+              {/* Shop Owner 메뉴 - 데스크탑만 표시 */}
               {user.role === 'shop_owner' && (
                 <div className="hidden lg:flex items-center gap-1">
                   <Link href="/admin/dashboard">
@@ -87,6 +84,17 @@ export function Navbar() {
                       <span>매출</span>
                     </button>
                   </Link>
+                  <Link href="/admin/operations">
+                    <button className={cn(
+                      "flex items-center gap-2 px-3 py-2 rounded-full font-medium transition-all",
+                      location.startsWith("/admin/operations")
+                        ? "bg-secondary text-secondary-foreground"
+                        : "text-foreground/70 hover:bg-secondary/30"
+                    )} data-testid="link-operations">
+                      <Wrench className="h-4 w-4" />
+                      <span>운영</span>
+                    </button>
+                  </Link>
                   <Link href="/admin/settings">
                     <button className={cn(
                       "flex items-center gap-2 px-3 py-2 rounded-full font-medium transition-all",
@@ -101,7 +109,25 @@ export function Navbar() {
                 </div>
               )}
 
-              {/* 로그아웃 버튼 */}
+              {/* 모바일: 설정 아이콘 (프로필) — shop_owner only, 데스크탑에선 숨김 */}
+              {user.role === 'shop_owner' && (
+                <Link href="/admin/settings">
+                  <button
+                    className={cn(
+                      "lg:hidden p-2 rounded-full transition-colors",
+                      location === "/admin/settings"
+                        ? "text-primary bg-primary/10"
+                        : "text-muted-foreground hover:text-foreground hover:bg-secondary/30"
+                    )}
+                    title="설정"
+                    data-testid="link-settings-mobile"
+                  >
+                    <User className="h-5 w-5" />
+                  </button>
+                </Link>
+              )}
+
+              {/* 로그아웃 */}
               <button
                 onClick={() => logout()}
                 className="p-2 text-muted-foreground hover:text-destructive transition-colors"
@@ -112,7 +138,6 @@ export function Navbar() {
               </button>
             </div>
           ) : (
-            // 예약 페이지에서는 로그인 버튼 숨김
             !isBookingPage && (
               <div className="flex items-center gap-2">
                 <Link href="/book/gangnam">
