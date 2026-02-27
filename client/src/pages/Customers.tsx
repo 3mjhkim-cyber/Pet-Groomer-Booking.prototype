@@ -2,15 +2,17 @@ import { useAuth } from "@/hooks/use-auth";
 import { useCustomersWithRevenue } from "@/hooks/use-shop";
 import { useLocation } from "wouter";
 import {
-  Loader2, Users, Search, Award, AlertCircle, RefreshCw, TrendingUp,
-  ChevronRight, PawPrint, Calendar
+  Loader2, Users, Search, Award, AlertCircle, RefreshCw,
+  ChevronRight, PawPrint, Calendar, MessageCircle,
 } from "lucide-react";
 import { differenceInDays, format } from "date-fns";
 import { ko } from "date-fns/locale";
 import { useState, useMemo, useEffect } from "react";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import CustomerDetailSheet from "@/components/CustomerDetailSheet";
+import { useToast } from "@/hooks/use-toast";
 import type { Customer } from "@shared/schema";
 
 type CustomerWithRevenue = Customer & { totalRevenue: number };
@@ -26,8 +28,11 @@ export default function Customers() {
   const { user, isLoading: isAuthLoading } = useAuth();
   const { data: rawCustomers, isLoading: isCustomersLoading } = useCustomersWithRevenue();
   const [_, setLocation] = useLocation();
+  const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState<EnrichedCustomer | null>(null);
+  // phone → currently sending
+  const [notifyingPhones, setNotifyingPhones] = useState<Set<string>>(new Set());
 
   const needsSubscription = useMemo(() => {
     if (user?.role === 'shop_owner' && user.shop) {
@@ -115,6 +120,28 @@ export default function Customers() {
     returnSoon: enrichedCustomers.filter(c => c.isReturnSoon).length,
   }), [enrichedCustomers]);
 
+  // 재방문 알림 전송 핸들러
+  const handleReturnVisitNotify = async (phone: string, customerName: string) => {
+    if (notifyingPhones.has(phone)) return;
+    setNotifyingPhones(prev => new Set([...prev, phone]));
+    try {
+      const res = await fetch(`/api/customers/${encodeURIComponent(phone)}/return-visit-notify`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast({ title: '전송 완료', description: `${customerName}님께 재방문 알림을 전송했습니다.` });
+      } else {
+        toast({ title: '전송 실패', description: data.message, variant: 'destructive' });
+      }
+    } catch {
+      toast({ title: '오류', description: '알림 전송 중 오류가 발생했습니다.', variant: 'destructive' });
+    } finally {
+      setNotifyingPhones(prev => { const n = new Set(prev); n.delete(phone); return n; });
+    }
+  };
+
   if (isAuthLoading) return <div className="h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
   if (!user || needsSubscription) return null;
 
@@ -195,7 +222,15 @@ export default function Customers() {
               <CustomerList customers={vipCustomers} onSelect={setSelectedCustomer} emptyMessage="VIP 고객이 없습니다" emptyDesc={`누적 매출 상위 20% (${vipThreshold.toLocaleString()}원 이상)`} />
             </TabsContent>
             <TabsContent value="at-risk">
-              <CustomerList customers={atRiskCustomers} onSelect={setSelectedCustomer} emptyMessage="이탈 위험 고객이 없습니다" emptyDesc="마지막 방문 후 45일 이상 경과한 고객" />
+              {/* 이탈위험 탭에서만 알림 버튼 노출 */}
+              <CustomerList
+                customers={atRiskCustomers}
+                onSelect={setSelectedCustomer}
+                emptyMessage="이탈 위험 고객이 없습니다"
+                emptyDesc="마지막 방문 후 45일 이상 경과한 고객"
+                onNotify={handleReturnVisitNotify}
+                notifyingPhones={notifyingPhones}
+              />
             </TabsContent>
             <TabsContent value="return-soon">
               <CustomerList customers={returnSoonCustomers} onSelect={setSelectedCustomer} emptyMessage="재방문 예정 고객이 없습니다" emptyDesc="평균 방문 주기 기준 3일 이내 방문 예상" />
@@ -220,11 +255,15 @@ function CustomerList({
   onSelect,
   emptyMessage,
   emptyDesc,
+  onNotify,
+  notifyingPhones,
 }: {
   customers: EnrichedCustomer[];
   onSelect: (c: EnrichedCustomer) => void;
   emptyMessage: string;
   emptyDesc?: string;
+  onNotify?: (phone: string, name: string) => void;
+  notifyingPhones?: Set<string>;
 }) {
   if (customers.length === 0) {
     return (
@@ -239,7 +278,13 @@ function CustomerList({
   return (
     <div className="space-y-2">
       {customers.map((customer) => (
-        <CustomerRow key={customer.id} customer={customer} onSelect={onSelect} />
+        <CustomerRow
+          key={customer.id}
+          customer={customer}
+          onSelect={onSelect}
+          onNotify={onNotify}
+          isNotifying={notifyingPhones?.has(customer.phone) ?? false}
+        />
       ))}
     </div>
   );
@@ -254,83 +299,113 @@ function getDaysSinceStyle(days: number | null): { className: string; icon: stri
   return { className: 'text-muted-foreground', icon: '' };
 }
 
-// 고객 행 컴포넌트 (컴팩트)
+// 고객 행 컴포넌트
+// onNotify가 전달된 경우(이탈위험 탭) 알림 버튼 노출.
+// 중첩 button을 피하기 위해 외부 컨테이너는 div로 처리.
 function CustomerRow({
   customer,
   onSelect,
+  onNotify,
+  isNotifying,
 }: {
   customer: EnrichedCustomer;
   onSelect: (c: EnrichedCustomer) => void;
+  onNotify?: (phone: string, name: string) => void;
+  isNotifying?: boolean;
 }) {
   const dayStyle = getDaysSinceStyle(customer.daysSinceVisit);
 
   return (
-    <button
-      className="w-full bg-white rounded-xl border border-border px-4 py-3 hover:shadow-sm active:bg-secondary/20 transition-all text-left"
-      onClick={() => onSelect(customer)}
-    >
-      <div className="flex items-center gap-3">
-        {/* 아바타 */}
-        <div className="relative flex-shrink-0">
-          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-            {customer.name.charAt(0)}
-          </div>
-          {customer.isVip && (
-            <div className="absolute -top-1 -right-1 w-4 h-4 bg-yellow-400 rounded-full flex items-center justify-center">
-              <Award className="w-2.5 h-2.5 text-white" />
+    <div className="w-full bg-white rounded-xl border border-border overflow-hidden">
+      {/* 메인 영역 — 클릭 시 상세 시트 오픈 */}
+      <div
+        className="px-4 py-3 hover:bg-secondary/20 active:bg-secondary/30 transition-colors cursor-pointer"
+        onClick={() => onSelect(customer)}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => e.key === 'Enter' && onSelect(customer)}
+      >
+        <div className="flex items-center gap-3">
+          {/* 아바타 */}
+          <div className="relative flex-shrink-0">
+            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
+              {customer.name.charAt(0)}
             </div>
-          )}
-        </div>
-
-        {/* 이름 + 배지 + 부가정보 */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="font-semibold text-sm">{customer.name}</span>
             {customer.isVip && (
-              <span className="text-[10px] bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded-full font-medium">VIP</span>
-            )}
-            {customer.isAtRisk && (
-              <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full font-medium flex items-center gap-0.5">
-                <AlertCircle className="w-2.5 h-2.5" /> {customer.daysSinceVisit}일 미방문
-              </span>
-            )}
-            {customer.isReturnSoon && (
-              <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-medium flex items-center gap-0.5">
-                <RefreshCw className="w-2.5 h-2.5" /> 재방문예정
-              </span>
+              <div className="absolute -top-1 -right-1 w-4 h-4 bg-yellow-400 rounded-full flex items-center justify-center">
+                <Award className="w-2.5 h-2.5 text-white" />
+              </div>
             )}
           </div>
-          <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
-            {customer.petName && (
-              <span className="flex items-center gap-0.5">
-                <PawPrint className="w-3 h-3" /> {customer.petName}
-              </span>
-            )}
-            {customer.lastVisit && (
-              <span className="flex items-center gap-0.5">
-                <Calendar className="w-3 h-3" />
-                {format(new Date(customer.lastVisit), 'M월 d일', { locale: ko })}
-              </span>
-            )}
-          </div>
-        </div>
 
-        {/* 매출 + 방문 횟수 + 경과일 */}
-        <div className="flex-shrink-0 text-right">
-          <div className="text-xs font-bold text-primary">
-            {customer.totalRevenue > 0 ? `${customer.totalRevenue.toLocaleString()}원` : '-'}
-          </div>
-          <div className="text-[10px] text-muted-foreground">{customer.visitCount}회 방문</div>
-          {customer.daysSinceVisit !== null && (
-            <div className={`text-[10px] mt-0.5 ${dayStyle.className}`}>
-              {dayStyle.icon && <span className="mr-0.5">{dayStyle.icon}</span>}
-              {customer.daysSinceVisit}일 경과
+          {/* 이름 + 배지 + 부가정보 */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="font-semibold text-sm">{customer.name}</span>
+              {customer.isVip && (
+                <span className="text-[10px] bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded-full font-medium">VIP</span>
+              )}
+              {customer.isAtRisk && (
+                <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full font-medium flex items-center gap-0.5">
+                  <AlertCircle className="w-2.5 h-2.5" /> {customer.daysSinceVisit}일 미방문
+                </span>
+              )}
+              {customer.isReturnSoon && (
+                <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-medium flex items-center gap-0.5">
+                  <RefreshCw className="w-2.5 h-2.5" /> 재방문예정
+                </span>
+              )}
             </div>
-          )}
-        </div>
+            <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
+              {customer.petName && (
+                <span className="flex items-center gap-0.5">
+                  <PawPrint className="w-3 h-3" /> {customer.petName}
+                </span>
+              )}
+              {customer.lastVisit && (
+                <span className="flex items-center gap-0.5">
+                  <Calendar className="w-3 h-3" />
+                  {format(new Date(customer.lastVisit), 'M월 d일', { locale: ko })}
+                </span>
+              )}
+            </div>
+          </div>
 
-        <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+          {/* 매출 + 방문 횟수 + 경과일 */}
+          <div className="flex-shrink-0 text-right">
+            <div className="text-xs font-bold text-primary">
+              {customer.totalRevenue > 0 ? `${customer.totalRevenue.toLocaleString()}원` : '-'}
+            </div>
+            <div className="text-[10px] text-muted-foreground">{customer.visitCount}회 방문</div>
+            {customer.daysSinceVisit !== null && (
+              <div className={`text-[10px] mt-0.5 ${dayStyle.className}`}>
+                {dayStyle.icon && <span className="mr-0.5">{dayStyle.icon}</span>}
+                {customer.daysSinceVisit}일 경과
+              </div>
+            )}
+          </div>
+
+          <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+        </div>
       </div>
-    </button>
+
+      {/* 재방문 알림 버튼 — 이탈위험 탭에서만 표시 */}
+      {onNotify && (
+        <div className="px-4 pb-3 pt-0">
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full gap-1.5 text-xs h-8 border-dashed"
+            onClick={() => onNotify(customer.phone, customer.name)}
+            disabled={isNotifying}
+          >
+            {isNotifying
+              ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              : <MessageCircle className="w-3.5 h-3.5" />}
+            재방문 알림 전송
+          </Button>
+        </div>
+      )}
+    </div>
   );
 }

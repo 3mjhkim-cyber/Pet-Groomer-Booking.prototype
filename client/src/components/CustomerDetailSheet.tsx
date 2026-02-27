@@ -1,12 +1,15 @@
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { useCustomerHistory } from "@/hooks/use-shop";
+import { useMutation } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
 import { format, differenceInDays } from "date-fns";
 import { ko } from "date-fns/locale";
 import {
   Phone, PawPrint, Calendar, Clock, Award, TrendingUp,
-  AlertCircle, RefreshCw, Loader2, FileText, Star
+  AlertCircle, RefreshCw, Loader2, FileText, Star, MessageCircle,
 } from "lucide-react";
 import type { Customer } from "@shared/schema";
 
@@ -19,9 +22,29 @@ interface CustomerDetailSheetProps {
 }
 
 export default function CustomerDetailSheet({ customer, open, onClose }: CustomerDetailSheetProps) {
+  const { toast } = useToast();
+
   const { data: historyData, isLoading: isHistoryLoading } = useCustomerHistory(
     open && customer ? customer.phone : null
   );
+
+  const { mutate: sendReturnVisitNotify, isPending: isSendingNotify } = useMutation({
+    mutationFn: async (phone: string) => {
+      const res = await fetch(`/api/customers/${encodeURIComponent(phone)}/return-visit-notify`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || '전송에 실패했습니다.');
+      return data;
+    },
+    onSuccess: () => {
+      toast({ title: '전송 완료', description: `${customer?.name}님께 재방문 알림을 전송했습니다.` });
+    },
+    onError: (err: Error) => {
+      toast({ title: '전송 실패', description: err.message, variant: 'destructive' });
+    },
+  });
 
   if (!customer) return null;
 
@@ -159,6 +182,24 @@ export default function CustomerDetailSheet({ customer, open, onClose }: Custome
                 </div>
               )}
             </div>
+          </div>
+
+          {/* 재방문 알림 전송 */}
+          <div>
+            <h3 className="text-sm font-semibold text-muted-foreground mb-2 flex items-center gap-1">
+              <MessageCircle className="w-4 h-4" /> 알림
+            </h3>
+            <Button
+              variant="outline"
+              className="w-full gap-2"
+              onClick={() => sendReturnVisitNotify(customer.phone)}
+              disabled={isSendingNotify}
+            >
+              {isSendingNotify
+                ? <Loader2 className="w-4 h-4 animate-spin" />
+                : <MessageCircle className="w-4 h-4" />}
+              재방문 알림 전송
+            </Button>
           </div>
 
           {/* 메모 / 특이사항 */}

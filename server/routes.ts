@@ -42,6 +42,7 @@ function parseNotifSettings(shop: Shop): NotifSettings {
  * 예) "2026-02-27", "14:00" → "2월 27일 오후 2:00"
  */
 function formatDateTime(date: string, time: string): string {
+  if (!date || !time) return '';
   const [, month, day] = date.split('-').map(Number);
   const [hourStr, minuteStr] = time.split(':');
   const hour = parseInt(hourStr, 10);
@@ -701,6 +702,42 @@ export async function registerRoutes(
     const query = req.query.q as string || '';
     const customers = await storage.searchCustomers(query, user.shopId);
     res.json(customers);
+  });
+
+  // 재방문 알림 전송
+  app.post('/api/customers/:phone/return-visit-notify', requireAuth, async (req, res) => {
+    const user = req.user as any;
+    const phone = decodeURIComponent(req.params.phone);
+
+    const customer = await storage.getCustomerByPhone(phone, user.shopId);
+    if (!customer) {
+      return res.status(404).json({ message: '고객을 찾을 수 없습니다.' });
+    }
+
+    const shop = user.shopId ? await storage.getShop(user.shopId) : null;
+    if (!shop) {
+      return res.status(400).json({ message: '가게 정보를 찾을 수 없습니다.' });
+    }
+
+    const notifSettings = parseNotifSettings(shop);
+    const config = notifSettings.returnVisit;
+
+    if (!config?.enabled) {
+      return res.status(400).json({
+        message: '재방문 알림이 비활성화되어 있습니다. 운영 > 알림 설정에서 활성화해주세요.',
+      });
+    }
+
+    // date, time 없이 치환 — 재방문 템플릿은 {예약일시} 변수를 사용하지 않음
+    const message = buildMessage(
+      config,
+      { customerName: customer.name, petName: customer.petName, date: '', time: '' },
+      shop,
+    );
+
+    await sendNotification(customer.phone, message, 'returnVisit');
+
+    res.json({ success: true, message: '재방문 알림을 전송했습니다.' });
   });
 
   app.get('/api/customers/:phone/history', requireAuth, async (req, res) => {
