@@ -13,6 +13,101 @@ import { insertShopSchema, Shop } from "@shared/schema";
 
 const scryptAsync = promisify(scrypt);
 
+// ─── 알림 템플릿 변수 치환 ─────────────────────────────────────────────────────
+
+type NotifConfig = { enabled: boolean; template: string; extraMessage: string };
+type NotifSettings = {
+  bookingConfirmed?: NotifConfig;
+  reminderBefore?: NotifConfig;
+  depositReceived?: NotifConfig;
+  returnVisit?: NotifConfig;
+};
+
+/**
+ * shop.notificationSettings JSON 문자열을 파싱해 반환.
+ * 파싱 실패 시 빈 객체 반환.
+ */
+function parseNotifSettings(shop: Shop): NotifSettings {
+  try {
+    const raw = (shop as any).notificationSettings;
+    if (!raw) return {};
+    return typeof raw === 'string' ? JSON.parse(raw) : raw;
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * 예약일시를 한국어 형식으로 변환.
+ * 예) "2026-02-27", "14:00" → "2월 27일 오후 2:00"
+ */
+function formatDateTime(date: string, time: string): string {
+  const [, month, day] = date.split('-').map(Number);
+  const [hourStr, minuteStr] = time.split(':');
+  const hour = parseInt(hourStr, 10);
+  const ampm = hour < 12 ? '오전' : '오후';
+  const hour12 = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+  return `${month}월 ${day}일 ${ampm} ${hour12}:${minuteStr}`;
+}
+
+/**
+ * 템플릿 문자열의 변수를 실제 예약·가게 데이터로 치환.
+ *
+ * 치환 변수 목록:
+ *   {매장명}        → shop.name
+ *   {고객명}        → booking.customerName
+ *   {반려동물이름}  → booking.petName (없으면 '반려동물')
+ *   {예약일시}      → "M월 D일 오전/오후 H:mm" 형식
+ *   {예약금액}      → shop.depositAmount (없으면 빈 문자열)
+ */
+function buildMessage(
+  config: NotifConfig,
+  booking: { customerName: string; petName?: string | null; date: string; time: string },
+  shop: { name: string; depositAmount?: number | null },
+): string {
+  const values: Record<string, string> = {
+    '{매장명}':       shop.name,
+    '{고객명}':       booking.customerName,
+    '{반려동물이름}': booking.petName || '반려동물',
+    '{예약일시}':     formatDateTime(booking.date, booking.time),
+    '{예약금액}':     shop.depositAmount != null ? String(shop.depositAmount) : '',
+  };
+
+  let message = config.template;
+  for (const [key, value] of Object.entries(values)) {
+    // split/join 방식으로 전역 치환 (replaceAll 대신 호환성 보장)
+    message = message.split(key).join(value);
+  }
+
+  if (config.extraMessage) {
+    message = `${message}\n${config.extraMessage}`;
+  }
+
+  return message;
+}
+
+/**
+ * 메시지 발송 스텁(stub).
+ * 실제 카카오 알림톡 / SMS API 연동 전까지 서버 로그에만 출력.
+ *
+ * TODO: 카카오 / SMS API 연동 시 이 함수 내부를 교체:
+ *   1) 알리고(solapi) 등 SMS API 호출
+ *   2) 카카오 비즈니스 채널 알림톡 API 호출
+ */
+async function sendNotification(
+  phone: string,
+  message: string,
+  type: keyof NotifSettings,
+): Promise<void> {
+  // 수신번호 마스킹 처리 (로그 보안)
+  const masked = phone.replace(/(\d{3})-?(\d{3,4})-?(\d{4})/, '$1-****-$3');
+  console.log(`[알림 전송] type=${type} to=${masked}`);
+  console.log(`[알림 내용]\n${message}\n`);
+  // ↑ 실제 API 호출로 교체할 위치
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 async function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");
   const buf = (await scryptAsync(password, salt, 64)) as Buffer;
@@ -733,11 +828,39 @@ export async function registerRoutes(
     }
   });
 
+  // 예약 확정 (예약 확정 알림)
+  // 흐름: status → confirmed 변경 → shop 조회 → 템플릿 치환 → 발송
   app.patch('/api/bookings/:id/approve', requireAuth, async (req, res) => {
-    const booking = await storage.updateBookingStatus(Number(req.params.id), 'confirmed');
+    const user = req.user as any;
+    const bookingId = Number(req.params.id);
+
+    // 1. 예약 데이터 조회 (확정 전 원본)
+    const bookingData = await storage.getBooking(bookingId);
+
+    // 2. 상태를 confirmed 로 변경
+    const booking = await storage.updateBookingStatus(bookingId, 'confirmed');
     if (!booking) {
       return res.status(404).json({ message: "Booking not found" });
     }
+
+    // 3. 가게 데이터 조회 및 bookingConfirmed 알림 발송
+    const shopId = booking.shopId ?? user.shopId;
+    if (shopId && bookingData) {
+      const shop = await storage.getShop(shopId);
+      if (shop) {
+        const notifSettings = parseNotifSettings(shop);
+        const config = notifSettings.bookingConfirmed;
+
+        if (config?.enabled) {
+          // 4. 템플릿 변수 치환
+          const message = buildMessage(config, bookingData, shop);
+
+          // 5. 발송 (stub)
+          await sendNotification(bookingData.customerPhone, message, 'bookingConfirmed');
+        }
+      }
+    }
+
     res.json(booking);
   });
 
@@ -765,18 +888,40 @@ export async function registerRoutes(
     res.json(booking);
   });
 
-  // 관리자용 입금확인 (depositStatus=paid, status=confirmed)
+  // 관리자용 입금확인 (예약금 입금 알림)
+  // 흐름: 예약 조회 → depositStatus=paid + status=confirmed → shop 조회 → 템플릿 치환 → 발송
   app.patch('/api/bookings/:id/admin-confirm-deposit', requireAuth, async (req, res) => {
+    const user = req.user as any;
     const bookingId = Number(req.params.id);
 
-    // depositStatus를 paid로, status를 confirmed로 변경
+    // 1. 예약 데이터 조회 (치환에 사용할 원본 데이터)
+    const bookingData = await storage.getBooking(bookingId);
+
+    // 2. 상태 변경 (confirmed + depositStatus=paid)
     const booking = await storage.updateBookingStatus(bookingId, 'confirmed');
     if (!booking) {
       return res.status(404).json({ message: "Booking not found" });
     }
-
-    // depositStatus도 paid로 업데이트
     const updatedBooking = await storage.confirmDeposit(bookingId);
+
+    // 3. 가게 데이터 조회 및 depositReceived 알림 발송
+    const shopId = booking.shopId ?? user.shopId;
+    if (shopId && bookingData) {
+      const shop = await storage.getShop(shopId);
+      if (shop) {
+        const notifSettings = parseNotifSettings(shop);
+        const config = notifSettings.depositReceived;
+
+        if (config?.enabled) {
+          // 4. 템플릿 변수 치환
+          const message = buildMessage(config, bookingData, shop);
+
+          // 5. 발송 (stub)
+          await sendNotification(bookingData.customerPhone, message, 'depositReceived');
+        }
+      }
+    }
+
     res.json(updatedBooking);
   });
 
@@ -789,13 +934,40 @@ export async function registerRoutes(
     res.json(booking);
   });
 
-  // 리마인드 전송 표시
+  // 리마인드 전송 (방문 전 리마인드 알림)
+  // 흐름: 예약 조회 → shop 조회 → 템플릿 변수 치환 → 발송 → DB 마킹
   app.patch('/api/bookings/:id/remind', requireAuth, async (req, res) => {
-    const booking = await storage.updateBookingRemind(Number(req.params.id));
+    const user = req.user as any;
+    const bookingId = Number(req.params.id);
+
+    // 1. 예약 데이터 조회 (serviceName JOIN 포함)
+    const booking = await storage.getBooking(bookingId);
     if (!booking) {
       return res.status(404).json({ message: "예약을 찾을 수 없습니다." });
     }
-    res.json(booking);
+
+    // 2. 가게 데이터 조회 (notificationSettings, name, depositAmount 포함)
+    const shopId = booking.shopId ?? user.shopId;
+    if (shopId) {
+      const shop = await storage.getShop(shopId);
+      if (shop) {
+        // 3. notificationSettings에서 reminderBefore 설정 꺼내기
+        const notifSettings = parseNotifSettings(shop);
+        const config = notifSettings.reminderBefore;
+
+        if (config?.enabled) {
+          // 4. 템플릿 변수 치환
+          const message = buildMessage(config, booking, shop);
+
+          // 5. 발송 (현재는 stub — 실제 API 연동 시 sendNotification 내부 교체)
+          await sendNotification(booking.customerPhone, message, 'reminderBefore');
+        }
+      }
+    }
+
+    // 6. DB에 전송 완료 표시
+    const updated = await storage.updateBookingRemind(bookingId);
+    res.json(updated);
   });
 
   // 내일 예약 조회
