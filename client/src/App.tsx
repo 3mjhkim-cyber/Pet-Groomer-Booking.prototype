@@ -16,6 +16,7 @@ import Deposit from "@/pages/Deposit";
 import PlatformAdmin from "@/pages/PlatformAdmin";
 import ShopsAdmin from "@/pages/ShopsAdmin";
 import ShopSettings from "@/pages/ShopSettings";
+import Operations from "@/pages/Operations";
 import Revenue from "@/pages/Revenue";
 import Subscription from "@/pages/Subscription";
 import PaymentSuccess from "@/pages/PaymentSuccess";
@@ -36,6 +37,7 @@ function Router() {
           <Route path="/admin/customers" component={Customers} />
           <Route path="/admin/calendar" component={Calendar} />
           <Route path="/admin/settings" component={ShopSettings} />
+          <Route path="/admin/operations" component={Operations} />
           <Route path="/admin/revenue" component={Revenue} />
           <Route path="/admin/subscription" component={Subscription} />
           <Route path="/admin/platform" component={PlatformAdmin} />
