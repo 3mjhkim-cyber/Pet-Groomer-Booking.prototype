@@ -78,18 +78,12 @@ function StatusBadge({ status }: { status: string | null }) {
   return <Badge variant="secondary" className="text-xs">비활성</Badge>;
 }
 
-/** 상세 패널의 구체적인 구독 상태 배지 */
+/** 상세 패널의 구독 상태 배지 (active / 그 외 모두 비활성) */
 function SubDetailBadge({ status }: { status: string | null }) {
-  switch (status) {
-    case "active":
-      return <Badge className="bg-green-100 text-green-700 border-green-200 hover:bg-green-100">활성</Badge>;
-    case "cancelled":
-      return <Badge variant="outline" className="text-orange-600 border-orange-300">취소</Badge>;
-    case "expired":
-      return <Badge variant="outline" className="text-red-500 border-red-200">만료</Badge>;
-    default:
-      return <Badge variant="secondary">미구독</Badge>;
+  if (status === "active") {
+    return <Badge className="bg-green-100 text-green-700 border-green-200 hover:bg-green-100">활성</Badge>;
   }
+  return <Badge variant="secondary">비활성</Badge>;
 }
 
 function tierLabel(tier: string | null | undefined): string {
@@ -133,8 +127,9 @@ export default function ShopsAdmin() {
   const [editForm, setEditForm] = useState({
     name: "", phone: "", address: "", businessHours: "",
     depositAmount: 0, depositRequired: true,
-    subscriptionStatus: "none", subscriptionTier: "basic",
-    subscriptionEnd: "", password: "",
+    subscriptionStatus: "inactive",
+    subscriptionStart: "", subscriptionEnd: "",
+    password: "",
   });
 
   // ── 가맹점 목록 조회 ──────────────────────────────────────────────────────
@@ -184,8 +179,10 @@ export default function ShopsAdmin() {
       businessHours:      shop.businessHours,
       depositAmount:      shop.depositAmount,
       depositRequired:    shop.depositRequired,
-      subscriptionStatus: shop.subscriptionStatus || "none",
-      subscriptionTier:   shop.subscriptionTier   || "basic",
+      // active/inactive 2개 값으로 정규화 (none·expired·cancelled → inactive)
+      subscriptionStatus: shop.subscriptionStatus === "active" ? "active" : "inactive",
+      subscriptionStart:  shop.subscriptionStart
+        ? new Date(shop.subscriptionStart).toISOString().split("T")[0] : "",
       subscriptionEnd:    shop.subscriptionEnd
         ? new Date(shop.subscriptionEnd).toISOString().split("T")[0] : "",
       password: "",
@@ -209,6 +206,16 @@ export default function ShopsAdmin() {
   if (!user || user.role !== "super_admin") return null;
 
   // ── 파생 데이터 ────────────────────────────────────────────────────────────
+
+  // 날짜 검증: active 상태이고 시작/만료일이 모두 입력된 경우에만 검사
+  const dateError: string | null =
+    editForm.subscriptionStatus === "active" &&
+    editForm.subscriptionStart &&
+    editForm.subscriptionEnd &&
+    new Date(editForm.subscriptionEnd) <= new Date(editForm.subscriptionStart)
+      ? "구독 만료일은 시작일보다 이후여야 합니다."
+      : null;
+
   const allShops     = shops ?? [];
   const activeShops  = allShops.filter(s => s.subscriptionStatus === "active");
   const inactiveShops = allShops.filter(s => s.subscriptionStatus !== "active");
@@ -530,10 +537,6 @@ export default function ShopsAdmin() {
                     <SubDetailBadge status={detailShop.subscriptionStatus} />
                   </div>
                   <div>
-                    <p className="text-muted-foreground text-xs mb-0.5">플랜</p>
-                    <p className="font-medium">{tierLabel(detailShop.subscriptionTier)}</p>
-                  </div>
-                  <div>
                     <p className="text-muted-foreground text-xs mb-0.5">구독 시작</p>
                     <p className="font-medium">{fmtDate(detailShop.subscriptionStart)}</p>
                   </div>
@@ -629,29 +632,28 @@ export default function ShopsAdmin() {
                   value={editForm.subscriptionStatus}
                   onChange={e => setEditForm({ ...editForm, subscriptionStatus: e.target.value })}
                 >
-                  <option value="none">미구독</option>
                   <option value="active">활성</option>
-                  <option value="expired">만료</option>
-                  <option value="cancelled">취소</option>
+                  <option value="inactive">비활성</option>
                 </select>
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="sa-sub-tier">구독 플랜</Label>
-                <select id="sa-sub-tier"
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  value={editForm.subscriptionTier}
-                  onChange={e => setEditForm({ ...editForm, subscriptionTier: e.target.value })}
-                >
-                  <option value="basic">베이직 (29,000원/월)</option>
-                  <option value="premium">프리미엄 (49,000원/월)</option>
-                  <option value="enterprise">엔터프라이즈 (99,000원/월)</option>
-                </select>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="sa-sub-end">구독 만료일</Label>
-                <Input id="sa-sub-end" type="date" value={editForm.subscriptionEnd}
-                  onChange={e => setEditForm({ ...editForm, subscriptionEnd: e.target.value })} />
-              </div>
+              {editForm.subscriptionStatus === "active" && (
+                <>
+                  <div className="grid gap-2">
+                    <Label htmlFor="sa-sub-start">구독 시작일</Label>
+                    <Input id="sa-sub-start" type="date" value={editForm.subscriptionStart}
+                      onChange={e => setEditForm({ ...editForm, subscriptionStart: e.target.value })} />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="sa-sub-end">구독 만료일</Label>
+                    <Input id="sa-sub-end" type="date" value={editForm.subscriptionEnd}
+                      className={dateError ? "border-red-400 focus-visible:ring-red-400" : ""}
+                      onChange={e => setEditForm({ ...editForm, subscriptionEnd: e.target.value })} />
+                    {dateError && (
+                      <p className="text-xs text-red-500">{dateError}</p>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
           </div>
 
@@ -660,7 +662,7 @@ export default function ShopsAdmin() {
             <Button
               onClick={() =>
                 editingShop && editMutation.mutate({ shopId: editingShop.id, data: editForm })}
-              disabled={editMutation.isPending}
+              disabled={editMutation.isPending || !!dateError}
             >
               {editMutation.isPending && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
               저장

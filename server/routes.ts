@@ -536,7 +536,11 @@ export async function registerRoutes(
 
   // 슈퍼관리자용 가맹점 정보 수정
   app.patch('/api/admin/shops/:id', requireSuperAdmin, async (req, res) => {
-    const { name, phone, address, businessHours, depositAmount, depositRequired, subscriptionStatus, subscriptionTier, subscriptionEnd, password } = req.body;
+    const {
+      name, phone, address, businessHours, depositAmount, depositRequired,
+      subscriptionStatus, subscriptionStart, subscriptionEnd,
+      password,
+    } = req.body;
 
     // 현재 shop 정보 가져오기
     const currentShop = await storage.getShop(Number(req.params.id));
@@ -544,26 +548,42 @@ export async function registerRoutes(
       return res.status(404).json({ message: "가맹점을 찾을 수 없습니다." });
     }
 
-    const updates: any = {
-      name, phone, address, businessHours, depositAmount, depositRequired
-    };
-
-    // 구독 정보가 있으면 추가
-    if (subscriptionStatus !== undefined) {
-      updates.subscriptionStatus = subscriptionStatus;
-
-      // 구독을 활성화하는데 시작일이 없으면 현재 시간으로 설정
-      if (subscriptionStatus === 'active' && !currentShop.subscriptionStart) {
-        updates.subscriptionStart = new Date();
+    // 날짜 검증: active 상태이고 시작/만료일이 모두 제공된 경우 만료일 > 시작일 이어야 함
+    if (subscriptionStatus === 'active' && subscriptionStart && subscriptionEnd) {
+      const start = new Date(subscriptionStart);
+      const end   = new Date(subscriptionEnd);
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        return res.status(400).json({ message: "날짜 형식이 올바르지 않습니다." });
+      }
+      if (end <= start) {
+        return res.status(400).json({ message: "구독 만료일은 시작일보다 이후여야 합니다." });
       }
     }
 
-    if (subscriptionTier !== undefined) {
-      updates.subscriptionTier = subscriptionTier;
-    }
+    const updates: any = {
+      name, phone, address, businessHours, depositAmount, depositRequired,
+    };
 
-    if (subscriptionEnd !== undefined) {
-      updates.subscriptionEnd = subscriptionEnd ? new Date(subscriptionEnd) : null;
+    if (subscriptionStatus !== undefined) {
+      // 'active' 또는 'inactive' 2값만 허용; 그 외(none·expired·cancelled 등)는 inactive 로 정규화
+      const normalizedStatus = subscriptionStatus === 'active' ? 'active' : 'inactive';
+      updates.subscriptionStatus = normalizedStatus;
+
+      if (normalizedStatus === 'active') {
+        // 시작일: 폼에서 받은 값 우선, 없으면 기존 값 유지, 기존 값도 없으면 현재 시각
+        if (subscriptionStart) {
+          updates.subscriptionStart = new Date(subscriptionStart);
+        } else if (!currentShop.subscriptionStart) {
+          updates.subscriptionStart = new Date();
+        }
+        // 만료일: 제공된 경우에만 업데이트
+        if (subscriptionEnd !== undefined) {
+          updates.subscriptionEnd = subscriptionEnd ? new Date(subscriptionEnd) : null;
+        }
+      } else {
+        // inactive: 만료일 null 처리
+        updates.subscriptionEnd = null;
+      }
     }
 
     const shop = await storage.updateShop(Number(req.params.id), updates);
