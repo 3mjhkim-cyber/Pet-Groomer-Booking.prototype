@@ -190,69 +190,18 @@ export default function Home() {
       </section>
 
       {/* ── Footer ───────────────────────────────────────────────── */}
-      <footer className="bg-foreground text-white/60 text-sm">
-        <div className="container mx-auto px-6 py-10 md:py-14">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-12 mb-10 md:mb-12">
-
-            {/* 브랜드 */}
-            <div className="col-span-2 md:col-span-1">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="bg-primary p-1.5 rounded-lg">
-                  <Scissors className="w-4 h-4 text-white" />
-                </div>
-                <span className="text-white font-bold text-base">정리하개</span>
-              </div>
-              <p className="text-xs leading-relaxed">
-                반려동물 미용샵 사장님을 위한<br />
-                예약·고객·매출 관리 플랫폼
-              </p>
+      <footer className="bg-foreground">
+        <div className="container mx-auto px-6 py-6">
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-[11px] text-white/25">
+            <div className="flex items-center gap-1.5 text-white/35">
+              <Scissors className="w-3 h-3" />
+              <span className="font-semibold">정리하개</span>
             </div>
-
-            {/* 서비스 */}
-            <div>
-              <p className="text-white font-semibold text-xs tracking-wider uppercase mb-3">서비스</p>
-              <ul className="space-y-2 text-xs">
-                <li><a href="/register" className="hover:text-white transition-colors">가게 등록</a></li>
-                <li><a href="/book/gangnam" className="hover:text-white transition-colors">예약 체험</a></li>
-                <li><a href="/admin/dashboard" className="hover:text-white transition-colors">관리자 로그인</a></li>
-                <li><span className="opacity-50 cursor-default">요금 안내</span></li>
-              </ul>
-            </div>
-
-            {/* 회사 */}
-            <div>
-              <p className="text-white font-semibold text-xs tracking-wider uppercase mb-3">회사</p>
-              <ul className="space-y-2 text-xs">
-                <li><span className="opacity-50 cursor-default">서비스 소개</span></li>
-                <li><span className="opacity-50 cursor-default">이용약관</span></li>
-                <li><span className="opacity-50 cursor-default">개인정보처리방침</span></li>
-                <li><span className="opacity-50 cursor-default">고객센터</span></li>
-              </ul>
-            </div>
-
-            {/* 고객지원 */}
-            <div>
-              <p className="text-white font-semibold text-xs tracking-wider uppercase mb-3">고객지원</p>
-              <ul className="space-y-2 text-xs">
-                <li className="text-white/80">운영시간 평일 10:00–18:00</li>
-                <li className="text-white/80">주말·공휴일 휴무</li>
-                <li className="mt-3">
-                  <span className="text-white/50">이메일</span>
-                  <br />
-                  <span className="text-white/80">help@jeongrihagae.com</span>
-                </li>
-              </ul>
-            </div>
-          </div>
-
-          {/* 하단 구분선 + 카피라이트 */}
-          <div className="border-t border-white/10 pt-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
-            <p className="text-white/40">© 2025 정리하개. All rights reserved.</p>
-            <div className="flex items-center gap-4 text-white/40">
-              <span className="opacity-50 cursor-default hover:text-white/60 transition-colors">이용약관</span>
-              <span className="opacity-50 cursor-default hover:text-white/60 transition-colors">개인정보처리방침</span>
-              <span className="opacity-50 cursor-default hover:text-white/60 transition-colors">사업자정보확인</span>
-            </div>
+            <span className="text-white/10">·</span>
+            <span>이용약관</span>
+            <span>개인정보처리방침</span>
+            <span>고객센터</span>
+            <span className="sm:ml-auto">help@jeongrihagae.com &nbsp;·&nbsp; 평일 10–18시</span>
           </div>
         </div>
       </footer>
