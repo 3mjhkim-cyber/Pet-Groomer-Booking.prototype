@@ -173,18 +173,89 @@ export default function Home() {
       </section>
 
       {/* ── CTA ──────────────────────────────────────────────────── */}
-      <section className="py-12 md:py-20">
+      <section className="py-14 md:py-20 bg-primary">
         <div className="container mx-auto px-4 text-center">
-          <h2 className="text-2xl md:text-3xl font-bold mb-3 md:mb-4">지금 바로 시작하세요</h2>
-          <p className="text-sm md:text-base text-muted-foreground mb-6 md:mb-8">
-            테스트 계정으로 모든 기능을 체험해보세요
+          <h2 className="text-2xl md:text-3xl font-bold text-white mb-3 md:mb-4">
+            지금 바로 시작하세요
+          </h2>
+          <p className="text-sm md:text-base text-white/70 mb-7 md:mb-8">
+            30일 무료체험, 카드 등록 없이 바로 시작할 수 있어요
           </p>
-          <div className="bg-white p-4 md:p-6 rounded-2xl border border-border inline-block">
-            <p className="text-xs md:text-sm text-muted-foreground mb-1 md:mb-2">테스트 계정</p>
-            <p className="font-mono text-base md:text-lg">test@test.com / 1234</p>
-          </div>
+          <Link href="/register">
+            <button className="px-8 py-3.5 md:py-4 bg-white text-primary rounded-2xl text-base md:text-lg font-bold shadow-xl hover:-translate-y-1 transition-all duration-200">
+              우리 가게 등록하기
+            </button>
+          </Link>
         </div>
       </section>
+
+      {/* ── Footer ───────────────────────────────────────────────── */}
+      <footer className="bg-foreground text-white/60 text-sm">
+        <div className="container mx-auto px-6 py-10 md:py-14">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-12 mb-10 md:mb-12">
+
+            {/* 브랜드 */}
+            <div className="col-span-2 md:col-span-1">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="bg-primary p-1.5 rounded-lg">
+                  <Scissors className="w-4 h-4 text-white" />
+                </div>
+                <span className="text-white font-bold text-base">정리하개</span>
+              </div>
+              <p className="text-xs leading-relaxed">
+                반려동물 미용샵 사장님을 위한<br />
+                예약·고객·매출 관리 플랫폼
+              </p>
+            </div>
+
+            {/* 서비스 */}
+            <div>
+              <p className="text-white font-semibold text-xs tracking-wider uppercase mb-3">서비스</p>
+              <ul className="space-y-2 text-xs">
+                <li><a href="/register" className="hover:text-white transition-colors">가게 등록</a></li>
+                <li><a href="/book/gangnam" className="hover:text-white transition-colors">예약 체험</a></li>
+                <li><a href="/admin/dashboard" className="hover:text-white transition-colors">관리자 로그인</a></li>
+                <li><span className="opacity-50 cursor-default">요금 안내</span></li>
+              </ul>
+            </div>
+
+            {/* 회사 */}
+            <div>
+              <p className="text-white font-semibold text-xs tracking-wider uppercase mb-3">회사</p>
+              <ul className="space-y-2 text-xs">
+                <li><span className="opacity-50 cursor-default">서비스 소개</span></li>
+                <li><span className="opacity-50 cursor-default">이용약관</span></li>
+                <li><span className="opacity-50 cursor-default">개인정보처리방침</span></li>
+                <li><span className="opacity-50 cursor-default">고객센터</span></li>
+              </ul>
+            </div>
+
+            {/* 고객지원 */}
+            <div>
+              <p className="text-white font-semibold text-xs tracking-wider uppercase mb-3">고객지원</p>
+              <ul className="space-y-2 text-xs">
+                <li className="text-white/80">운영시간 평일 10:00–18:00</li>
+                <li className="text-white/80">주말·공휴일 휴무</li>
+                <li className="mt-3">
+                  <span className="text-white/50">이메일</span>
+                  <br />
+                  <span className="text-white/80">help@jeongrihagae.com</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          {/* 하단 구분선 + 카피라이트 */}
+          <div className="border-t border-white/10 pt-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+            <p className="text-white/40">© 2025 정리하개. All rights reserved.</p>
+            <div className="flex items-center gap-4 text-white/40">
+              <span className="opacity-50 cursor-default hover:text-white/60 transition-colors">이용약관</span>
+              <span className="opacity-50 cursor-default hover:text-white/60 transition-colors">개인정보처리방침</span>
+              <span className="opacity-50 cursor-default hover:text-white/60 transition-colors">사업자정보확인</span>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }

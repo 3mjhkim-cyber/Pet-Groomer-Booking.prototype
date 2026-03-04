@@ -155,7 +155,7 @@ export default function Login() {
                 <Link href="/register">
                   <Button variant="outline" className="w-full" data-testid="link-register">
                     <Store className="w-4 h-4 mr-2" />
-                    가맹점 등록 신청하기
+                    우리 가게 등록하기
                   </Button>
                 </Link>
               </div>
