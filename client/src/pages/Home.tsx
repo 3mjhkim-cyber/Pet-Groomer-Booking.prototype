@@ -7,27 +7,41 @@ export default function Home() {
     <div className="min-h-screen bg-gradient-to-b from-background to-secondary/20">
 
       {/* ── Hero ──────────────────────────────────────────────────── */}
-      <section className="relative pt-14 pb-20 md:pt-20 md:pb-32 px-4 overflow-hidden">
-        <div className="container mx-auto max-w-5xl text-center relative z-10">
+      <section className="relative pt-16 pb-24 md:pt-24 md:pb-40 px-4 overflow-hidden">
+        <div className="container mx-auto max-w-4xl text-center relative z-10">
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
+            transition={{ duration: 0.65 }}
+            className="flex flex-col items-center"
           >
-            {/* 배지: 작고 명료하게 */}
-            <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary font-semibold text-[11px] tracking-[0.12em] uppercase mb-5 md:mb-6 border border-primary/15">
+            {/* 배지 */}
+            <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary font-semibold text-[11px] tracking-[0.14em] uppercase mb-5 md:mb-6 border border-primary/15">
               반려동물 미용샵 토탈 솔루션
             </span>
 
-            {/* 헤드라인: 모바일은 절충 크기, 데스크탑은 대형 */}
+            {/* 브랜드명 — 주인공 */}
+            <div className="flex items-center justify-center gap-2.5 md:gap-3 mb-6 md:mb-8">
+              <div className="bg-primary p-2 md:p-2.5 rounded-xl md:rounded-2xl shadow-lg shadow-primary/30 flex-shrink-0">
+                <Scissors className="w-6 h-6 md:w-8 md:h-8 text-white" />
+              </div>
+              <span
+                className="text-4xl sm:text-5xl md:text-7xl font-black text-primary"
+                style={{ letterSpacing: "-0.035em" }}
+              >
+                정리하개
+              </span>
+            </div>
+
+            {/* 핵심 문구 */}
             <h1
-              className="text-[2.25rem] sm:text-5xl md:text-7xl font-bold text-foreground mb-4 md:mb-6 tracking-tight"
-              style={{ lineHeight: 1.15, wordBreak: "keep-all" }}
+              className="text-[1.85rem] sm:text-4xl md:text-[3.25rem] font-bold text-foreground mb-6 md:mb-8"
+              style={{ lineHeight: 1.35, wordBreak: "keep-all" }}
             >
-              정리하개{" "}
-              <br className="hidden sm:block" />
+              일은 줄이고
+              <br />
               <span className="text-primary relative inline-block">
-                예약 관리
+                매출은 늘리세요
                 <svg
                   className="absolute -bottom-1.5 left-0 w-full h-2.5 md:h-3 text-primary/30"
                   viewBox="0 0 100 10"
@@ -36,22 +50,21 @@ export default function Home() {
                   <path d="M0 5 Q 50 10 100 5" stroke="currentColor" strokeWidth="8" fill="none" />
                 </svg>
               </span>
-              의 새로운 기준
             </h1>
 
-            {/* 서브타이틀: 모바일 줄바꿈 자연스럽게 */}
+            {/* 서브타이틀 */}
             <p
-              className="text-base md:text-xl text-muted-foreground mb-8 md:mb-10 max-w-xl mx-auto"
-              style={{ lineHeight: 1.75, wordBreak: "keep-all" }}
+              className="text-base md:text-lg text-muted-foreground mb-9 md:mb-11 max-w-md mx-auto"
+              style={{ lineHeight: 1.9, wordBreak: "keep-all" }}
             >
-              예약 접수부터 승인, 예약금 관리, 고객 관리까지{" "}
+              예약 접수부터 승인, 예약금 관리, 고객 관리까지
               <br className="hidden sm:block" />
-              미용샵 운영에 필요한 모든 기능을 하나로
+              {" "}미용샵 운영에 필요한 모든 기능을 하나로
             </p>
 
-            {/* CTA 버튼: 모바일은 세로, sm 이상은 가로 */}
-            <div className="flex flex-col sm:flex-row gap-3 md:gap-4 justify-center">
-              <Link href="/book/gangnam">
+            {/* CTA 버튼 */}
+            <div className="flex flex-col sm:flex-row gap-3 md:gap-4 justify-center w-full sm:w-auto">
+              <Link href="/book/gangnam" className="w-full sm:w-auto">
                 <button
                   className="w-full sm:w-auto px-7 py-3.5 md:px-8 md:py-4 bg-primary hover:bg-primary/90 text-white rounded-2xl text-base md:text-lg font-bold shadow-xl shadow-primary/25 hover:-translate-y-1 transition-all duration-200 flex items-center justify-center gap-2"
                   data-testid="button-book-now"
@@ -60,7 +73,7 @@ export default function Home() {
                   예약 페이지 체험
                 </button>
               </Link>
-              <Link href="/login">
+              <Link href="/login" className="w-full sm:w-auto">
                 <button
                   className="w-full sm:w-auto px-7 py-3.5 md:px-8 md:py-4 bg-white hover:bg-gray-50 text-foreground rounded-2xl text-base md:text-lg font-bold shadow-lg shadow-black/5 border border-border/50 hover:-translate-y-1 transition-all duration-200"
                   data-testid="button-admin-login"
@@ -72,8 +85,8 @@ export default function Home() {
           </motion.div>
         </div>
 
-        <div className="absolute top-1/2 left-10 w-64 h-64 bg-primary/10 rounded-full blur-3xl -z-10 animate-pulse" />
-        <div className="absolute top-20 right-10 w-72 h-72 bg-blue-400/10 rounded-full blur-3xl -z-10 animate-pulse delay-700" />
+        <div className="absolute top-1/2 left-10 w-72 h-72 bg-primary/8 rounded-full blur-3xl -z-10 animate-pulse" />
+        <div className="absolute top-20 right-10 w-80 h-80 bg-blue-400/8 rounded-full blur-3xl -z-10 animate-pulse delay-700" />
       </section>
 
       {/* ── Features ─────────────────────────────────────────────── */}
