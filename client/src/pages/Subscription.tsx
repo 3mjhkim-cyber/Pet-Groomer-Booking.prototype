@@ -1,13 +1,11 @@
 /**
  * Subscription.tsx — 구독 관리 페이지 (/admin/subscription)
  *
- * 단일 플랜 (29,000원/월) + 30일 무료체험 (카드 없이 시작)
- *
  * 상태별 뷰:
  *   none            → 서비스 소개 + 무료체험 시작 버튼
  *   trialing        → 체험 중 (D-3 이하이면 결제 유도 배너 표시)
  *   pending_payment → 체험 만료 / 결제 필요 (잠금)
- *   active          → 구독 관리 (다음 결제일 · 결제 내역 · 해지)
+ *   active          → 구독 관리 (플랜 / 결제수단 / 청구서 / 취소)
  *   past_due        → 결제 실패 (카드 재등록 유도)
  *   cancelled       → 해지 완료
  */
@@ -16,15 +14,12 @@ import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  Card, CardContent, CardDescription, CardHeader, CardTitle,
-} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import {
   Loader2, Check, CreditCard, ArrowLeft, AlertTriangle,
-  CalendarDays, Receipt, ShieldCheck, Lock, RefreshCw,
+  CalendarDays, Lock, RefreshCw, Scissors,
 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
@@ -34,7 +29,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { apiRequest } from "@/lib/queryClient";
 
-// ─── 단일 플랜 정의 ────────────────────────────────────────────────────────────
+// ─── 플랜 정의 ─────────────────────────────────────────────────────────────────
 const PLAN = {
   price: 29_000,
   name: "스탠다드",
@@ -76,6 +71,8 @@ interface SubData {
   daysUntilTrialEnd?: number;
   showPaymentNudge?: boolean;
   isLocked?: boolean;
+  cardBrand?: string;
+  cardLast4?: string;
 }
 
 interface PaymentRecord {
@@ -91,7 +88,7 @@ interface PaymentRecord {
 // ─── 헬퍼 ─────────────────────────────────────────────────────────────────────
 function fmtDate(d: string | null | undefined) {
   if (!d) return "-";
-  return new Date(d).toLocaleDateString("ko-KR");
+  return new Date(d).toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric" });
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -101,22 +98,17 @@ export default function Subscription() {
   const { toast } = useToast();
   const qc = useQueryClient();
 
-  // 카드 등록 중 상태
   const [isRegisteringCard, setIsRegisteringCard] = useState(false);
-  // 데모 카드 등록 다이얼로그
   const [showDemoCardDialog, setShowDemoCardDialog] = useState(false);
-  // 해지 모달
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [cancelNote, setCancelNote] = useState("");
 
-  // PortOne 설정 여부
   const isPortOneConfigured = !!(
     import.meta.env.VITE_PORTONE_STORE_ID &&
     import.meta.env.VITE_PORTONE_CHANNEL_KEY
   );
 
-  // ── API 조회 ────────────────────────────────────────────────────────────────
   const { data: sub, isLoading: isSubLoading } = useQuery<SubData>({
     queryKey: ["/api/subscription"],
     enabled: !!user,
@@ -128,7 +120,6 @@ export default function Subscription() {
     enabled: !!user && (sub?.status === "active" || sub?.status === "past_due"),
   });
 
-  // ── Mutation: 무료체험 시작 ─────────────────────────────────────────────────
   const startTrialMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", "/api/subscription/start-trial", {});
@@ -142,7 +133,6 @@ export default function Subscription() {
       toast({ title: "오류", description: "무료체험 시작에 실패했습니다.", variant: "destructive" }),
   });
 
-  // ── Mutation: 해지 ──────────────────────────────────────────────────────────
   const cancelMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", "/api/subscription/cancel", {});
@@ -157,7 +147,6 @@ export default function Subscription() {
       toast({ title: "해지 실패", variant: "destructive" }),
   });
 
-  // ── 카드 등록 + 첫 결제 ─────────────────────────────────────────────────────
   const attachAndPay = async (billingKey: string) => {
     setIsRegisteringCard(true);
     try {
@@ -176,36 +165,25 @@ export default function Subscription() {
 
   const handleRegisterCard = async () => {
     if (!isPortOneConfigured) {
-      // 개발/데모 모드
       setShowDemoCardDialog(true);
       return;
     }
-
     setIsRegisteringCard(true);
     try {
       const PortOne = (await import("@portone/browser-sdk/v2")).default;
       const storeId    = import.meta.env.VITE_PORTONE_STORE_ID;
       const channelKey = import.meta.env.VITE_PORTONE_CHANNEL_KEY;
-
-      // PortOne V2: 빌링키 발급 (카드 등록)
       const response = await (PortOne as any).requestIssueBillingKey({
-        storeId,
-        channelKey,
+        storeId, channelKey,
         billingKeyMethod: "CARD",
         issueId: `issue-${Date.now()}-${Math.random().toString(36).slice(2)}`,
         issueName: "펫그루머 서비스 카드 등록",
         customer: { id: String(user?.id) },
       });
-
       if (response?.code) {
-        toast({
-          title: "카드 등록 실패",
-          description: response.message || "카드 등록이 취소되었습니다.",
-          variant: "destructive",
-        });
+        toast({ title: "카드 등록 실패", description: response.message || "카드 등록이 취소되었습니다.", variant: "destructive" });
         return;
       }
-
       await attachAndPay(response.billingKey);
     } catch (err: any) {
       toast({ title: "카드 등록 오류", description: err.message, variant: "destructive" });
@@ -230,7 +208,7 @@ export default function Subscription() {
   const status = sub?.status ?? "none";
 
   // ══════════════════════════════════════════════════════════════════════════════
-  // 뷰 1: 구독 없음 — 서비스 소개 + 무료체험 시작
+  // 뷰 1: 구독 없음 — 무료체험 시작
   // ══════════════════════════════════════════════════════════════════════════════
   if (status === "none") {
     return (
@@ -240,264 +218,241 @@ export default function Subscription() {
             onClick={() => setLocation("/admin/dashboard")}>
             <ArrowLeft className="w-4 h-4" /> 대시보드로
           </Button>
-
           <div className="text-center mb-8">
             <h1 className="text-3xl font-bold mb-2">30일 무료체험 시작하기</h1>
-            <p className="text-muted-foreground">
+            <p className="text-muted-foreground text-sm">
               카드 등록 없이 바로 시작하세요. 체험 기간 동안 모든 기능을 무제한으로 이용할 수 있습니다.
             </p>
           </div>
-
-          <Card className="border-primary/30 shadow-md mb-6">
-            <CardHeader className="text-center">
-              <CardTitle className="text-xl">스탠다드 플랜</CardTitle>
-              <div className="mt-2">
-                <span className="text-4xl font-bold">{PLAN.price.toLocaleString()}원</span>
-                <span className="text-muted-foreground">/월</span>
-              </div>
-              <CardDescription>체험 종료 후 자동으로 요금이 청구되지 않습니다</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ul className="space-y-2.5 mb-6">
-                {PLAN.features.map((f) => (
-                  <li key={f} className="flex items-center gap-2.5 text-sm">
-                    <Check className="w-4 h-4 text-primary flex-shrink-0" />
-                    {f}
-                  </li>
-                ))}
-              </ul>
-              <Button
-                className="w-full" size="lg"
-                onClick={() => startTrialMutation.mutate()}
-                disabled={startTrialMutation.isPending}
-              >
-                {startTrialMutation.isPending
-                  ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />시작하는 중...</>
-                  : <>무료체험 시작하기 (30일, 카드 불필요)</>
-                }
-              </Button>
-              <p className="text-xs text-muted-foreground text-center mt-3">
-                • 체험 종료 후 자동 결제되지 않습니다 &nbsp;•&nbsp; 언제든지 카드 등록 후 유료 전환 가능
-              </p>
-            </CardContent>
-          </Card>
+          <div className="rounded-xl border border-primary/20 shadow-sm p-6 bg-card mb-4">
+            <div className="text-center mb-5">
+              <p className="text-sm text-muted-foreground mb-1">{PLAN.name} 플랜</p>
+              <p className="text-4xl font-bold">{PLAN.price.toLocaleString()}<span className="text-xl font-normal text-muted-foreground">원/월</span></p>
+            </div>
+            <ul className="space-y-2.5 mb-6">
+              {PLAN.features.map((f) => (
+                <li key={f} className="flex items-center gap-2.5 text-sm">
+                  <Check className="w-4 h-4 text-primary flex-shrink-0" />
+                  {f}
+                </li>
+              ))}
+            </ul>
+            <Button className="w-full" size="lg"
+              onClick={() => startTrialMutation.mutate()}
+              disabled={startTrialMutation.isPending}>
+              {startTrialMutation.isPending
+                ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />시작하는 중...</>
+                : "무료체험 시작하기 (30일, 카드 불필요)"}
+            </Button>
+            <p className="text-xs text-muted-foreground text-center mt-3">
+              체험 종료 후 자동 결제되지 않습니다
+            </p>
+          </div>
         </div>
       </div>
     );
   }
 
   // ══════════════════════════════════════════════════════════════════════════════
-  // 공통 레이아웃 (trialing / pending / active / past_due / cancelled)
+  // 공통 레이아웃 — 설정 페이지 스타일
   // ══════════════════════════════════════════════════════════════════════════════
   return (
     <div className="min-h-screen bg-background py-10 px-4">
-      <div className="max-w-2xl mx-auto space-y-4">
+      <div className="max-w-2xl mx-auto">
 
         {/* 헤더 */}
-        <div className="flex items-center gap-3 mb-2">
+        <div className="flex items-center gap-3 mb-8">
           <Button variant="ghost" size="icon" onClick={() => setLocation("/admin/dashboard")}>
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <h1 className="text-2xl font-bold">구독 관리</h1>
         </div>
 
-        {/* ─── 체험 D-3 경고 배너 ──────────────────────────────────────────── */}
+        {/* ─── 경고 배너들 ─────────────────────────────────────────────────── */}
         {sub?.showPaymentNudge && status === "trialing" && (
-          <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 mb-6">
             <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0 text-amber-500" />
-            <span>
-              무료체험이 <strong>{sub.daysUntilTrialEnd}일 후</strong> 종료됩니다.
-              서비스를 계속 이용하려면 카드를 등록해주세요.
-            </span>
+            <span>무료체험이 <strong>{sub.daysUntilTrialEnd}일 후</strong> 종료됩니다. 서비스를 계속 이용하려면 카드를 등록해주세요.</span>
           </div>
         )}
-
-        {/* ─── 체험 만료 / 잠금 배너 ───────────────────────────────────────── */}
         {status === "pending_payment" && (
-          <div className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          <div className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 mb-6">
             <Lock className="w-4 h-4 mt-0.5 flex-shrink-0 text-red-500" />
-            <span>
-              {sub?.daysUntilTrialEnd != null && sub.daysUntilTrialEnd <= 0
-                ? "무료체험이 종료되어 서비스가 제한됩니다."
-                : `무료체험 종료 ${Math.abs(sub?.daysUntilTrialEnd ?? 0)}일 전입니다.`}
-              {" "}카드를 등록하면 즉시 이용 가능합니다.
-            </span>
+            <span>무료체험이 종료되어 서비스가 제한됩니다. 카드를 등록하면 즉시 이용 가능합니다.</span>
           </div>
         )}
-
-        {/* ─── 결제 실패 배너 ──────────────────────────────────────────────── */}
         {status === "past_due" && (
-          <div className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          <div className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 mb-6">
             <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0 text-red-500" />
-            <span>
-              정기결제에 실패했습니다 ({sub?.failCount ?? 0}회).
-              카드를 다시 등록하면 즉시 결제 후 서비스가 정상화됩니다.
-            </span>
+            <span>정기결제에 실패했습니다 ({sub?.failCount ?? 0}회). 카드를 다시 등록하면 즉시 결제 후 서비스가 정상화됩니다.</span>
           </div>
         )}
 
-        {/* ─── 현재 플랜 카드 ──────────────────────────────────────────────── */}
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-start justify-between mb-3">
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">구독 플랜</p>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xl font-bold">{PLAN.name}</span>
-                  <Badge variant="secondary">월간</Badge>
-                  {status === "trialing" && (
-                    <Badge className="bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-100">
-                      무료체험 중{sub?.daysUntilTrialEnd != null ? ` (D-${Math.max(0, sub.daysUntilTrialEnd)})` : ""}
-                    </Badge>
-                  )}
-                  {status === "pending_payment" && (
-                    <Badge variant="outline" className="text-red-600 border-red-300">결제 필요</Badge>
-                  )}
-                  {status === "active" && (
-                    <Badge className="bg-green-100 text-green-700 border-green-200 hover:bg-green-100">활성</Badge>
-                  )}
-                  {status === "past_due" && (
-                    <Badge variant="outline" className="text-orange-600 border-orange-300">결제 실패</Badge>
-                  )}
-                  {status === "cancelled" && (
-                    <Badge variant="secondary">해지됨</Badge>
-                  )}
-                </div>
-              </div>
-              <span className="text-lg font-bold text-primary whitespace-nowrap">
-                {PLAN.price.toLocaleString()}원
-                <span className="text-sm font-normal text-muted-foreground">/월</span>
-              </span>
+        {/* ─── 1. 플랜 섹션 ───────────────────────────────────────────────── */}
+        <div className="flex items-start justify-between py-6 border-b">
+          <div className="flex items-center gap-4">
+            <div className="bg-primary/10 p-3 rounded-xl">
+              <Scissors className="w-5 h-5 text-primary" />
             </div>
+            <div>
+              <div className="flex items-center gap-2 mb-0.5">
+                <span className="font-semibold text-base">{PLAN.name} 플랜</span>
+                {status === "trialing" && (
+                  <Badge className="bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-100 text-xs">
+                    무료체험{sub?.daysUntilTrialEnd != null ? ` D-${Math.max(0, sub.daysUntilTrialEnd)}` : ""}
+                  </Badge>
+                )}
+                {status === "active" && (
+                  <Badge className="bg-green-100 text-green-700 border-green-200 hover:bg-green-100 text-xs">활성</Badge>
+                )}
+                {status === "past_due" && (
+                  <Badge variant="outline" className="text-orange-600 border-orange-300 text-xs">결제 실패</Badge>
+                )}
+                {status === "cancelled" && (
+                  <Badge variant="secondary" className="text-xs">해지됨</Badge>
+                )}
+                {status === "pending_payment" && (
+                  <Badge variant="outline" className="text-red-600 border-red-300 text-xs">결제 필요</Badge>
+                )}
+              </div>
+              <p className="text-sm text-muted-foreground">
+                월간 · {PLAN.price.toLocaleString()}원/월
+              </p>
+              {status === "active" && sub?.nextBillingDate && (
+                <p className="text-sm text-muted-foreground flex items-center gap-1 mt-0.5">
+                  <CalendarDays className="w-3.5 h-3.5" />
+                  구독이 {fmtDate(sub.nextBillingDate)}에 자동으로 갱신됩니다
+                </p>
+              )}
+              {status === "trialing" && sub?.trialEndDate && (
+                <p className="text-sm text-muted-foreground flex items-center gap-1 mt-0.5">
+                  <CalendarDays className="w-3.5 h-3.5" />
+                  무료체험 종료일: {fmtDate(sub.trialEndDate)}
+                </p>
+              )}
+              {status === "cancelled" && (
+                <p className="text-sm text-muted-foreground mt-0.5">구독이 해지되었습니다.</p>
+              )}
+            </div>
+          </div>
+          {/* 플랜 조정 버튼은 active 상태일 때만 */}
+          {status === "active" && (
+            <Button variant="outline" size="sm" className="flex-shrink-0">
+              요금제 조정
+            </Button>
+          )}
+        </div>
 
-            {/* 날짜 정보 */}
-            {status === "trialing" && sub?.trialEndDate && (
-              <p className="text-sm text-muted-foreground flex items-center gap-1.5 mb-3">
-                <CalendarDays className="w-4 h-4" />
-                무료체험 종료일: <strong>{fmtDate(sub.trialEndDate)}</strong>
-              </p>
-            )}
-            {status === "active" && sub?.nextBillingDate && (
-              <p className="text-sm text-muted-foreground flex items-center gap-1.5 mb-3">
-                <CalendarDays className="w-4 h-4" />
-                다음 결제일: <strong>{fmtDate(sub.nextBillingDate)}</strong>
-              </p>
-            )}
-            {status === "cancelled" && (
-              <p className="text-sm text-muted-foreground mb-3">
-                구독이 해지되었습니다. 다시 이용하시려면 카드를 등록하세요.
-              </p>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* ─── 카드 등록 CTA (trialing·pending_payment·past_due·cancelled) ─ */}
-        {(status === "trialing" || status === "pending_payment" || status === "past_due" || status === "cancelled") && (
-          <Card className={
-            status === "pending_payment" || status === "past_due"
-              ? "border-primary shadow-md"
-              : ""
-          }>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                <CreditCard className="w-4 h-4" />
-                {status === "past_due" ? "카드 재등록" : "카드 등록 후 구독 시작"}
-              </CardTitle>
-              <CardDescription>
-                카드를 등록하면 즉시 {PLAN.price.toLocaleString()}원이 결제되고 구독이 시작됩니다.
-                이후 매월 자동으로 갱신됩니다.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Button
-                className="w-full" size="lg"
+        {/* ─── 2. 결제 수단 섹션 (active·past_due) ───────────────────────── */}
+        {(status === "active" || status === "past_due") && (
+          <div className="py-6 border-b">
+            <h2 className="font-semibold mb-4">결제</h2>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm">
+                <CreditCard className="w-4 h-4 text-muted-foreground" />
+                {sub?.cardBrand && sub?.cardLast4
+                  ? <span>{sub.cardBrand} ●●●● {sub.cardLast4}</span>
+                  : <span className="text-muted-foreground">등록된 카드</span>
+                }
+              </div>
+              <Button variant="outline" size="sm"
                 onClick={handleRegisterCard}
-                disabled={isRegisteringCard}
-              >
+                disabled={isRegisteringCard}>
                 {isRegisteringCard
-                  ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />처리 중...</>
-                  : <><CreditCard className="w-4 h-4 mr-2" />카드 등록하고 구독 시작</>
+                  ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />처리 중...</>
+                  : status === "past_due" ? "카드 재등록" : "업데이트"
                 }
               </Button>
-              <p className="text-xs text-muted-foreground">
-                • 구독은 언제든지 해지할 수 있습니다 &nbsp;•&nbsp; 해지 후 남은 기간은 계속 이용 가능합니다
-              </p>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         )}
 
-        {/* ─── 결제 내역 (active·past_due) ────────────────────────────────── */}
+        {/* ─── 카드 등록 CTA (trialing·pending_payment·cancelled) ────────── */}
+        {(status === "trialing" || status === "pending_payment" || status === "cancelled") && (
+          <div className="py-6 border-b">
+            <h2 className="font-semibold mb-1">결제</h2>
+            <p className="text-sm text-muted-foreground mb-4">
+              카드를 등록하면 즉시 {PLAN.price.toLocaleString()}원이 결제되고 구독이 시작됩니다.
+            </p>
+            <Button
+              onClick={handleRegisterCard}
+              disabled={isRegisteringCard}
+              variant={status === "pending_payment" ? "default" : "outline"}
+            >
+              {isRegisteringCard
+                ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />처리 중...</>
+                : <><CreditCard className="w-4 h-4 mr-2" />카드 등록하고 구독 시작</>
+              }
+            </Button>
+          </div>
+        )}
+
+        {/* ─── 3. 청구서 섹션 (active·past_due) ──────────────────────────── */}
         {(status === "active" || status === "past_due") && (
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Receipt className="w-4 h-4" />
-                결제 내역
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              {!payments || payments.length === 0 ? (
-                <p className="text-sm text-muted-foreground px-6 pb-6">결제 내역이 없습니다.</p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b bg-muted/40">
-                        <th className="text-left px-6 py-2 text-xs text-muted-foreground font-medium">날짜</th>
-                        <th className="text-left px-4 py-2 text-xs text-muted-foreground font-medium">금액</th>
-                        <th className="text-left px-4 py-2 text-xs text-muted-foreground font-medium">상태</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {payments.map((p) => (
-                        <tr key={p.id} className="border-b last:border-0 hover:bg-muted/20">
-                          <td className="px-6 py-3">{fmtDate(p.attemptedAt)}</td>
-                          <td className="px-4 py-3 font-medium">₩{p.amount.toLocaleString()}</td>
-                          <td className="px-4 py-3">
-                            {p.result === "success" ? (
-                              <Badge variant="outline" className="text-green-700 border-green-200 bg-green-50 gap-1">
-                                <ShieldCheck className="w-3 h-3" />결제됨
-                              </Badge>
-                            ) : (
-                              <Badge variant="outline" className="text-red-600 border-red-200 gap-1">
-                                <RefreshCw className="w-3 h-3" />실패
-                              </Badge>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+          <div className="py-6 border-b">
+            <h2 className="font-semibold mb-4">청구서</h2>
+            {!payments || payments.length === 0 ? (
+              <p className="text-sm text-muted-foreground">결제 내역이 없습니다.</p>
+            ) : (
+              <div className="w-full">
+                {/* 테이블 헤더 */}
+                <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-8 text-xs text-muted-foreground pb-3 border-b">
+                  <span>날짜</span>
+                  <span>총계</span>
+                  <span>상태</span>
+                  <span>작업</span>
                 </div>
-              )}
-            </CardContent>
-          </Card>
+                {/* 테이블 행 */}
+                {payments.map((p) => (
+                  <div key={p.id} className="grid grid-cols-[1fr_auto_auto_auto] gap-x-8 items-center py-3 border-b last:border-0 text-sm">
+                    <span>{fmtDate(p.attemptedAt)}</span>
+                    <span className="font-medium">₩{p.amount.toLocaleString()}</span>
+                    <span>
+                      {p.result === "success" ? (
+                        <span className="text-green-600 font-medium">결제됨</span>
+                      ) : (
+                        <span className="text-red-500 flex items-center gap-1">
+                          <RefreshCw className="w-3 h-3" />실패
+                        </span>
+                      )}
+                    </span>
+                    <span>
+                      {p.result === "success" && p.providerTxId ? (
+                        <button className="text-primary text-sm underline underline-offset-2 hover:opacity-70 transition-opacity">
+                          보기
+                        </button>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         )}
 
-        {/* ─── 구독 해지 (active만) ────────────────────────────────────────── */}
+        {/* ─── 4. 취소 섹션 (active만) ────────────────────────────────────── */}
         {status === "active" && (
-          <Card className="border-destructive/20">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base text-destructive">구독 해지</CardTitle>
-              <CardDescription>
-                해지하면 다음 결제일부터 자동 갱신이 중단됩니다.
-                {sub?.nextBillingDate && ` (다음 결제일: ${fmtDate(sub.nextBillingDate)})`}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button
-                variant="outline"
-                className="border-destructive/40 text-destructive hover:bg-destructive hover:text-white"
-                onClick={() => setShowCancelModal(true)}
-              >
-                구독 해지
-              </Button>
-            </CardContent>
-          </Card>
+          <div className="py-6">
+            <h2 className="font-semibold mb-1">취소</h2>
+            <p className="text-sm text-muted-foreground mb-4">
+              구독을 취소하면 다음 결제일부터 자동 갱신이 중단됩니다.
+              {sub?.nextBillingDate && ` (다음 결제일: ${fmtDate(sub.nextBillingDate)})`}
+            </p>
+            <Button
+              variant="outline"
+              className="text-destructive border-destructive/30 hover:bg-destructive hover:text-white"
+              onClick={() => setShowCancelModal(true)}
+            >
+              구독 취소
+            </Button>
+          </div>
         )}
+
       </div>
 
-      {/* ── 데모 카드 등록 다이얼로그 (PortOne 미설정 시) ───────────────────── */}
+      {/* ── 데모 카드 등록 다이얼로그 ─────────────────────────────────────────── */}
       <Dialog open={showDemoCardDialog} onOpenChange={setShowDemoCardDialog}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
@@ -520,9 +475,7 @@ export default function Subscription() {
             </div>
           </div>
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setShowDemoCardDialog(false)} disabled={isRegisteringCard}>
-              취소
-            </Button>
+            <Button variant="outline" onClick={() => setShowDemoCardDialog(false)} disabled={isRegisteringCard}>취소</Button>
             <Button
               onClick={async () => {
                 setShowDemoCardDialog(false);
@@ -543,9 +496,9 @@ export default function Subscription() {
       <Dialog open={showCancelModal} onOpenChange={setShowCancelModal}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>구독 해지</DialogTitle>
+            <DialogTitle>구독 취소</DialogTitle>
             <DialogDescription>
-              해지하면 다음 결제일부터 자동 갱신이 중단됩니다.
+              취소 사유를 선택해주세요. 다음 결제일부터 자동 갱신이 중단됩니다.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
@@ -587,7 +540,7 @@ export default function Subscription() {
               onClick={() => cancelMutation.mutate()}
             >
               {cancelMutation.isPending && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
-              구독 해지
+              구독 취소
             </Button>
           </DialogFooter>
         </DialogContent>
