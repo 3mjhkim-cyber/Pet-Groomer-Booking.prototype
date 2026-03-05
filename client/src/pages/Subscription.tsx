@@ -205,7 +205,13 @@ export default function Subscription() {
     return null;
   }
 
-  const status = sub?.status ?? "none";
+  // API가 none을 반환해도 shop 레벨 구독이 활성이면 해당 상태를 사용
+  const shopStatus = (user as any)?.shop?.subscriptionStatus as string | undefined;
+  const rawStatus = sub?.status ?? "none";
+  const status: SubStatus =
+    rawStatus === "none" && (shopStatus === "active" || shopStatus === "trialing")
+      ? (shopStatus as SubStatus)
+      : rawStatus;
 
   // ══════════════════════════════════════════════════════════════════════════════
   // 뷰 1: 구독 없음 — 무료체험 시작
