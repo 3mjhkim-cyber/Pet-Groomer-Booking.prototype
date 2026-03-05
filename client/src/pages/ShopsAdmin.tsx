@@ -245,10 +245,10 @@ export default function ShopsAdmin() {
   const paginated   = filtered.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
   // ── 탭 정의 ──────────────────────────────────────────────────────────────
-  const TABS: { key: ShopFilter; label: string; count: number }[] = [
-    { key: "all",      label: "전체 가맹점",  count: allShops.length },
-    { key: "active",   label: "활성 가맹점",  count: activeShops.length },
-    { key: "inactive", label: "비활성 가맹점", count: inactiveShops.length },
+  const TABS: { key: ShopFilter; label: string; shortLabel: string; count: number }[] = [
+    { key: "all",      label: "전체 가맹점",  shortLabel: "전체",  count: allShops.length },
+    { key: "active",   label: "활성 가맹점",  shortLabel: "활성",  count: activeShops.length },
+    { key: "inactive", label: "비활성 가맹점", shortLabel: "비활성", count: inactiveShops.length },
   ];
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -257,29 +257,29 @@ export default function ShopsAdmin() {
 
       {/* ── 헤더 ── */}
       <header className="bg-white border-b sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-3">
+        <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center gap-2">
+          <div className="flex items-center gap-2 min-w-0">
             {/* 플랫폼 관리 대시보드로 돌아가기 */}
             <Button
               variant="ghost" size="sm"
-              className="gap-1.5 text-muted-foreground hover:text-foreground"
+              className="gap-1 text-muted-foreground hover:text-foreground px-2 flex-shrink-0"
               onClick={() => setLocation("/admin/platform")}
             >
               <ArrowLeft className="w-4 h-4" />
               <span className="hidden sm:inline">돌아가기</span>
             </Button>
-            <div className="w-px h-6 bg-border" />
-            <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center">
-              <Store className="w-5 h-5 text-white" />
+            <div className="w-px h-6 bg-border flex-shrink-0" />
+            <div className="w-8 h-8 sm:w-10 sm:h-10 bg-primary rounded-xl flex items-center justify-center flex-shrink-0">
+              <Store className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
             </div>
-            <div>
-              <h1 className="font-bold text-lg">가맹점 관리</h1>
-              <p className="text-sm text-muted-foreground">전체 가맹점 목록 · 검색 · 편집</p>
+            <div className="min-w-0">
+              <h1 className="font-bold text-sm sm:text-lg leading-tight">가맹점 관리</h1>
+              <p className="text-xs text-muted-foreground hidden sm:block">전체 가맹점 목록 · 검색 · 편집</p>
             </div>
           </div>
-          <Button variant="outline" size="sm" onClick={() => logout()}>
-            <LogOut className="w-4 h-4 mr-2" />
-            로그아웃
+          <Button variant="outline" size="sm" onClick={() => logout()} className="flex-shrink-0">
+            <LogOut className="w-4 h-4 sm:mr-2" />
+            <span className="hidden sm:inline">로그아웃</span>
           </Button>
         </div>
       </header>
@@ -292,39 +292,41 @@ export default function ShopsAdmin() {
         <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
 
           {/* 박스 헤더 */}
-          <div className="flex items-center justify-between px-5 py-4 border-b">
-            <div className="flex items-center gap-2">
-              <Store className="w-5 h-5 text-primary" />
-              <h2 className="font-bold text-base">가맹점 목록</h2>
-              <span className="text-sm text-muted-foreground">
-                ({filtered.length}개 / 전체 {allShops.length}개)
+          <div className="flex items-center justify-between px-5 py-4 border-b gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <Store className="w-4 h-4 sm:w-5 sm:h-5 text-primary flex-shrink-0" />
+              <h2 className="font-bold text-sm sm:text-base whitespace-nowrap">가맹점 목록</h2>
+              <span className="text-xs text-muted-foreground whitespace-nowrap">
+                <span className="sm:hidden">({filtered.length}/{allShops.length})</span>
+                <span className="hidden sm:inline">({filtered.length}개 / 전체 {allShops.length}개)</span>
               </span>
             </div>
             <Button
               variant="ghost" size="sm"
               onClick={() => refetch()}
               disabled={isFetching}
-              className="text-muted-foreground gap-1.5"
+              className="text-muted-foreground gap-1 flex-shrink-0 px-2"
             >
               <RefreshCw className={`w-4 h-4 ${isFetching ? "animate-spin" : ""}`} />
-              새로고침
+              <span className="hidden sm:inline">새로고침</span>
             </Button>
           </div>
 
           {/* 탭 */}
-          <div className="flex border-b px-5 gap-1">
+          <div className="flex border-b px-3 sm:px-5 gap-0.5 sm:gap-1">
             {TABS.map(t => (
               <button
                 key={t.key}
                 onClick={() => { setFilter(t.key); setSearch(""); }}
                 className={[
-                  "flex items-center gap-1.5 px-3 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
+                  "flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-3 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
                   filter === t.key
                     ? "border-primary text-primary"
                     : "border-transparent text-muted-foreground hover:text-foreground",
                 ].join(" ")}
               >
-                {t.label}
+                <span className="sm:hidden">{t.shortLabel}</span>
+                <span className="hidden sm:inline">{t.label}</span>
                 <span className={[
                   "text-xs rounded-full px-1.5 py-0.5 font-semibold",
                   filter === t.key

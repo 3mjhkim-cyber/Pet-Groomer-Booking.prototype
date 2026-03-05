@@ -92,19 +92,19 @@ export default function PlatformAdmin() {
 
       {/* ── 헤더 ── */}
       <header className="bg-white border-b sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center">
-              <Settings className="w-5 h-5 text-white" />
+        <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 bg-primary rounded-xl flex items-center justify-center flex-shrink-0">
+              <Settings className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
             </div>
-            <div>
-              <h1 className="font-bold text-lg">정리하개 플랫폼 관리</h1>
-              <p className="text-sm text-muted-foreground">총 관리자 대시보드</p>
+            <div className="min-w-0">
+              <h1 className="font-bold text-sm sm:text-lg leading-tight truncate">정리하개 플랫폼 관리</h1>
+              <p className="text-xs text-muted-foreground hidden sm:block">총 관리자 대시보드</p>
             </div>
           </div>
-          <Button variant="outline" onClick={() => logout()} data-testid="button-logout">
-            <LogOut className="w-4 h-4 mr-2" />
-            로그아웃
+          <Button variant="outline" size="sm" onClick={() => logout()} data-testid="button-logout" className="flex-shrink-0">
+            <LogOut className="w-4 h-4 sm:mr-2" />
+            <span className="hidden sm:inline">로그아웃</span>
           </Button>
         </div>
       </header>
@@ -148,21 +148,22 @@ export default function PlatformAdmin() {
 
         {/* ── 최근 등록 가맹점 미리보기 ────────────────────────────────────── */}
         <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
-          <div className="flex items-center justify-between px-5 py-4 border-b">
-            <div className="flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-primary" />
-              <h2 className="font-bold text-base">최근 등록 가맹점</h2>
-              <span className="text-sm text-muted-foreground">(최근 5개)</span>
+          <div className="flex items-center justify-between px-5 py-4 border-b gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-primary flex-shrink-0" />
+              <h2 className="font-bold text-sm sm:text-base whitespace-nowrap">최근 등록 가맹점</h2>
+              <span className="text-xs text-muted-foreground whitespace-nowrap hidden sm:inline">(최근 5개)</span>
             </div>
             {/* 전체 가맹점 관리 페이지로 이동 */}
             <Button
               variant="outline" size="sm"
               onClick={() => setLocation("/admin/shops")}
-              className="gap-1.5"
+              className="gap-1 flex-shrink-0 text-xs sm:text-sm px-2 sm:px-3"
               data-testid="button-go-shops-admin"
             >
-              전체 가맹점 관리
-              <ArrowRight className="w-4 h-4" />
+              <span className="sm:hidden">전체보기</span>
+              <span className="hidden sm:inline">전체 가맹점 관리</span>
+              <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </Button>
           </div>
 
