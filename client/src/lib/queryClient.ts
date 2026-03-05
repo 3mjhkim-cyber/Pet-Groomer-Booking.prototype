@@ -2,6 +2,11 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
+    // 구독 만료 → 구독 관리 페이지로 이동
+    if (res.status === 402) {
+      window.location.href = '/admin/subscription';
+      return;
+    }
     const text = (await res.text()) || res.statusText;
     throw new Error(`${res.status}: ${text}`);
   }
