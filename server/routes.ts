@@ -973,37 +973,20 @@ export async function registerRoutes(
     res.json(booking);
   });
 
+  // 관리자용 예약금 요청 (depositReceived 알림 발송)
+  // 흐름: 예약 조회 → depositStatus=waiting → shop 조회 → 템플릿 치환 → 발송
   app.patch('/api/bookings/:id/deposit-request', requireAuth, async (req, res) => {
-    const booking = await storage.requestDeposit(Number(req.params.id));
-    if (!booking) {
-      return res.status(404).json({ message: "Booking not found" });
-    }
-    res.json(booking);
-  });
-
-  app.patch('/api/bookings/:id/deposit-confirm', async (req, res) => {
-    const booking = await storage.confirmDeposit(Number(req.params.id));
-    if (!booking) {
-      return res.status(404).json({ message: "Booking not found" });
-    }
-    res.json(booking);
-  });
-
-  // 관리자용 입금확인 (예약금 입금 알림)
-  // 흐름: 예약 조회 → depositStatus=paid + status=confirmed → shop 조회 → 템플릿 치환 → 발송
-  app.patch('/api/bookings/:id/admin-confirm-deposit', requireAuth, async (req, res) => {
     const user = req.user as any;
     const bookingId = Number(req.params.id);
 
     // 1. 예약 데이터 조회 (치환에 사용할 원본 데이터)
     const bookingData = await storage.getBooking(bookingId);
 
-    // 2. 상태 변경 (confirmed + depositStatus=paid)
-    const booking = await storage.updateBookingStatus(bookingId, 'confirmed');
+    // 2. 상태 변경 (depositStatus=waiting)
+    const booking = await storage.requestDeposit(bookingId);
     if (!booking) {
       return res.status(404).json({ message: "Booking not found" });
     }
-    const updatedBooking = await storage.confirmDeposit(bookingId);
 
     // 3. 가게 데이터 조회 및 depositReceived 알림 발송
     const shopId = booking.shopId ?? user.shopId;
@@ -1019,6 +1002,51 @@ export async function registerRoutes(
 
           // 5. 발송 (stub)
           await sendNotification(bookingData.customerPhone, message, 'depositReceived');
+        }
+      }
+    }
+
+    res.json(booking);
+  });
+
+  app.patch('/api/bookings/:id/deposit-confirm', async (req, res) => {
+    const booking = await storage.confirmDeposit(Number(req.params.id));
+    if (!booking) {
+      return res.status(404).json({ message: "Booking not found" });
+    }
+    res.json(booking);
+  });
+
+  // 관리자용 입금확인 (예약 확정 알림)
+  // 흐름: 예약 조회 → depositStatus=paid + status=confirmed → shop 조회 → 템플릿 치환 → 발송
+  app.patch('/api/bookings/:id/admin-confirm-deposit', requireAuth, async (req, res) => {
+    const user = req.user as any;
+    const bookingId = Number(req.params.id);
+
+    // 1. 예약 데이터 조회 (치환에 사용할 원본 데이터)
+    const bookingData = await storage.getBooking(bookingId);
+
+    // 2. 상태 변경 (confirmed + depositStatus=paid)
+    const booking = await storage.updateBookingStatus(bookingId, 'confirmed');
+    if (!booking) {
+      return res.status(404).json({ message: "Booking not found" });
+    }
+    const updatedBooking = await storage.confirmDeposit(bookingId);
+
+    // 3. 가게 데이터 조회 및 bookingConfirmed 알림 발송
+    const shopId = booking.shopId ?? user.shopId;
+    if (shopId && bookingData) {
+      const shop = await storage.getShop(shopId);
+      if (shop) {
+        const notifSettings = parseNotifSettings(shop);
+        const config = notifSettings.bookingConfirmed;
+
+        if (config?.enabled) {
+          // 4. 템플릿 변수 치환
+          const message = buildMessage(config, bookingData, shop);
+
+          // 5. 발송 (stub)
+          await sendNotification(bookingData.customerPhone, message, 'bookingConfirmed');
         }
       }
     }
