@@ -150,6 +150,37 @@ function requireShopOwner(req: any, res: any, next: any) {
   next();
 }
 
+/**
+ * 구독 상태 체크 미들웨어.
+ * 슈퍼관리자는 항상 통과. 샵 오너는 구독이 활성이어야 함.
+ * 만료·미구독 → 402 SUBSCRIPTION_REQUIRED
+ */
+async function requireActiveSubscription(req: any, res: any, next: any) {
+  if (!req.user) return res.status(401).json({ message: "로그인이 필요합니다." });
+  if (req.user.role === 'super_admin') return next();
+
+  const user = req.user;
+
+  // shop 레벨 구독 확인 (관리자가 수동 활성화한 경우 포함)
+  if (user.shopId) {
+    const shop = await storage.getShop(user.shopId);
+    if (shop?.subscriptionStatus === 'active') {
+      const now = new Date();
+      const end = shop.subscriptionEnd ? new Date(shop.subscriptionEnd) : null;
+      if (!end || end > now) return next();
+    }
+  }
+
+  // userSubscription 레벨 구독 확인 (빌링 시스템)
+  const sub = await storage.getUserSubscription(user.id);
+  if (sub?.status === 'active') return next();
+
+  return res.status(402).json({
+    code: 'SUBSCRIPTION_REQUIRED',
+    message: '구독이 만료되었습니다. 구독 관리 페이지에서 결제해주세요.',
+  });
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -172,6 +203,21 @@ export async function registerRoutes(
 
   app.use(passport.initialize());
   app.use(passport.session());
+
+  // ── 구독 필요 API 경로에 requireActiveSubscription 적용 ──────────────────────
+  // /api/subscription* 은 제외 (구독 페이지 자체 API는 항상 접근 가능해야 함)
+  const SUBSCRIPTION_GUARDED = [
+    '/api/bookings',
+    '/api/customers',
+    '/api/calendar',
+    '/api/revenue',
+    '/api/services',
+    '/api/operations',
+    '/api/notifications',
+  ];
+  for (const path of SUBSCRIPTION_GUARDED) {
+    app.use(path, requireActiveSubscription);
+  }
 
   passport.use(new LocalStrategy(
     { usernameField: 'email', passwordField: 'password' },
