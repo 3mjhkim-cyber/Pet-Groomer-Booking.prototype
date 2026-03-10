@@ -198,10 +198,11 @@ export default function Home() {
               <span className="font-semibold">정리하개</span>
             </div>
             <span className="text-white/10">·</span>
-            <span>이용약관</span>
-            <span>개인정보처리방침</span>
-            <span>고객센터</span>
-            <span className="sm:ml-auto">help@jeongrihagae.com &nbsp;·&nbsp; 평일 10–18시</span>
+            <a href="/terms" className="hover:text-white/60 transition-colors">이용약관</a>
+            <a href="/privacy" className="hover:text-white/60 transition-colors">개인정보처리방침</a>
+            <a href="/refund" className="hover:text-white/60 transition-colors">환불정책</a>
+            <a href="/support" className="hover:text-white/60 transition-colors">고객센터</a>
+            <span className="sm:ml-auto">3mjhkim@naver.com &nbsp;·&nbsp; 평일 10–18시</span>
           </div>
         </div>
       </footer>
