@@ -191,7 +191,7 @@ export default function Home() {
 
       {/* ── Footer ───────────────────────────────────────────────── */}
       <footer className="bg-foreground">
-        <div className="container mx-auto px-6 py-6">
+        <div className="container mx-auto px-6 py-6 space-y-3">
           <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-[11px] text-white/25">
             <div className="flex items-center gap-1.5 text-white/35">
               <Scissors className="w-3 h-3" />
@@ -203,6 +203,11 @@ export default function Home() {
             <a href="/refund" className="hover:text-white/60 transition-colors">환불정책</a>
             <a href="/support" className="hover:text-white/60 transition-colors">고객센터</a>
             <span className="sm:ml-auto">3mjhkim@naver.com &nbsp;·&nbsp; 평일 10–18시</span>
+          </div>
+          <div className="text-[10px] text-white/20 flex flex-wrap gap-x-4 gap-y-1">
+            <span>상호: 정리하개</span>
+            <span>대표자: 김제훈</span>
+            <span>사업자등록번호: 855-17-02648</span>
           </div>
         </div>
       </footer>
