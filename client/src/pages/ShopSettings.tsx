@@ -1,4 +1,5 @@
 import { useAuth } from "@/hooks/use-auth";
+import { useIsSubscriptionAccessible } from "@/hooks/use-subscription";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Loader2, User, Key, ArrowLeft, CheckCircle2, AlertCircle, ExternalLink } from "lucide-react";
@@ -14,6 +15,7 @@ import type { Shop } from "@shared/schema";
 
 export default function ShopSettings() {
   const { user, isLoading: isAuthLoading } = useAuth();
+  const { userAccessible, isLoading: isSubLoading } = useIsSubscriptionAccessible();
   const [_, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -65,13 +67,13 @@ export default function ShopSettings() {
   }, [isAuthLoading, user, setLocation]);
 
   useEffect(() => {
-    if (user?.shop) {
+    if (!isSubLoading && user?.role === 'shop_owner') {
       const s = user.shop as any;
-      const accessible = s.subscriptionStatus === 'active' ||
-        (s.subscriptionStatus === 'cancelled' && s.subscriptionEnd && new Date(s.subscriptionEnd) > new Date());
-      if (!accessible) setLocation('/admin/subscription');
+      const shopAccessible = s?.subscriptionStatus === 'active' ||
+        (s?.subscriptionStatus === 'cancelled' && s?.subscriptionEnd && new Date(s.subscriptionEnd) > new Date());
+      if (!shopAccessible && !userAccessible) setLocation('/admin/subscription');
     }
-  }, [user, setLocation]);
+  }, [user, userAccessible, isSubLoading, setLocation]);
 
   if (isAuthLoading || isShopLoading) {
     return <div className="h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;

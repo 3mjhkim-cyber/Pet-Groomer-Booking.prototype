@@ -292,6 +292,7 @@ async function requireActiveSubscription(req: any, res: any, next: any) {
   // userSubscription 레벨 구독 확인 (빌링 시스템)
   const sub = await storage.getUserSubscription(user.id);
   if (sub?.status === 'active') return next();
+  if (sub?.status === 'trialing' && sub.trialEndDate && new Date(sub.trialEndDate) > new Date()) return next();
 
   return res.status(402).json({
     code: 'SUBSCRIPTION_REQUIRED',

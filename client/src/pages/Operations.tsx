@@ -1,4 +1,5 @@
 import { useAuth } from "@/hooks/use-auth";
+import { useIsSubscriptionAccessible } from "@/hooks/use-subscription";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import {
@@ -114,6 +115,7 @@ type SectionId = typeof SECTIONS[number]['id'];
 // --- Main Component ---
 export default function Operations() {
   const { user, isLoading: isAuthLoading } = useAuth();
+  const { userAccessible, isLoading: isSubLoading } = useIsSubscriptionAccessible();
   const [_, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -203,13 +205,13 @@ export default function Operations() {
   }, [isAuthLoading, user, setLocation]);
 
   useEffect(() => {
-    if (user?.shop) {
+    if (!isSubLoading && user?.role === 'shop_owner') {
       const s = user.shop as any;
-      const accessible = s.subscriptionStatus === 'active' ||
-        (s.subscriptionStatus === 'cancelled' && s.subscriptionEnd && new Date(s.subscriptionEnd) > new Date());
-      if (!accessible) setLocation('/admin/subscription');
+      const shopAccessible = s?.subscriptionStatus === 'active' ||
+        (s?.subscriptionStatus === 'cancelled' && s?.subscriptionEnd && new Date(s.subscriptionEnd) > new Date());
+      if (!shopAccessible && !userAccessible) setLocation('/admin/subscription');
     }
-  }, [user, setLocation]);
+  }, [user, userAccessible, isSubLoading, setLocation]);
 
   // --- Mutations ---
   const updateShopMutation = useMutation({

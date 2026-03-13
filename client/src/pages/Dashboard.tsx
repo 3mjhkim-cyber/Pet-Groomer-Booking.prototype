@@ -1,5 +1,6 @@
 import { useAuth } from "@/hooks/use-auth";
 import { useBookings, useServices, useApproveBooking, useRejectBooking, useRequestDeposit, useAdminCreateBooking, useSearchCustomers, useCustomerHistory, useCancelBooking, useUpdateBooking, useUpdateBookingCustomer, useAdminConfirmDeposit, useUpdateCustomer } from "@/hooks/use-shop";
+import { useIsSubscriptionAccessible } from "@/hooks/use-subscription";
 import { useLocation } from "wouter";
 import { Loader2, Calendar, Clock, User, Phone, Scissors, Check, X, Banknote, Plus, Link, Copy, History, Edit, XCircle, UserCog, PawPrint, FileText, Bell, MessageCircle, ChevronLeft, ChevronRight, LayoutDashboard, DollarSign } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -21,6 +22,7 @@ import { ko } from "date-fns/locale";
 
 export default function Dashboard() {
   const { user, isLoading: isAuthLoading } = useAuth();
+  const { userAccessible, isLoading: isSubLoading } = useIsSubscriptionAccessible();
   const { data: bookings, isLoading: isBookingsLoading } = useBookings();
   const { data: services } = useServices();
   const { mutate: approveBooking } = useApproveBooking();
@@ -208,13 +210,13 @@ export default function Dashboard() {
   }, [isAuthLoading, user, setLocation]);
 
   useEffect(() => {
-    if (user?.role === 'shop_owner' && user?.shop) {
+    if (!isSubLoading && user?.role === 'shop_owner') {
       const shop = user.shop as any;
-      const accessible = shop.subscriptionStatus === 'active' ||
-        (shop.subscriptionStatus === 'cancelled' && shop.subscriptionEnd && new Date(shop.subscriptionEnd) > new Date());
-      if (!accessible) setLocation("/admin/subscription");
+      const shopAccessible = shop?.subscriptionStatus === 'active' ||
+        (shop?.subscriptionStatus === 'cancelled' && shop?.subscriptionEnd && new Date(shop.subscriptionEnd) > new Date());
+      if (!shopAccessible && !userAccessible) setLocation("/admin/subscription");
     }
-  }, [user, setLocation]);
+  }, [user, userAccessible, isSubLoading, setLocation]);
 
   if (isAuthLoading) return <div className="h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
 

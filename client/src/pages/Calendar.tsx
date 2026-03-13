@@ -1,5 +1,6 @@
 import { useAuth } from "@/hooks/use-auth";
 import { useBookings } from "@/hooks/use-shop";
+import { useIsSubscriptionAccessible } from "@/hooks/use-subscription";
 import { useLocation } from "wouter";
 import { Loader2, CalendarDays, Clock, User, Scissors, Phone } from "lucide-react";
 import FullCalendar from "@fullcalendar/react";
@@ -34,6 +35,7 @@ interface BookingEvent {
 export default function Calendar() {
   const { user, isLoading: isAuthLoading } = useAuth();
   const { data: bookings, isLoading: isBookingsLoading } = useBookings();
+  const { userAccessible, isLoading: isSubLoading } = useIsSubscriptionAccessible();
   const [_, setLocation] = useLocation();
   const [selectedEvent, setSelectedEvent] = useState<BookingEvent | null>(null);
   const [currentView, setCurrentView] = useState("dayGridMonth");
@@ -54,13 +56,13 @@ export default function Calendar() {
   }, [isAuthLoading, user, setLocation]);
 
   useEffect(() => {
-    if (user?.role === 'shop_owner' && user?.shop) {
+    if (!isSubLoading && user?.role === 'shop_owner') {
       const shop = user.shop as any;
-      const accessible = shop.subscriptionStatus === 'active' ||
-        (shop.subscriptionStatus === 'cancelled' && shop.subscriptionEnd && new Date(shop.subscriptionEnd) > new Date());
-      if (!accessible) setLocation("/admin/subscription");
+      const shopAccessible = shop?.subscriptionStatus === 'active' ||
+        (shop?.subscriptionStatus === 'cancelled' && shop?.subscriptionEnd && new Date(shop.subscriptionEnd) > new Date());
+      if (!shopAccessible && !userAccessible) setLocation("/admin/subscription");
     }
-  }, [user, setLocation]);
+  }, [user, userAccessible, isSubLoading, setLocation]);
 
   if (isAuthLoading) return <div className="h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
 

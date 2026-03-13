@@ -1,5 +1,6 @@
 import { useAuth } from "@/hooks/use-auth";
 import { useCustomersWithRevenue } from "@/hooks/use-shop";
+import { useIsSubscriptionAccessible } from "@/hooks/use-subscription";
 import { useLocation } from "wouter";
 import {
   Loader2, Users, Search, Award, AlertCircle, RefreshCw,
@@ -26,6 +27,7 @@ type EnrichedCustomer = CustomerWithRevenue & {
 
 export default function Customers() {
   const { user, isLoading: isAuthLoading } = useAuth();
+  const { userAccessible, isLoading: isSubLoading } = useIsSubscriptionAccessible();
   const { data: rawCustomers, isLoading: isCustomersLoading } = useCustomersWithRevenue();
   const [_, setLocation] = useLocation();
   const { toast } = useToast();
@@ -35,19 +37,19 @@ export default function Customers() {
   const [notifyingPhones, setNotifyingPhones] = useState<Set<string>>(new Set());
 
   const needsSubscription = useMemo(() => {
-    if (user?.role === 'shop_owner' && user.shop) {
+    if (user?.role === 'shop_owner' && !isSubLoading) {
       const shop = user.shop as any;
-      const accessible = shop.subscriptionStatus === 'active' ||
-        (shop.subscriptionStatus === 'cancelled' && shop.subscriptionEnd && new Date(shop.subscriptionEnd) > new Date());
-      return !accessible;
+      const shopAccessible = shop?.subscriptionStatus === 'active' ||
+        (shop?.subscriptionStatus === 'cancelled' && shop?.subscriptionEnd && new Date(shop.subscriptionEnd) > new Date());
+      return !shopAccessible && !userAccessible;
     }
     return false;
-  }, [user]);
+  }, [user, userAccessible, isSubLoading]);
 
   useEffect(() => {
     if (!isAuthLoading && !user) setLocation("/login");
-    if (!isAuthLoading && needsSubscription) setLocation("/admin/subscription");
-  }, [isAuthLoading, user, needsSubscription, setLocation]);
+    if (!isAuthLoading && !isSubLoading && needsSubscription) setLocation("/admin/subscription");
+  }, [isAuthLoading, user, needsSubscription, isSubLoading, setLocation]);
 
   // VIP 임계값: 누적 매출 상위 20%
   const vipThreshold = useMemo(() => {

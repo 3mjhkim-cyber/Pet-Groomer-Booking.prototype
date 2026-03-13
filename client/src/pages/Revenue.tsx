@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
+import { useIsSubscriptionAccessible } from "@/hooks/use-subscription";
 import { useCustomersWithRevenue } from "@/hooks/use-shop";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -116,18 +117,19 @@ const PREV_LABEL: Record<Period, string> = {
 
 export default function Revenue() {
   const { user } = useAuth();
+  const { userAccessible, isLoading: isSubLoading } = useIsSubscriptionAccessible();
   const [, navigate] = useLocation();
   const [period, setPeriod]       = useState<Period>("month");
   const [refDate, setRefDate]     = useState(new Date());
   const [calendarOpen, setCalendarOpen] = useState(false);
 
   if (!user || user.role !== "shop_owner") { navigate("/login"); return null; }
-  if (user.shop) {
+  if (!isSubLoading && user.shop) {
     const shop = user.shop as any;
-    const ok = shop.subscriptionStatus === "active" ||
+    const shopOk = shop.subscriptionStatus === "active" ||
       (shop.subscriptionStatus === "cancelled" && shop.subscriptionEnd &&
        new Date(shop.subscriptionEnd) > new Date());
-    if (!ok) { navigate("/admin/subscription"); return null; }
+    if (!shopOk && !userAccessible) { navigate("/admin/subscription"); return null; }
   }
 
   const { startDate, endDate }                     = getDateRange(period, refDate);
