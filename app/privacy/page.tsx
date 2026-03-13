@@ -111,7 +111,7 @@ export default function PrivacyPage() {
             <p className="mt-3">
               위 권리 행사는 아래 이메일로 요청하시면 처리합니다. 법령에 따라 일부 요청이 제한될 수 있습니다.
             </p>
-            <p className="mt-1 font-medium text-gray-900">이메일: 3mjhkim@naver.com</p>
+            <p className="mt-1 font-medium text-gray-900">이메일: support@jeongrihagae.com</p>
           </section>
 
           <hr className="border-gray-100" />
@@ -132,7 +132,7 @@ export default function PrivacyPage() {
           <section>
             <h2 className="text-lg font-semibold text-gray-900 mb-3">제8조 문의</h2>
             <p>개인정보 처리와 관련한 문의는 아래로 연락해 주시기 바랍니다.</p>
-            <p className="mt-2 font-medium text-gray-900">이메일: 3mjhkim@naver.com</p>
+            <p className="mt-2 font-medium text-gray-900">이메일: support@jeongrihagae.com</p>
           </section>
 
         </div>
@@ -143,7 +143,7 @@ export default function PrivacyPage() {
           <p>상호: 정리하게</p>
           <p>대표자: 김제훈</p>
           <p>사업자등록번호: 855-17-02648</p>
-          <p>이메일: 3mjhkim@naver.com</p>
+          <p>이메일: support@jeongrihagae.com</p>
         </div>
 
         {/* 홈 링크 */}

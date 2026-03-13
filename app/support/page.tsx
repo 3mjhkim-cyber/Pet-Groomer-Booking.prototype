@@ -19,7 +19,7 @@ export default function SupportPage() {
                 <span className="text-gray-400 mt-0.5">📧</span>
                 <div>
                   <p className="font-medium text-gray-800">이메일 문의</p>
-                  <p className="text-gray-600">3mjhkim@naver.com</p>
+                  <p className="text-gray-600">support@jeongrihagae.com</p>
                 </div>
               </div>
               <div className="flex items-start gap-3">
@@ -100,7 +100,7 @@ export default function SupportPage() {
           <p>상호: 정리하게</p>
           <p>대표자: 김제훈</p>
           <p>사업자등록번호: 855-17-02648</p>
-          <p>이메일: 3mjhkim@naver.com</p>
+          <p>이메일: support@jeongrihagae.com</p>
         </div>
 
         {/* 홈 링크 */}
