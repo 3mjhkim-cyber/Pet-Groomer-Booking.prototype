@@ -144,14 +144,7 @@ export default function Login() {
             </form>
             
             <div className="mt-6 pt-6 border-t border-dashed text-center space-y-3">
-              <p className="text-sm text-muted-foreground">
-                테스트 계정: test@shop.com / test1234
-              </p>
-              <p className="text-sm text-muted-foreground">
-                총관리자: admin@yeyakhagae.com / admin1234
-              </p>
-              
-              <div className="pt-3">
+              <div>
                 <Link href="/register">
                   <Button variant="outline" className="w-full" data-testid="link-register">
                     <Store className="w-4 h-4 mr-2" />
