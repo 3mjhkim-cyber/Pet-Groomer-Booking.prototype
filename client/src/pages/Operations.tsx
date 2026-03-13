@@ -29,13 +29,9 @@ type BusinessDays = {
   mon: DaySchedule; tue: DaySchedule; wed: DaySchedule; thu: DaySchedule;
   fri: DaySchedule; sat: DaySchedule; sun: DaySchedule;
 };
-type NotificationConfig = { enabled: boolean; template: string };
-type NotificationSettings = {
-  bookingConfirmed: NotificationConfig;
-  reminderBefore: NotificationConfig;
-  depositReceived: NotificationConfig;
-  returnVisit: NotificationConfig;
-};
+// 카카오 알림톡 고정 템플릿 – 활성화 여부만 관리
+type KakaoTemplateKey = 'bookingConfirmed' | 'depositGuide' | 'reminderBefore' | 'bookingCancelled' | 'returnVisit';
+type NotifEnabled = Partial<Record<KakaoTemplateKey, boolean>>;
 
 // --- Constants ---
 const DAY_LABELS: Record<keyof BusinessDays, string> = {
@@ -52,51 +48,54 @@ const getDefaultBusinessDays = (): BusinessDays => ({
   sun: { open: '09:00', close: '18:00', closed: true },
 });
 
-const NOTIFICATION_TYPES = [
+// 카카오 알림톡 고정 템플릿 목록 (서버와 동일한 양식 유지)
+const KAKAO_TEMPLATE_TYPES: { key: KakaoTemplateKey; label: string; description: string; template: string }[] = [
   {
-    key: 'bookingConfirmed' as const,
-    label: '예약 확정 알림',
-    description: '예약이 확정되면 고객에게 알림을 발송합니다',
-    defaultTemplate: '[{매장명}] {고객명}님의 예약이 확정되었습니다.\n예약일시: {예약일시}\n반려동물: {반려동물이름}',
+    key: 'bookingConfirmed',
+    label: '예약 확정',
+    description: '예약이 확정되면 고객에게 발송합니다.',
+    template: `[#{매장명}]\n#{고객명}님의 예약이 확정되었습니다.\n예약일시: #{예약일시}\n반려동물: #{반려동물이름}\n문의: #{매장전화번호}`,
   },
   {
-    key: 'reminderBefore' as const,
-    label: '방문 전 리마인드 알림',
-    description: '방문 전날 고객에게 리마인드 알림을 발송합니다',
-    defaultTemplate: '[{매장명}] 내일 {반려동물이름}의 미용 예약이 있습니다.\n예약일시: {예약일시}\n잊지 말고 방문해주세요!',
+    key: 'depositGuide',
+    label: '예약금 안내',
+    description: '예약금 입금을 안내할 때 발송합니다.',
+    template: `[#{매장명}]\n#{고객명}님의 예약이 접수되었습니다.\n예약금: #{예약금}원\n입금계좌: #{계좌번호}\n예약일시: #{예약일시}\n반려동물: #{반려동물이름}\n문의: #{매장전화번호}`,
   },
   {
-    key: 'depositReceived' as const,
-    label: '예약금 입금 요청 알림',
-    description: '고객에게 예약금 입금을 요청하는 알림입니다. 입금 확인 후 예약 확정 알림은 별도로 발송됩니다.',
-    defaultTemplate: '[{매장명}] 예약을 위해 예약금 {예약금액}원 입금이 필요합니다.\n\n입금 계좌는 예약 상세에서 확인해주세요.\n입금 확인 후 예약이 확정됩니다.',
+    key: 'reminderBefore',
+    label: '방문 전 리마인드',
+    description: '방문 전날 자동으로 발송합니다.',
+    template: `[#{매장명}]\n#{고객명}님 방문 예정 예약이 있습니다.\n예약일시: #{예약일시}\n반려동물: #{반려동물이름}\n문의: #{매장전화번호}`,
   },
   {
-    key: 'returnVisit' as const,
-    label: '재방문 알림',
-    description: '마지막 방문 후 일정 기간이 지나면 재방문 알림을 발송합니다',
-    defaultTemplate: '[{매장명}] {고객명}님, 오랜만이에요!\n{반려동물이름}의 미용 예약 어떠세요? 🐾',
+    key: 'bookingCancelled',
+    label: '예약 취소',
+    description: '예약이 취소될 때 고객에게 발송합니다.',
+    template: `[#{매장명}]\n#{고객명}님의 예약이 취소되었습니다.\n예약일시: #{예약일시}\n반려동물: #{반려동물이름}\n문의: #{매장전화번호}`,
   },
-] as const;
+  {
+    key: 'returnVisit',
+    label: '재방문 안내',
+    description: '마지막 방문 후 일정 기간이 지난 고객에게 발송합니다.',
+    template: `[#{매장명}]\n#{고객명}님, 오랜만이에요!\n#{반려동물이름}의 미용 예약 어떠세요?\n문의: #{매장전화번호}`,
+  },
+];
 
-type NotifKey = typeof NOTIFICATION_TYPES[number]['key'];
-
-const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
-  bookingConfirmed: { enabled: false, template: NOTIFICATION_TYPES[0].defaultTemplate },
-  reminderBefore:   { enabled: false, template: NOTIFICATION_TYPES[1].defaultTemplate },
-  depositReceived:  { enabled: false, template: NOTIFICATION_TYPES[2].defaultTemplate },
-  returnVisit:      { enabled: false, template: NOTIFICATION_TYPES[3].defaultTemplate },
-};
-
-const VARIABLES = ['{매장명}', '{고객명}', '{반려동물이름}', '{예약일시}', '{예약금액}'];
-const SAMPLE_VALUES: Record<string, string> = {
-  '{매장명}': '정리하개 강남점', '{고객명}': '김철수',
-  '{반려동물이름}': '몽이', '{예약일시}': '2월 28일 오후 2시', '{예약금액}': '10,000',
-};
-
-function previewTemplate(template: string): string {
+// 미리보기용 샘플 치환
+function previewKakaoTemplate(template: string, shopName: string, phone: string, depositAmount: string, bankAccount: string, extraNote: string): string {
+  const values: Record<string, string> = {
+    '#{매장명}': shopName || '내 매장',
+    '#{고객명}': '홍길동',
+    '#{반려동물이름}': '몽이',
+    '#{예약일시}': '4월 1일 오후 2:00',
+    '#{예약금}': depositAmount || '10,000',
+    '#{계좌번호}': bankAccount || '(계좌번호 미설정)',
+    '#{매장전화번호}': phone || '010-0000-0000',
+  };
   let result = template;
-  for (const [k, v] of Object.entries(SAMPLE_VALUES)) result = result.split(k).join(v);
+  for (const [k, v] of Object.entries(values)) result = result.split(k).join(v);
+  if (extraNote.trim()) result += `\n${extraNote.trim()}`;
   return result;
 }
 
@@ -161,8 +160,10 @@ export default function Operations() {
     duration: '' as string | number,
     price: '' as string | number,
   });
-  const [notifSettings, setNotifSettings] = useState<NotificationSettings>(DEFAULT_NOTIFICATION_SETTINGS);
-  const [expandedNotif, setExpandedNotif] = useState<NotifKey | null>(null);
+  const [notifEnabled, setNotifEnabled] = useState<NotifEnabled>({});
+  const [bankAccount, setBankAccount] = useState('');
+  const [notifExtraNote, setNotifExtraNote] = useState('');
+  const [expandedNotif, setExpandedNotif] = useState<KakaoTemplateKey | null>(null);
 
   // --- Hydrate from shop data ---
   useEffect(() => {
@@ -188,10 +189,12 @@ export default function Operations() {
       try { const p = JSON.parse(shop.forceOpenSlots); setForceOpenSlots(typeof p === 'object' && p ? p : {}); }
       catch { setForceOpenSlots({}); }
     }
-    if ((shop as any).notificationSettings) {
-      try { setNotifSettings({ ...DEFAULT_NOTIFICATION_SETTINGS, ...JSON.parse((shop as any).notificationSettings) }); }
+    if ((shop as any).notificationEnabled) {
+      try { setNotifEnabled(JSON.parse((shop as any).notificationEnabled)); }
       catch {}
     }
+    if ((shop as any).bankAccount) setBankAccount((shop as any).bankAccount);
+    if ((shop as any).notificationExtraNote) setNotifExtraNote((shop as any).notificationExtraNote);
   }, [shop]);
 
   // --- Auth / subscription guards ---
@@ -356,12 +359,18 @@ export default function Operations() {
     addServiceMutation.mutate({ name: newService.name, description: newService.description || '', duration, price });
   };
 
-  const updateNotif = (key: NotifKey, field: keyof NotificationConfig, value: string | boolean) => {
-    setNotifSettings(prev => ({ ...prev, [key]: { ...prev[key], [field]: value } }));
+  const toggleNotif = (key: KakaoTemplateKey, value: boolean) => {
+    const updated = { ...notifEnabled, [key]: value };
+    setNotifEnabled(updated);
+    updateShopMutation.mutate({ notificationEnabled: JSON.stringify(updated) });
   };
 
-  const saveNotif = () => {
-    updateShopMutation.mutate({ notificationSettings: JSON.stringify(notifSettings) });
+  const saveNotifSettings = () => {
+    updateShopMutation.mutate({
+      bankAccount,
+      notificationExtraNote: notifExtraNote,
+      notificationEnabled: JSON.stringify(notifEnabled),
+    });
   };
 
   // --- Loading / auth guard ---
@@ -637,32 +646,76 @@ export default function Operations() {
   );
 
   const renderNotificationsSection = () => (
-    <div className="space-y-3">
-      <p className="text-sm text-muted-foreground px-1">카카오 알림톡 또는 문자 발송 설정을 구성합니다. 각 알림을 켜면 메시지 템플릿을 수정할 수 있습니다.</p>
-      {NOTIFICATION_TYPES.map((notif) => {
-        const config = notifSettings[notif.key];
+    <div className="space-y-4">
+      <p className="text-sm text-muted-foreground px-1">
+        카카오 알림톡 고정 템플릿을 사용합니다. 문장은 수정할 수 없으며, 필요한 값만 설정하세요.
+      </p>
+
+      {/* 공통 설정: 계좌번호 + 추가 안내문구 */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">알림톡 공통 설정</CardTitle>
+          <CardDescription>모든 알림 유형에 공통으로 적용되는 값을 설정합니다.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="bankAccount">입금 계좌번호 <span className="text-xs text-muted-foreground">(예약금 안내 알림에 표시)</span></Label>
+            <Input
+              id="bankAccount"
+              value={bankAccount}
+              onChange={e => setBankAccount(e.target.value)}
+              placeholder="예: 신한 110-000-000000 홍길동"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="notifExtraNote">추가 안내문구 <span className="text-xs text-muted-foreground">(선택, 모든 알림 하단에 1줄 추가)</span></Label>
+            <Input
+              id="notifExtraNote"
+              value={notifExtraNote}
+              onChange={e => setNotifExtraNote(e.target.value)}
+              placeholder="예: 주차는 건물 지하 1층 이용 가능합니다."
+              maxLength={60}
+            />
+          </div>
+          <Button size="sm" onClick={saveNotifSettings} disabled={updateShopMutation.isPending}>
+            <Save className="w-3.5 h-3.5 mr-1" /> 공통 설정 저장
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* 알림 유형별 활성화 + 미리보기 */}
+      {KAKAO_TEMPLATE_TYPES.map((notif) => {
+        const enabled = !!notifEnabled[notif.key];
         const isExpanded = expandedNotif === notif.key;
+        const preview = previewKakaoTemplate(
+          notif.template,
+          formData.name,
+          formData.phone,
+          String(depositAmount || 10000),
+          bankAccount,
+          notifExtraNote,
+        );
 
         return (
-          <Card key={notif.key} className={cn('overflow-hidden transition-all', config.enabled && 'border-primary/40')}>
+          <Card key={notif.key} className={cn('overflow-hidden transition-all', enabled && 'border-primary/40')}>
             <div
-              className={cn('flex items-center justify-between p-4', config.enabled && 'cursor-pointer hover:bg-secondary/20 transition-colors')}
-              onClick={() => { if (config.enabled) setExpandedNotif(isExpanded ? null : notif.key); }}
+              className={cn('flex items-center justify-between p-4', enabled && 'cursor-pointer hover:bg-secondary/20 transition-colors')}
+              onClick={() => { if (enabled) setExpandedNotif(isExpanded ? null : notif.key); }}
             >
               <div className="flex-1 min-w-0 mr-4">
                 <div className="font-medium text-sm">{notif.label}</div>
                 <div className="text-xs text-muted-foreground mt-0.5">{notif.description}</div>
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
-                {config.enabled && (
+                {enabled && (
                   isExpanded
                     ? <ChevronUp className="w-4 h-4 text-muted-foreground" />
                     : <ChevronDown className="w-4 h-4 text-muted-foreground" />
                 )}
                 <Switch
-                  checked={config.enabled}
+                  checked={enabled}
                   onCheckedChange={v => {
-                    updateNotif(notif.key, 'enabled', v);
+                    toggleNotif(notif.key, v);
                     if (!v) setExpandedNotif(null);
                     else setExpandedNotif(notif.key);
                   }}
@@ -671,35 +724,15 @@ export default function Operations() {
               </div>
             </div>
 
-            {config.enabled && isExpanded && (
-              <CardContent className="border-t pt-4 space-y-4 bg-secondary/10">
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">메시지 템플릿</Label>
-                  <Textarea
-                    value={config.template}
-                    onChange={e => updateNotif(notif.key, 'template', e.target.value)}
-                    rows={4}
-                    className="resize-none text-sm font-mono bg-white"
-                  />
-                </div>
-
-                <div className="bg-white border rounded-lg p-3 space-y-2">
-                  <p className="text-xs font-medium text-muted-foreground">사용 가능한 변수</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {VARIABLES.map(v => (
-                      <code key={v} className="text-xs bg-secondary px-2 py-0.5 rounded text-primary font-mono">{v}</code>
-                    ))}
-                  </div>
-                </div>
-
+            {enabled && isExpanded && (
+              <CardContent className="border-t pt-4 space-y-3 bg-secondary/10">
                 <div className="bg-blue-50 border border-blue-100 rounded-lg p-3">
-                  <p className="text-xs font-semibold text-blue-700 mb-2">미리보기 (샘플 데이터)</p>
-                  <p className="text-sm text-blue-900 whitespace-pre-wrap leading-relaxed">{previewTemplate(config.template)}</p>
+                  <p className="text-xs font-semibold text-blue-700 mb-2">발송 메시지 미리보기</p>
+                  <p className="text-sm text-blue-900 whitespace-pre-wrap leading-relaxed font-mono">{preview}</p>
                 </div>
-
-                <Button size="sm" onClick={saveNotif} disabled={updateShopMutation.isPending}>
-                  <Save className="w-3.5 h-3.5 mr-1" /> 저장
-                </Button>
+                <p className="text-xs text-muted-foreground">
+                  카카오 알림톡 심사 통과 템플릿입니다. 문장을 직접 수정할 수 없습니다.
+                </p>
               </CardContent>
             )}
           </Card>

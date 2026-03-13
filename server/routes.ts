@@ -15,29 +15,55 @@ import { addOneMonth } from "./scheduler";
 
 const scryptAsync = promisify(scrypt);
 
-// ─── 알림 템플릿 변수 치환 ─────────────────────────────────────────────────────
-
-type NotifConfig = { enabled: boolean; template: string };
-type NotifSettings = {
-  bookingConfirmed?: NotifConfig;
-  reminderBefore?: NotifConfig;
-  depositReceived?: NotifConfig;
-  returnVisit?: NotifConfig;
-};
+// ─── 카카오 알림톡 고정 템플릿 시스템 ────────────────────────────────────────────
 
 /**
- * shop.notificationSettings JSON 문자열을 파싱해 반환.
- * 파싱 실패 시 빈 객체 반환.
+ * 알림 유형 키
+ * 카카오 알림톡 심사 통과 후 templateCode를 각 항목에 매핑하세요.
  */
-function parseNotifSettings(shop: Shop): NotifSettings {
-  try {
-    const raw = (shop as any).notificationSettings;
-    if (!raw) return {};
-    return typeof raw === 'string' ? JSON.parse(raw) : raw;
-  } catch {
-    return {};
-  }
-}
+export type KakaoTemplateType =
+  | 'bookingConfirmed'   // 예약 확정
+  | 'depositGuide'       // 예약금 안내
+  | 'reminderBefore'     // 방문 전 리마인드
+  | 'bookingCancelled'   // 예약 취소
+  | 'returnVisit';       // 재방문 안내
+
+/** 활성화 여부 저장 JSON 구조 */
+type NotifEnabled = Partial<Record<KakaoTemplateType, boolean>>;
+
+/** 고정 템플릿 정의 – 카카오 알림톡 심사 양식과 동일하게 유지 */
+const KAKAO_TEMPLATES: Record<KakaoTemplateType, string> = {
+  bookingConfirmed: `[#{매장명}]
+#{고객명}님의 예약이 확정되었습니다.
+예약일시: #{예약일시}
+반려동물: #{반려동물이름}
+문의: #{매장전화번호}`,
+
+  depositGuide: `[#{매장명}]
+#{고객명}님의 예약이 접수되었습니다.
+예약금: #{예약금}원
+입금계좌: #{계좌번호}
+예약일시: #{예약일시}
+반려동물: #{반려동물이름}
+문의: #{매장전화번호}`,
+
+  reminderBefore: `[#{매장명}]
+#{고객명}님 방문 예정 예약이 있습니다.
+예약일시: #{예약일시}
+반려동물: #{반려동물이름}
+문의: #{매장전화번호}`,
+
+  bookingCancelled: `[#{매장명}]
+#{고객명}님의 예약이 취소되었습니다.
+예약일시: #{예약일시}
+반려동물: #{반려동물이름}
+문의: #{매장전화번호}`,
+
+  returnVisit: `[#{매장명}]
+#{고객명}님, 오랜만이에요!
+#{반려동물이름}의 미용 예약 어떠세요?
+문의: #{매장전화번호}`,
+};
 
 /**
  * 예약일시를 한국어 형식으로 변환.
@@ -53,56 +79,124 @@ function formatDateTime(date: string, time: string): string {
   return `${month}월 ${day}일 ${ampm} ${hour12}:${minuteStr}`;
 }
 
+/** shop.notificationEnabled JSON 파싱 */
+function parseNotifEnabled(shop: Shop): NotifEnabled {
+  try {
+    const raw = (shop as any).notificationEnabled;
+    if (!raw) return {};
+    return typeof raw === 'string' ? JSON.parse(raw) : raw;
+  } catch {
+    return {};
+  }
+}
+
 /**
- * 템플릿 문자열의 변수를 실제 예약·가게 데이터로 치환.
+ * 고정 템플릿에 실제 값을 치환해 최종 메시지를 반환.
  *
- * 치환 변수 목록:
- *   {매장명}        → shop.name
- *   {고객명}        → booking.customerName
- *   {반려동물이름}  → booking.petName (없으면 '반려동물')
- *   {예약일시}      → "M월 D일 오전/오후 H:mm" 형식
- *   {예약금액}      → shop.depositAmount (없으면 빈 문자열)
+ * #{매장명}        → shop.name
+ * #{고객명}        → booking.customerName
+ * #{반려동물이름}  → booking.petName (없으면 '반려동물')
+ * #{예약일시}      → formatDateTime 결과
+ * #{예약금}        → shop.depositAmount
+ * #{계좌번호}      → shop.bankAccount
+ * #{매장전화번호}  → shop.phone
  */
-function buildMessage(
-  config: NotifConfig,
+function buildKakaoMessage(
+  templateType: KakaoTemplateType,
   booking: { customerName: string; petName?: string | null; date: string; time: string },
-  shop: { name: string; depositAmount?: number | null },
+  shop: { name: string; phone: string; depositAmount?: number | null; bankAccount?: string | null; notificationExtraNote?: string | null },
 ): string {
+  let message = KAKAO_TEMPLATES[templateType];
+
   const values: Record<string, string> = {
-    '{매장명}':       shop.name,
-    '{고객명}':       booking.customerName,
-    '{반려동물이름}': booking.petName || '반려동물',
-    '{예약일시}':     formatDateTime(booking.date, booking.time),
-    '{예약금액}':     shop.depositAmount != null ? String(shop.depositAmount) : '',
+    '#{매장명}':       shop.name,
+    '#{고객명}':       booking.customerName,
+    '#{반려동물이름}': booking.petName || '반려동물',
+    '#{예약일시}':     formatDateTime(booking.date, booking.time),
+    '#{예약금}':       shop.depositAmount != null ? shop.depositAmount.toLocaleString() : '-',
+    '#{계좌번호}':     shop.bankAccount || '(계좌번호 미설정)',
+    '#{매장전화번호}': shop.phone,
   };
 
-  let message = config.template;
   for (const [key, value] of Object.entries(values)) {
-    // split/join 방식으로 전역 치환 (replaceAll 대신 호환성 보장)
     message = message.split(key).join(value);
+  }
+
+  // 추가 안내문구가 있으면 마지막에 붙임
+  if (shop.notificationExtraNote?.trim()) {
+    message += `\n${shop.notificationExtraNote.trim()}`;
   }
 
   return message;
 }
 
 /**
- * 메시지 발송 스텁(stub).
- * 실제 카카오 알림톡 / SMS API 연동 전까지 서버 로그에만 출력.
+ * 알림톡 발송 + 로그 저장.
  *
- * TODO: 카카오 / SMS API 연동 시 이 함수 내부를 교체:
- *   1) 알리고(solapi) 등 SMS API 호출
- *   2) 카카오 비즈니스 채널 알림톡 API 호출
+ * TODO: 카카오 / SMS API 연동 시 sendKakaoAlimtalk() 내부를 교체:
+ *   - Solapi: https://solapi.com
+ *   - 카카오 비즈니스 채널 알림톡 API 직접 연동
+ *
+ * 반환값: { success, providerMessageId?, errorMessage? }
  */
-async function sendNotification(
+async function sendKakaoAlimtalk(
   phone: string,
   message: string,
-  type: keyof NotifSettings,
-): Promise<void> {
-  // 수신번호 마스킹 처리 (로그 보안)
+  templateType: KakaoTemplateType,
+): Promise<{ success: boolean; providerMessageId?: string; errorMessage?: string }> {
+  // 수신번호 마스킹 (로그 보안)
   const masked = phone.replace(/(\d{3})-?(\d{3,4})-?(\d{4})/, '$1-****-$3');
-  console.log(`[알림 전송] type=${type} to=${masked}`);
-  console.log(`[알림 내용]\n${message}\n`);
-  // ↑ 실제 API 호출로 교체할 위치
+  console.log(`[알림톡 발송] type=${templateType} to=${masked}`);
+  console.log(`[알림톡 내용]\n${message}\n`);
+
+  // ──────────────────────────────────────────────────
+  // TODO: 실제 API 호출 예시 (Solapi 기준)
+  // const solapi = require('solapi');
+  // const result = await solapi.sendKakaoAlimtalk({
+  //   to: phone,
+  //   from: process.env.SOLAPI_SENDER_PHONE,
+  //   kakaoOptions: {
+  //     pfId: process.env.KAKAO_PFID,
+  //     templateId: KAKAO_TEMPLATE_CODES[templateType],
+  //     variables: { ... },
+  //   },
+  // });
+  // return { success: true, providerMessageId: result.messageId };
+  // ──────────────────────────────────────────────────
+
+  // 현재는 stub — 항상 성공 처리
+  return { success: true, providerMessageId: `stub_${Date.now()}` };
+}
+
+/**
+ * 알림 발송 + 로그 저장 통합 함수.
+ */
+async function sendAndLog(opts: {
+  templateType: KakaoTemplateType;
+  phone: string;
+  message: string;
+  shopId: number;
+  reservationId?: number;
+}): Promise<void> {
+  const { templateType, phone, message, shopId, reservationId } = opts;
+
+  const result = await sendKakaoAlimtalk(phone, message, templateType);
+
+  try {
+    const db = (await import('./db')).db;
+    const { notificationLogs } = await import('@shared/schema');
+    await db.insert(notificationLogs).values({
+      shopId,
+      reservationId: reservationId ?? null,
+      templateType,
+      phone,
+      status: result.success ? 'sent' : 'failed',
+      providerMessageId: result.providerMessageId ?? null,
+      errorMessage: result.errorMessage ?? null,
+    });
+  } catch (logErr) {
+    console.error('[알림 로그 저장 실패]', logErr);
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -677,10 +771,17 @@ export async function registerRoutes(
     if (!user.shopId) {
       return res.status(400).json({ message: "No shop associated" });
     }
-    const { name, phone, address, businessHours, depositAmount, depositRequired, businessDays, closedDates, shopMemo, blockedSlots, forceOpenSlots } = req.body;
+    const {
+      name, phone, address, businessHours, depositAmount, depositRequired,
+      businessDays, closedDates, shopMemo, blockedSlots, forceOpenSlots,
+      // 카카오 알림톡 관련 필드
+      bankAccount, notificationExtraNote, notificationEnabled,
+    } = req.body;
     const shop = await storage.updateShop(user.shopId, {
-      name, phone, address, businessHours, depositAmount, depositRequired, businessDays, closedDates, shopMemo, blockedSlots, forceOpenSlots
-    });
+      name, phone, address, businessHours, depositAmount, depositRequired,
+      businessDays, closedDates, shopMemo, blockedSlots, forceOpenSlots,
+      bankAccount, notificationExtraNote, notificationEnabled,
+    } as any);
     res.json(shop);
   });
 
@@ -704,6 +805,40 @@ export async function registerRoutes(
       depositAmount: shop.depositAmount,
       depositRequired: shop.depositRequired,
     });
+  });
+
+  // ── 알림톡 발송 로그 조회 ──────────────────────────────────────────────────────
+  app.get('/api/shop/notification-logs', requireShopOwner, async (req, res) => {
+    const user = req.user as any;
+    if (!user.shopId) return res.status(400).json({ message: 'No shop associated' });
+    const dbModule = await import('./db');
+    const schemaModule = await import('@shared/schema');
+    const { eq, desc } = await import('drizzle-orm');
+    const logs = await dbModule.db
+      .select()
+      .from(schemaModule.notificationLogs)
+      .where(eq(schemaModule.notificationLogs.shopId, user.shopId))
+      .orderBy(desc(schemaModule.notificationLogs.sentAt))
+      .limit(100);
+    res.json(logs);
+  });
+
+  // 카카오 알림톡 고정 템플릿 미리보기 반환 (프론트용)
+  app.get('/api/shop/notification-templates', requireShopOwner, async (req, res) => {
+    const user = req.user as any;
+    if (!user.shopId) return res.status(400).json({ message: 'No shop associated' });
+    const shop = await storage.getShop(user.shopId);
+    if (!shop) return res.status(404).json({ message: 'Shop not found' });
+
+    const sampleBooking = { customerName: '홍길동', petName: '몽이', date: '2026-04-01', time: '14:00' };
+    const templates: Record<string, { label: string; preview: string }> = {
+      bookingConfirmed:  { label: '예약 확정',         preview: buildKakaoMessage('bookingConfirmed',  sampleBooking, shop as any) },
+      depositGuide:      { label: '예약금 안내',        preview: buildKakaoMessage('depositGuide',      sampleBooking, shop as any) },
+      reminderBefore:    { label: '방문 전 리마인드',   preview: buildKakaoMessage('reminderBefore',    sampleBooking, shop as any) },
+      bookingCancelled:  { label: '예약 취소',          preview: buildKakaoMessage('bookingCancelled',  sampleBooking, shop as any) },
+      returnVisit:       { label: '재방문 안내',         preview: buildKakaoMessage('returnVisit',       sampleBooking, shop as any) },
+    };
+    res.json(templates);
   });
 
   // Services (shop-scoped)
@@ -787,23 +922,22 @@ export async function registerRoutes(
       return res.status(400).json({ message: '가게 정보를 찾을 수 없습니다.' });
     }
 
-    const notifSettings = parseNotifSettings(shop);
-    const config = notifSettings.returnVisit;
+    const notifEnabled = parseNotifEnabled(shop);
 
-    if (!config?.enabled) {
+    if (!notifEnabled.returnVisit) {
       return res.status(400).json({
         message: '재방문 알림이 비활성화되어 있습니다. 운영 > 알림 설정에서 활성화해주세요.',
       });
     }
 
-    // date, time 없이 치환 — 재방문 템플릿은 {예약일시} 변수를 사용하지 않음
-    const message = buildMessage(
-      config,
+    // 재방문 템플릿은 예약일시 없음
+    const message = buildKakaoMessage(
+      'returnVisit',
       { customerName: customer.name, petName: customer.petName, date: '', time: '' },
-      shop,
+      shop as any,
     );
 
-    await sendNotification(customer.phone, message, 'returnVisit');
+    await sendAndLog({ templateType: 'returnVisit', phone: customer.phone, message, shopId: shop.id });
 
     res.json({ success: true, message: '재방문 알림을 전송했습니다.' });
   });
@@ -949,15 +1083,10 @@ export async function registerRoutes(
     if (shopId && bookingData) {
       const shop = await storage.getShop(shopId);
       if (shop) {
-        const notifSettings = parseNotifSettings(shop);
-        const config = notifSettings.bookingConfirmed;
-
-        if (config?.enabled) {
-          // 4. 템플릿 변수 치환
-          const message = buildMessage(config, bookingData, shop);
-
-          // 5. 발송 (stub)
-          await sendNotification(bookingData.customerPhone, message, 'bookingConfirmed');
+        const notifEnabled = parseNotifEnabled(shop);
+        if (notifEnabled.bookingConfirmed) {
+          const message = buildKakaoMessage('bookingConfirmed', bookingData, shop as any);
+          await sendAndLog({ templateType: 'bookingConfirmed', phone: bookingData.customerPhone, message, shopId, reservationId: bookingId });
         }
       }
     }
@@ -988,20 +1117,15 @@ export async function registerRoutes(
       return res.status(404).json({ message: "Booking not found" });
     }
 
-    // 3. 가게 데이터 조회 및 depositReceived 알림 발송
+    // 3. 가게 데이터 조회 및 depositGuide 알림 발송
     const shopId = booking.shopId ?? user.shopId;
     if (shopId && bookingData) {
       const shop = await storage.getShop(shopId);
       if (shop) {
-        const notifSettings = parseNotifSettings(shop);
-        const config = notifSettings.depositReceived;
-
-        if (config?.enabled) {
-          // 4. 템플릿 변수 치환
-          const message = buildMessage(config, bookingData, shop);
-
-          // 5. 발송 (stub)
-          await sendNotification(bookingData.customerPhone, message, 'depositReceived');
+        const notifEnabled = parseNotifEnabled(shop);
+        if (notifEnabled.depositGuide) {
+          const message = buildKakaoMessage('depositGuide', bookingData, shop as any);
+          await sendAndLog({ templateType: 'depositGuide', phone: bookingData.customerPhone, message, shopId, reservationId: bookingId });
         }
       }
     }
@@ -1033,20 +1157,15 @@ export async function registerRoutes(
     }
     const updatedBooking = await storage.confirmDeposit(bookingId);
 
-    // 3. 가게 데이터 조회 및 bookingConfirmed 알림 발송
+    // 3. 가게 데이터 조회 및 bookingConfirmed 알림 발송 (입금 확인 후)
     const shopId = booking.shopId ?? user.shopId;
     if (shopId && bookingData) {
       const shop = await storage.getShop(shopId);
       if (shop) {
-        const notifSettings = parseNotifSettings(shop);
-        const config = notifSettings.bookingConfirmed;
-
-        if (config?.enabled) {
-          // 4. 템플릿 변수 치환
-          const message = buildMessage(config, bookingData, shop);
-
-          // 5. 발송 (stub)
-          await sendNotification(bookingData.customerPhone, message, 'bookingConfirmed');
+        const notifEnabled = parseNotifEnabled(shop);
+        if (notifEnabled.bookingConfirmed) {
+          const message = buildKakaoMessage('bookingConfirmed', bookingData, shop as any);
+          await sendAndLog({ templateType: 'bookingConfirmed', phone: bookingData.customerPhone, message, shopId, reservationId: bookingId });
         }
       }
     }
@@ -1054,12 +1173,28 @@ export async function registerRoutes(
     res.json(updatedBooking);
   });
 
-  // 예약 취소 (cancelled 상태로 변경, 시간대 해제)
+  // 예약 취소 (cancelled 상태로 변경 + 취소 알림 발송)
   app.patch('/api/bookings/:id/cancel', requireAuth, async (req, res) => {
-    const booking = await storage.updateBookingStatus(Number(req.params.id), 'cancelled');
+    const user = req.user as any;
+    const bookingId = Number(req.params.id);
+    const bookingData = await storage.getBooking(bookingId);
+    const booking = await storage.updateBookingStatus(bookingId, 'cancelled');
     if (!booking) {
       return res.status(404).json({ message: "예약을 찾을 수 없습니다." });
     }
+
+    const shopId = booking.shopId ?? user.shopId;
+    if (shopId && bookingData) {
+      const shop = await storage.getShop(shopId);
+      if (shop) {
+        const notifEnabled = parseNotifEnabled(shop);
+        if (notifEnabled.bookingCancelled) {
+          const message = buildKakaoMessage('bookingCancelled', bookingData, shop as any);
+          await sendAndLog({ templateType: 'bookingCancelled', phone: bookingData.customerPhone, message, shopId, reservationId: bookingId });
+        }
+      }
+    }
+
     res.json(booking);
   });
 
@@ -1075,21 +1210,15 @@ export async function registerRoutes(
       return res.status(404).json({ message: "예약을 찾을 수 없습니다." });
     }
 
-    // 2. 가게 데이터 조회 (notificationSettings, name, depositAmount 포함)
+    // 2. 가게 데이터 조회 및 reminderBefore 알림 발송
     const shopId = booking.shopId ?? user.shopId;
     if (shopId) {
       const shop = await storage.getShop(shopId);
       if (shop) {
-        // 3. notificationSettings에서 reminderBefore 설정 꺼내기
-        const notifSettings = parseNotifSettings(shop);
-        const config = notifSettings.reminderBefore;
-
-        if (config?.enabled) {
-          // 4. 템플릿 변수 치환
-          const message = buildMessage(config, booking, shop);
-
-          // 5. 발송 (현재는 stub — 실제 API 연동 시 sendNotification 내부 교체)
-          await sendNotification(booking.customerPhone, message, 'reminderBefore');
+        const notifEnabled = parseNotifEnabled(shop);
+        if (notifEnabled.reminderBefore) {
+          const message = buildKakaoMessage('reminderBefore', booking, shop as any);
+          await sendAndLog({ templateType: 'reminderBefore', phone: booking.customerPhone, message, shopId, reservationId: bookingId });
         }
       }
     }
