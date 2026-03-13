@@ -116,7 +116,7 @@ export default function TermsPage() {
           <section>
             <h2 className="text-lg font-semibold text-gray-900 mb-3">제9조 문의</h2>
             <p>이 약관에 관한 문의 또는 서비스 관련 불만은 아래 이메일로 접수하시면 확인 후 성실히 답변드리겠습니다.</p>
-            <p className="mt-2 font-medium text-gray-900">이메일: 3mjhkim@naver.com</p>
+            <p className="mt-2 font-medium text-gray-900">이메일: support@jeongrihagae.com</p>
           </section>
 
         </div>
@@ -127,7 +127,7 @@ export default function TermsPage() {
           <p>상호: 정리하게</p>
           <p>대표자: 김제훈</p>
           <p>사업자등록번호: 855-17-02648</p>
-          <p>이메일: 3mjhkim@naver.com</p>
+          <p>이메일: support@jeongrihagae.com</p>
         </div>
 
         {/* 홈 링크 */}

@@ -29,7 +29,7 @@ export default function Refund() {
               <li>결제일 및 결제 금액</li>
               <li>환불 요청 사유</li>
             </ul>
-            <p className="mt-3 font-medium text-gray-900">환불 문의 이메일: 3mjhkim@naver.com</p>
+            <p className="mt-3 font-medium text-gray-900">환불 문의 이메일: support@jeongrihagae.com</p>
           </section>
 
           <hr className="border-gray-100" />
@@ -86,7 +86,7 @@ export default function Refund() {
           <section>
             <h2 className="text-lg font-semibold text-gray-900 mb-3">제6조 문의</h2>
             <p>환불 관련 문의 또는 이의 제기는 아래 이메일로 접수해 주시면 빠르게 확인 후 답변드리겠습니다.</p>
-            <p className="mt-2 font-medium text-gray-900">이메일: 3mjhkim@naver.com</p>
+            <p className="mt-2 font-medium text-gray-900">이메일: support@jeongrihagae.com</p>
           </section>
 
         </div>
@@ -96,7 +96,7 @@ export default function Refund() {
           <p>상호: 정리하개</p>
           <p>대표자: 김제훈</p>
           <p>사업자등록번호: 855-17-02648</p>
-          <p>이메일: 3mjhkim@naver.com</p>
+          <p>이메일: support@jeongrihagae.com</p>
         </div>
 
         <div className="mt-6 text-center">

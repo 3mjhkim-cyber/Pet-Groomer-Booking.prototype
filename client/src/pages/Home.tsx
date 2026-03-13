@@ -202,7 +202,7 @@ export default function Home() {
             <a href="/privacy" className="hover:text-white/60 transition-colors">개인정보처리방침</a>
             <a href="/refund" className="hover:text-white/60 transition-colors">환불정책</a>
             <a href="/support" className="hover:text-white/60 transition-colors">고객센터</a>
-            <span className="sm:ml-auto">3mjhkim@naver.com &nbsp;·&nbsp; 평일 10–18시</span>
+            <span className="sm:ml-auto">support@jeongrihagae.com &nbsp;·&nbsp; 평일 10–18시</span>
           </div>
           <div className="text-[10px] text-white/20 flex flex-wrap gap-x-4 gap-y-1">
             <span>상호: 정리하개</span>
