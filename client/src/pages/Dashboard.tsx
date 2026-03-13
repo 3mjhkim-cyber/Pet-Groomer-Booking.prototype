@@ -1,11 +1,12 @@
 import { useAuth } from "@/hooks/use-auth";
-import { useBookings, useServices, useApproveBooking, useRejectBooking, useRequestDeposit, useAdminCreateBooking, useSearchCustomers, useCustomerHistory, useCancelBooking, useUpdateBooking, useUpdateBookingCustomer, useAdminConfirmDeposit } from "@/hooks/use-shop";
+import { useBookings, useServices, useApproveBooking, useRejectBooking, useRequestDeposit, useAdminCreateBooking, useSearchCustomers, useCustomerHistory, useCancelBooking, useUpdateBooking, useUpdateBookingCustomer, useAdminConfirmDeposit, useUpdateCustomer } from "@/hooks/use-shop";
 import { useLocation } from "wouter";
 import { Loader2, Calendar, Clock, User, Phone, Scissors, Check, X, Banknote, Plus, Link, Copy, History, Edit, XCircle, UserCog, PawPrint, FileText, Bell, MessageCircle, ChevronLeft, ChevronRight, LayoutDashboard, DollarSign } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect, useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -1296,27 +1297,55 @@ export default function Dashboard() {
 function CustomerDetailDialog({ customerId, open, onOpenChange }: { customerId: number | null, open: boolean, onOpenChange: (open: boolean) => void }) {
   const { data: customer, isLoading } = useQuery<Customer>({
     queryKey: ['/api/customers', customerId],
+    queryFn: async () => {
+      const res = await fetch(`/api/customers/${customerId}`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch customer');
+      return res.json();
+    },
     enabled: !!customerId && open,
   });
-  
+
+  const { data: historyData } = useCustomerHistory(customer?.phone ?? null);
+  const { mutate: updateCustomer, isPending: isSaving } = useUpdateCustomer();
+
+  const [isEditingMemo, setIsEditingMemo] = useState(false);
+  const [memoValue, setMemoValue] = useState('');
+
+  // 편집 시작 시 현재 메모값 세팅
+  const handleStartEdit = () => {
+    setMemoValue(customer?.memo || '');
+    setIsEditingMemo(true);
+  };
+
+  const handleSaveMemo = () => {
+    if (!customer) return;
+    updateCustomer({ id: customer.id, data: { memo: memoValue } }, {
+      onSuccess: () => setIsEditingMemo(false),
+    });
+  };
+
+  // 메모가 있는 예약들 (고객이 작성한 참고사항)
+  const bookingsWithMemo = (historyData?.history ?? []).filter((b: any) => b.memo?.trim());
+
   if (!customerId) return null;
-  
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+    <Dialog open={open} onOpenChange={(o) => { if (!o) setIsEditingMemo(false); onOpenChange(o); }}>
+      <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <User className="w-5 h-5" />
             고객 상세 정보
           </DialogTitle>
         </DialogHeader>
-        
+
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
             <Loader2 className="w-6 h-6 animate-spin text-primary" />
           </div>
         ) : customer ? (
           <div className="space-y-4">
+            {/* 기본 정보 */}
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div>
                 <span className="text-muted-foreground">이름</span>
@@ -1327,7 +1356,8 @@ function CustomerDetailDialog({ customerId, open, onOpenChange }: { customerId: 
                 <p className="font-medium font-mono">{customer.phone}</p>
               </div>
             </div>
-            
+
+            {/* 반려동물 정보 */}
             {(customer.petName || customer.petBreed) && (
               <div className="border-t pt-4">
                 <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
@@ -1354,7 +1384,8 @@ function CustomerDetailDialog({ customerId, open, onOpenChange }: { customerId: 
                 </div>
               </div>
             )}
-            
+
+            {/* 방문 정보 */}
             <div className="border-t pt-4">
               <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
                 <Calendar className="w-4 h-4" />
@@ -1375,36 +1406,63 @@ function CustomerDetailDialog({ customerId, open, onOpenChange }: { customerId: 
                 </div>
               </div>
             </div>
-            
-            {customer.memo && (
+
+            {/* 고객 참고사항 (예약 시 고객이 직접 입력) */}
+            {bookingsWithMemo.length > 0 && (
               <div className="border-t pt-4">
                 <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+                  <MessageCircle className="w-4 h-4 text-blue-500" />
+                  고객 참고사항
+                </h4>
+                <div className="space-y-2">
+                  {bookingsWithMemo.slice(0, 5).map((b: any) => (
+                    <div key={b.id} className="bg-blue-50 rounded-lg px-3 py-2 text-sm">
+                      <p className="text-xs text-muted-foreground mb-1">{b.date} {b.time}</p>
+                      <p className="text-sm whitespace-pre-wrap">{b.memo}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 가맹점 메모 (사장님 전용, 고객에게 비공개) */}
+            <div className="border-t pt-4">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-sm font-medium flex items-center gap-2">
                   <FileText className="w-4 h-4" />
-                  메모
+                  사장님 메모
+                  <span className="text-xs text-muted-foreground font-normal">(고객에게 비공개)</span>
                 </h4>
-                <p className="text-sm text-muted-foreground whitespace-pre-wrap">{customer.memo}</p>
+                {!isEditingMemo && (
+                  <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={handleStartEdit}>
+                    <Edit className="w-3 h-3 mr-1" />
+                    {customer.memo ? '편집' : '추가'}
+                  </Button>
+                )}
               </div>
-            )}
-            
-            {customer.behaviorNotes && (
-              <div className="border-t pt-4">
-                <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
-                  <PawPrint className="w-4 h-4" />
-                  행동 특성
-                </h4>
-                <p className="text-sm text-muted-foreground whitespace-pre-wrap">{customer.behaviorNotes}</p>
-              </div>
-            )}
-            
-            {customer.specialNotes && (
-              <div className="border-t pt-4">
-                <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
-                  <FileText className="w-4 h-4" />
-                  특이사항
-                </h4>
-                <p className="text-sm text-muted-foreground whitespace-pre-wrap">{customer.specialNotes}</p>
-              </div>
-            )}
+              {isEditingMemo ? (
+                <div className="space-y-2">
+                  <Textarea
+                    value={memoValue}
+                    onChange={(e) => setMemoValue(e.target.value)}
+                    placeholder="고객에 대한 메모를 입력하세요..."
+                    className="text-sm min-h-[80px]"
+                    autoFocus
+                  />
+                  <div className="flex gap-2 justify-end">
+                    <Button variant="ghost" size="sm" onClick={() => setIsEditingMemo(false)}>취소</Button>
+                    <Button size="sm" onClick={handleSaveMemo} disabled={isSaving}>
+                      {isSaving ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : null}
+                      저장
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                  {customer.memo || '등록된 메모가 없습니다.'}
+                </p>
+              )}
+            </div>
           </div>
         ) : (
           <p className="text-sm text-muted-foreground text-center py-4">고객 정보를 찾을 수 없습니다.</p>
