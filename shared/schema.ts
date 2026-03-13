@@ -21,6 +21,12 @@ export const shops = pgTable("shops", {
   shopMemo: text("shop_memo"),
   depositAmount: integer("deposit_amount").default(10000).notNull(),
   depositRequired: boolean("deposit_required").default(true).notNull(),
+  // 예약금 입금 계좌번호 (카카오 알림톡 템플릿용)
+  bankAccount: text("bank_account"),
+  // 알림톡 추가 안내문구 (선택, 1줄)
+  notificationExtraNote: text("notification_extra_note"),
+  // 알림 유형별 활성화 여부 (JSON): {"bookingConfirmed":true,"depositGuide":true,...}
+  notificationEnabled: text("notification_enabled"),
   isApproved: boolean("is_approved").default(true).notNull(), // 자동 승인으로 변경
   // 구독 관련 필드
   subscriptionStatus: text("subscription_status").default("none").notNull(), // none, active, expired, cancelled
@@ -129,6 +135,19 @@ export const userSubscriptions = pgTable("user_subscriptions", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// ─── 카카오 알림톡 발송 로그 ────────────────────────────────────────────────────
+export const notificationLogs = pgTable("notification_logs", {
+  id: serial("id").primaryKey(),
+  shopId: integer("shop_id").references(() => shops.id).notNull(),
+  reservationId: integer("reservation_id").references(() => bookings.id),
+  templateType: text("template_type").notNull(), // bookingConfirmed | depositGuide | reminderBefore | bookingCancelled | returnVisit
+  phone: text("phone").notNull(),
+  status: text("status").notNull(), // sent | failed
+  providerMessageId: text("provider_message_id"),
+  errorMessage: text("error_message"),
+  sentAt: timestamp("sent_at").defaultNow().notNull(),
+});
+
 export const userPayments = pgTable("user_payments", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").references(() => users.id).notNull(),
@@ -165,3 +184,6 @@ export type UserSubscription = typeof userSubscriptions.$inferSelect;
 export type UserPayment = typeof userPayments.$inferSelect;
 export type InsertUserSubscription = typeof userSubscriptions.$inferInsert;
 export type InsertUserPayment = typeof userPayments.$inferInsert;
+
+export type NotificationLog = typeof notificationLogs.$inferSelect;
+export type InsertNotificationLog = typeof notificationLogs.$inferInsert;
