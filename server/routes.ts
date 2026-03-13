@@ -616,17 +616,23 @@ export async function registerRoutes(
         return res.status(400).json({ message: "이미 사용중인 이메일입니다." });
       }
 
-      const generateSlug = (shopName: string) => {
-        const base = shopName.toLowerCase()
-          .replace(/[^a-z0-9가-힣]/g, '-')
+      const generateUniqueSlug = async (shopName: string) => {
+        const base = shopName
+          .replace(/[^\w가-힣]/g, '-')
           .replace(/-+/g, '-')
           .replace(/^-|-$/g, '') || 'shop';
-        return `${base}-${Date.now()}`;
+        let candidate = base;
+        let counter = 2;
+        while (await storage.getShopBySlug(candidate)) {
+          candidate = `${base}-${counter}`;
+          counter++;
+        }
+        return candidate;
       };
 
       const shopInput = {
         name,
-        slug: generateSlug(name),
+        slug: await generateUniqueSlug(name),
         phone,
         address,
         businessHours: shopData.businessHours || '09:00-18:00',
