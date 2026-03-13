@@ -118,11 +118,9 @@ function buildKakaoMessage(
   templateType: KakaoTemplateType,
   booking: { customerName: string; petName?: string | null; date: string; time: string },
   shop: { name: string; phone: string; slug?: string | null; depositAmount?: number | null; bankAccount?: string | null; notificationExtraNote?: string | null },
+  bookingLink?: string,
 ): string {
   let message = KAKAO_TEMPLATES[templateType];
-
-  const appUrl = process.env.APP_URL || '';
-  const bookingLink = shop.slug ? `${appUrl}/book/${shop.slug}` : `${appUrl}/book`;
 
   const values: Record<string, string> = {
     '#{매장명}':       shop.name,
@@ -132,7 +130,7 @@ function buildKakaoMessage(
     '#{예약금}':       shop.depositAmount != null ? shop.depositAmount.toLocaleString() : '-',
     '#{계좌번호}':     shop.bankAccount || '(계좌번호 미설정)',
     '#{매장전화번호}': shop.phone,
-    '#{예약링크}':     bookingLink,
+    '#{예약링크}':     bookingLink || '',
   };
 
   for (const [key, value] of Object.entries(values)) {
@@ -963,10 +961,13 @@ export async function registerRoutes(
     }
 
     // 재방문 템플릿은 예약일시 없음
+    const baseUrl = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
+    const bookingLink = `${baseUrl}/book/${shop.slug}`;
     const message = buildKakaoMessage(
       'returnVisit',
       { customerName: customer.name, petName: customer.petName, date: '', time: '' },
       shop as any,
+      bookingLink,
     );
 
     await sendAndLog({ templateType: 'returnVisit', phone: customer.phone, message, shopId: shop.id });
