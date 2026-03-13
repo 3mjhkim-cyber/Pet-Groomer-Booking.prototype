@@ -62,7 +62,7 @@ const KAKAO_TEMPLATES: Record<KakaoTemplateType, string> = {
   returnVisit: `[#{매장명}]
 #{고객명}님, 오랜만이에요!
 #{반려동물이름}의 미용 예약 어떠세요?
-문의: #{매장전화번호}`,
+예약하기: #{예약링크}`,
 };
 
 /**
@@ -104,9 +104,12 @@ function parseNotifEnabled(shop: Shop): NotifEnabled {
 function buildKakaoMessage(
   templateType: KakaoTemplateType,
   booking: { customerName: string; petName?: string | null; date: string; time: string },
-  shop: { name: string; phone: string; depositAmount?: number | null; bankAccount?: string | null; notificationExtraNote?: string | null },
+  shop: { name: string; phone: string; slug?: string | null; depositAmount?: number | null; bankAccount?: string | null; notificationExtraNote?: string | null },
 ): string {
   let message = KAKAO_TEMPLATES[templateType];
+
+  const appUrl = process.env.APP_URL || '';
+  const bookingLink = shop.slug ? `${appUrl}/book/${shop.slug}` : `${appUrl}/book`;
 
   const values: Record<string, string> = {
     '#{매장명}':       shop.name,
@@ -116,6 +119,7 @@ function buildKakaoMessage(
     '#{예약금}':       shop.depositAmount != null ? shop.depositAmount.toLocaleString() : '-',
     '#{계좌번호}':     shop.bankAccount || '(계좌번호 미설정)',
     '#{매장전화번호}': shop.phone,
+    '#{예약링크}':     bookingLink,
   };
 
   for (const [key, value] of Object.entries(values)) {
