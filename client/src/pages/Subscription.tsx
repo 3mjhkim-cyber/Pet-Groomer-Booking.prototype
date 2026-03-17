@@ -342,12 +342,6 @@ export default function Subscription() {
               )}
             </div>
           </div>
-          {/* 플랜 조정 버튼은 active 상태일 때만 */}
-          {status === "active" && (
-            <Button variant="outline" size="sm" className="flex-shrink-0">
-              요금제 조정
-            </Button>
-          )}
         </div>
 
         {/* ─── 2. 결제 수단 섹션 (active·past_due) ───────────────────────── */}
