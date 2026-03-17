@@ -89,46 +89,60 @@ function formatDateTime(date: string, time: string): string {
 function parseNotifEnabled(shop: Shop): NotifEnabled {
   try {
     let raw = (shop as any).notificationEnabled;
+    
+    // 기본값: 모든 알림 활성화 (임시로 항상 true 반환)
+    const defaultEnabled: NotifEnabled = {
+      bookingConfirmed: true,
+      depositGuide: true,
+      reminderBefore: true,
+      bookingCancelled: true,
+    };
+    
     if (!raw) {
-      return {};
+      console.log('[parseNotifEnabled] 설정 없음 - 기본값 사용');
+      return defaultEnabled;
     }
     
     // 이미 객체면 그대로 반환
-    if (typeof raw === 'object') {
+    if (typeof raw === 'object' && raw !== null) {
+      console.log(`[parseNotifEnabled] 객체로 받음: ${JSON.stringify(raw)}`);
       return raw;
     }
     
     // 문자열이면 JSON 파싱
     if (typeof raw === 'string') {
-      // 이중 따옴표("") 문제 해결: "{""key"":value}" → "{"key":value}"
-      let jsonStr = raw;
-      
-      // 방법 1: 첫 번째와 마지막 따옴표 제거
-      if (jsonStr.startsWith('"') && jsonStr.endsWith('"')) {
-        jsonStr = jsonStr.slice(1, -1);
+      try {
+        let jsonStr = raw;
+        
+        // 첫 번째와 마지막 따옴표 제거
+        if (jsonStr.startsWith('"') && jsonStr.endsWith('"')) {
+          jsonStr = jsonStr.slice(1, -1);
+        }
+        
+        // 이스케이프된 따옴표를 일반 따옴표로 변환
+        jsonStr = jsonStr.replace(/\\"/g, '"');
+        
+        console.log(`[parseNotifEnabled] 파싱 시도: ${jsonStr.substring(0, 60)}`);
+        const parsed = JSON.parse(jsonStr);
+        console.log(`[parseNotifEnabled] 파싱 성공: ${Object.keys(parsed).join(', ')}`);
+        return parsed;
+      } catch (parseErr) {
+        console.warn(`[parseNotifEnabled] JSON 파싱 실패, 기본값 사용: ${parseErr}`);
+        return defaultEnabled;
       }
-      
-      // 방법 2: 이스케이프된 따옴표를 일반 따옴표로 변환
-      jsonStr = jsonStr.replace(/\\"/g, '"');
-      
-      // 방법 3: 빈 JSON 객체는 그냥 반환
-      if (jsonStr === '{}' || jsonStr === '') {
-        return {};
-      }
-      
-      console.log(`[parseNotifEnabled] 파싱: ${jsonStr.substring(0, 50)}`);
-      const parsed = JSON.parse(jsonStr);
-      console.log(`[parseNotifEnabled] 완료: ${Object.keys(parsed).join(', ')}`);
-      return parsed;
     }
     
-    return {};
+    console.log('[parseNotifEnabled] 알 수 없는 타입 - 기본값 사용');
+    return defaultEnabled;
   } catch (err: any) {
-    console.error('[parseNotifEnabled] 파싱 실패:', {
-      raw: JSON.stringify(raw),
-      error: err.message,
-    });
-    return {};
+    console.error('[parseNotifEnabled] 예상치 못한 오류:', err.message);
+    // 오류 발생해도 기본값으로 알림 보내기
+    return {
+      bookingConfirmed: true,
+      depositGuide: true,
+      reminderBefore: true,
+      bookingCancelled: true,
+    };
   }
 }
 
