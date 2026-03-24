@@ -353,10 +353,15 @@ async function requireActiveSubscription(req: any, res: any, next: any) {
   // shop 레벨 구독 확인 (관리자가 수동 활성화한 경우 포함)
   if (user.shopId) {
     const shop = await storage.getShop(user.shopId);
+    const now = new Date();
     if (shop?.subscriptionStatus === 'active') {
-      const now = new Date();
       const end = shop.subscriptionEnd ? new Date(shop.subscriptionEnd) : null;
       if (!end || end > now) return next();
+    }
+    // 취소했더라도 subscriptionEnd 이전까지는 이용 허용
+    if (shop?.subscriptionStatus === 'cancelled') {
+      const end = shop.subscriptionEnd ? new Date(shop.subscriptionEnd) : null;
+      if (end && end > now) return next();
     }
   }
 
@@ -364,6 +369,14 @@ async function requireActiveSubscription(req: any, res: any, next: any) {
   const sub = await storage.getUserSubscription(user.id);
   if (sub?.status === 'active') return next();
   if (sub?.status === 'trialing' && sub.trialEndDate && new Date(sub.trialEndDate) > new Date()) return next();
+  // 취소했더라도 기한 내에는 이용 허용
+  if (sub?.status === 'cancelled') {
+    const now = new Date();
+    // 무료체험 중 취소: trialEndDate까지
+    if (sub.trialEndDate && new Date(sub.trialEndDate) > now) return next();
+    // 유료 구독 취소: nextBillingDate(=결제 예정일, 즉 현재 기간 종료일)까지
+    if (sub.nextBillingDate && new Date(sub.nextBillingDate) > now) return next();
+  }
 
   return res.status(402).json({
     code: 'SUBSCRIPTION_REQUIRED',
@@ -1744,9 +1757,9 @@ export async function registerRoutes(
       return res.json({ subscription: sub, message: '이미 해지된 구독입니다.' });
     }
 
+    // nextBillingDate는 유지: 현재 기간 종료일로 사용 (미들웨어에서 접근 허용 기준)
     const updated = await storage.updateUserSubscription(sub.id, {
       status: 'cancelled',
-      nextBillingDate: null,
     });
     res.json({ subscription: updated });
   });
