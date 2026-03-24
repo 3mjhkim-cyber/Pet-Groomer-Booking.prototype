@@ -116,7 +116,7 @@ export const subscriptions = pgTable("subscriptions", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-// ─── 사용자별 구독 빌링 (단일 플랜 29,000원/월) ────────────────────────────────
+// ─── 사용자별 구독 빌링 (단일 플랜 39,000원/월) ────────────────────────────────
 // status 흐름:
 //   trialing → pending_payment (D-3 또는 체험 만료) → active (첫 결제 성공)
 //                                                    → past_due (결제 실패/재시도)
@@ -151,7 +151,7 @@ export const notificationLogs = pgTable("notification_logs", {
 export const userPayments = pgTable("user_payments", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").references(() => users.id).notNull(),
-  amount: integer("amount").notNull(),          // 29000
+  amount: integer("amount").notNull(),          // 39000
   attemptedAt: timestamp("attempted_at").notNull(),
   paidAt: timestamp("paid_at"),                 // nullable: 실패 시 null
   result: text("result").notNull(),             // success | fail
