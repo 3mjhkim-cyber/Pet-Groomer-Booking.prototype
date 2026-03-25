@@ -31,7 +31,7 @@ import { apiRequest } from "@/lib/queryClient";
 
 // ─── 플랜 정의 ─────────────────────────────────────────────────────────────────
 const PLAN = {
-  price: 29_000,
+  price: 39_000,
   name: "스탠다드",
   features: [
     "무제한 예약 관리",
