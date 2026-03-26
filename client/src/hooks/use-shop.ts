@@ -24,7 +24,9 @@ export function useBookings(isDialogOpen: boolean = false) {
       return api.bookings.list.responses[200].parse(await res.json());
     },
     retry: false,
-    enabled: !isDialogOpen,
+    refetchInterval: isDialogOpen ? false : 3000,
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: !isDialogOpen,
   });
 }
 
