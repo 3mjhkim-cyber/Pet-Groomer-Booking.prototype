@@ -23,7 +23,30 @@ import { ko } from "date-fns/locale";
 export default function Dashboard() {
   const { user, isLoading: isAuthLoading } = useAuth();
   const { userAccessible, isLoading: isSubLoading } = useIsSubscriptionAccessible();
-  const { data: bookings, isLoading: isBookingsLoading } = useBookings();
+  
+  const [isManualDialogOpen, setIsManualDialogOpen] = useState(false);
+  const [selectedCustomerPhone, setSelectedCustomerPhone] = useState<string | null>(null);
+  const [isHistoryDialogOpen, setIsHistoryDialogOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [editBooking, setEditBooking] = useState<(Booking & { serviceName: string }) | null>(null);
+  const [editForm, setEditForm] = useState({ date: '', time: '', serviceId: 0 });
+  const [editCustomerBooking, setEditCustomerBooking] = useState<(Booking & { serviceName: string }) | null>(null);
+  const [editCustomerForm, setEditCustomerForm] = useState({ customerName: '', customerPhone: '' });
+  const [cancelConfirmBooking, setCancelConfirmBooking] = useState<(Booking & { serviceName: string }) | null>(null);
+  const [customerDetailId, setCustomerDetailId] = useState<number | null>(null);
+  const [isCustomerDetailOpen, setIsCustomerDetailOpen] = useState(false);
+  const [remindBooking, setRemindBooking] = useState<(Booking & { serviceName: string }) | null>(null);
+  const [dashboardDetailBooking, setDashboardDetailBooking] = useState<(Booking & { serviceName: string }) | null>(null);
+  const [dashboardMemoText, setDashboardMemoText] = useState("");
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+
+  // 다이얼로그가 열려있는지 확인
+  const isAnyDialogOpen = isHistoryDialogOpen || isCustomerDetailOpen || !!remindBooking || !!editBooking || !!editCustomerBooking || !!cancelConfirmBooking || isManualDialogOpen || isCalendarOpen;
+  
+  // 다이얼로그가 열려있을 때만 폴링 중지
+  const { data: bookings, isLoading: isBookingsLoading } = useBookings(isAnyDialogOpen);
   const { data: services } = useServices();
   const { mutate: approveBooking } = useApproveBooking();
   const { mutate: rejectBooking } = useRejectBooking();
@@ -34,40 +57,8 @@ export default function Dashboard() {
   const { mutate: updateBookingCustomer, isPending: isUpdatingCustomer } = useUpdateBookingCustomer();
   const { mutate: adminConfirmDeposit, isPending: isConfirmingDeposit } = useAdminConfirmDeposit();
   const [_, setLocation] = useLocation();
-  const [isManualDialogOpen, setIsManualDialogOpen] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  
-  const [selectedCustomerPhone, setSelectedCustomerPhone] = useState<string | null>(null);
-  const [isHistoryDialogOpen, setIsHistoryDialogOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  
-  // 예약 수정 다이얼로그 상태
-  const [editBooking, setEditBooking] = useState<(Booking & { serviceName: string }) | null>(null);
-  const [editForm, setEditForm] = useState({ date: '', time: '', serviceId: 0 });
-  
-  // 고객 정보 수정 다이얼로그 상태
-  const [editCustomerBooking, setEditCustomerBooking] = useState<(Booking & { serviceName: string }) | null>(null);
-  const [editCustomerForm, setEditCustomerForm] = useState({ customerName: '', customerPhone: '' });
-  
-  // 취소 확인 다이얼로그 상태
-  const [cancelConfirmBooking, setCancelConfirmBooking] = useState<(Booking & { serviceName: string }) | null>(null);
-  
-  // 고객 정보 상세 모달 상태
-  const [customerDetailId, setCustomerDetailId] = useState<number | null>(null);
-  const [isCustomerDetailOpen, setIsCustomerDetailOpen] = useState(false);
-  
-  // 리마인드 모달 상태
-  const [remindBooking, setRemindBooking] = useState<(Booking & { serviceName: string }) | null>(null);
-
-  // 대시보드 일정 상세 모달 상태
-  const [dashboardDetailBooking, setDashboardDetailBooking] = useState<(Booking & { serviceName: string }) | null>(null);
-  const [dashboardMemoText, setDashboardMemoText] = useState("");
-
-  // 확정 예약 날짜 필터 상태
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
 
   const { data: searchResults } = useSearchCustomers(searchQuery);
   const { data: customerHistoryData } = useCustomerHistory(selectedCustomerPhone);
@@ -89,18 +80,6 @@ export default function Dashboard() {
       setRemindBooking(null);
     },
   });
-
-  // 다이얼로그가 열려있는지 확인
-  const isAnyDialogOpen = isHistoryDialogOpen || isCustomerDetailOpen || !!remindBooking || !!editBooking || !!editCustomerBooking || !!cancelConfirmBooking || isManualDialogOpen || isCalendarOpen;
-
-  // 실시간 업데이트: 2초마다 예약 데이터 갱신 (다이얼로그가 열려있으면 일시 중지)
-  useEffect(() => {
-    if (isAnyDialogOpen) return;
-    const interval = setInterval(() => {
-      queryClient.invalidateQueries({ queryKey: [api.bookings.list.path] });
-    }, 2000);
-    return () => clearInterval(interval);
-  }, [queryClient, isAnyDialogOpen]);
 
   const copyDepositLink = (bookingId: number) => {
     const link = `${window.location.origin}/deposit/${bookingId}`;
