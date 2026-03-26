@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, memo } from "react";
 import { Link } from "wouter";
 import { AlertTriangle, X } from "lucide-react";
 import { useSubscription } from "@/hooks/use-subscription";
@@ -10,7 +10,7 @@ interface Props {
   className?: string;
 }
 
-export function TrialNudgeBanner({ className }: Props) {
+export const TrialNudgeBanner = memo(function TrialNudgeBanner({ className }: Props) {
   const { data: sub } = useSubscription();
   const [dismissed, setDismissed] = useState(
     () => sessionStorage.getItem(DISMISS_KEY) === "true",
@@ -52,4 +52,4 @@ export function TrialNudgeBanner({ className }: Props) {
       </button>
     </div>
   );
-}
+});
