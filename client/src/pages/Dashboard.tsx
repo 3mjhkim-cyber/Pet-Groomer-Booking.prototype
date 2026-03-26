@@ -81,6 +81,21 @@ export default function Dashboard() {
     },
   });
 
+  // 실시간 업데이트: SSE로 새 예약 푸시 수신
+  useEffect(() => {
+    if (!user?.shopId) return;
+    const es = new EventSource('/api/sse/bookings');
+    es.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === 'new-booking') {
+          queryClient.refetchQueries({ queryKey: [api.bookings.list.path] });
+          toast({ title: "새 예약 신청", description: "새로운 예약이 들어왔습니다!" });
+        }
+      } catch {}
+    };
+    return () => es.close();
+  }, [user?.shopId, queryClient, toast]);
 
   const copyDepositLink = (bookingId: number) => {
     const link = `${window.location.origin}/deposit/${bookingId}`;
