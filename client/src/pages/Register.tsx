@@ -27,6 +27,7 @@ export default function Register() {
     confirmPassword: '',
     shopName: '',
     phone: '',
+    ownerPhone: '',
     address: '',
     addressDetail: '',
   });
@@ -89,6 +90,12 @@ export default function Register() {
       newErrors.phone = "전화번호를 입력해주세요.";
     }
 
+    if (!formData.ownerPhone.trim()) {
+      newErrors.ownerPhone = "사장님 휴대폰 번호를 입력해주세요.";
+    } else if (!/^010-\d{3,4}-\d{4}$/.test(formData.ownerPhone)) {
+      newErrors.ownerPhone = "010으로 시작하는 휴대폰 번호를 입력해주세요.";
+    }
+
     if (!formData.address.trim()) {
       newErrors.address = "주소를 검색하여 선택해주세요.";
     }
@@ -109,6 +116,7 @@ export default function Register() {
         body: JSON.stringify({
           email: formData.email,
           password: formData.password,
+          ownerPhone: formData.ownerPhone,
           shop: {
             name: formData.shopName,
             phone: formData.phone,
@@ -150,6 +158,11 @@ export default function Register() {
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const formatted = formatKoreanPhone(e.target.value);
     setFormData(f => ({ ...f, phone: formatted }));
+  };
+
+  const handleOwnerPhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatKoreanPhone(e.target.value);
+    setFormData(f => ({ ...f, ownerPhone: formatted }));
   };
 
   return (
@@ -221,16 +234,30 @@ export default function Register() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="phone">전화번호 <span className="text-destructive">*</span></Label>
-              <Input 
+              <Label htmlFor="phone">가게 전화번호 <span className="text-destructive">*</span></Label>
+              <Input
                 id="phone"
                 value={formData.phone}
                 onChange={handlePhoneChange}
-                placeholder="010-1234-5678"
+                placeholder="02-1234-5678"
                 data-testid="input-phone"
                 className={errors.phone ? "border-destructive" : ""}
               />
               {errors.phone && <p className="text-sm text-destructive">{errors.phone}</p>}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="ownerPhone">사장님 휴대폰 번호 <span className="text-destructive">*</span></Label>
+              <Input
+                id="ownerPhone"
+                value={formData.ownerPhone}
+                onChange={handleOwnerPhoneChange}
+                placeholder="010-1234-5678"
+                data-testid="input-owner-phone"
+                className={errors.ownerPhone ? "border-destructive" : ""}
+              />
+              <p className="text-xs text-muted-foreground">비밀번호 찾기 시 인증번호를 받을 번호입니다.</p>
+              {errors.ownerPhone && <p className="text-sm text-destructive">{errors.ownerPhone}</p>}
             </div>
 
             <div className="space-y-2">
