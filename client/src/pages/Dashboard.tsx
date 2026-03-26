@@ -97,7 +97,7 @@ export default function Dashboard() {
   useEffect(() => {
     if (isAnyDialogOpen) return;
     const interval = setInterval(() => {
-      queryClient.invalidateQueries({ queryKey: [api.bookings.list.path] });
+      queryClient.refetchQueries({ queryKey: [api.bookings.list.path] });
     }, 2000);
     return () => clearInterval(interval);
   }, [queryClient, isAnyDialogOpen]);
