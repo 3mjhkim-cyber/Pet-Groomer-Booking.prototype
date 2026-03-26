@@ -93,14 +93,6 @@ export default function Dashboard() {
   // 다이얼로그가 열려있는지 확인
   const isAnyDialogOpen = isHistoryDialogOpen || isCustomerDetailOpen || !!remindBooking || !!editBooking || !!editCustomerBooking || !!cancelConfirmBooking || isManualDialogOpen || isCalendarOpen;
 
-  // 실시간 업데이트: 2초마다 예약 데이터 갱신 (다이얼로그가 열려있으면 일시 중지)
-  useEffect(() => {
-    if (isAnyDialogOpen) return;
-    const interval = setInterval(() => {
-      queryClient.refetchQueries({ queryKey: [api.bookings.list.path] });
-    }, 2000);
-    return () => clearInterval(interval);
-  }, [queryClient, isAnyDialogOpen]);
 
   const copyDepositLink = (bookingId: number) => {
     const link = `${window.location.origin}/deposit/${bookingId}`;
