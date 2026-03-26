@@ -81,6 +81,13 @@ export default function Dashboard() {
     },
   });
 
+  // 다이얼로그 닫힐 때 즉시 새로고침 (외부에서 들어온 예약 감지)
+  useEffect(() => {
+    if (!isAnyDialogOpen) {
+      queryClient.refetchQueries({ queryKey: [api.bookings.list.path] });
+    }
+  }, [isAnyDialogOpen, queryClient]);
+
   const copyDepositLink = (bookingId: number) => {
     const link = `${window.location.origin}/deposit/${bookingId}`;
     navigator.clipboard.writeText(link).then(() => {
