@@ -1,7 +1,6 @@
 import { useAuth } from "@/hooks/use-auth";
 import { useBookings, useServices, useApproveBooking, useRejectBooking, useRequestDeposit, useAdminCreateBooking, useSearchCustomers, useCustomerHistory, useCancelBooking, useUpdateBooking, useUpdateBookingCustomer, useAdminConfirmDeposit, useUpdateCustomer, useUpdateBookingMemo } from "@/hooks/use-shop";
 import { useIsSubscriptionAccessible } from "@/hooks/use-subscription";
-import { TrialNudgeBanner } from "@/components/TrialNudgeBanner";
 import { useLocation } from "wouter";
 import { Loader2, Calendar, Clock, User, Phone, Scissors, Check, X, Banknote, Plus, Link, Copy, History, Edit, XCircle, UserCog, PawPrint, FileText, Bell, MessageCircle, ChevronLeft, ChevronRight, LayoutDashboard, DollarSign } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -394,8 +393,6 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
-
-      <TrialNudgeBanner />
 
       <div className="container mx-auto px-4 py-8 max-w-6xl">
         {isBookingsLoading ? (
