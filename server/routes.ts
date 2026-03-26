@@ -388,6 +388,16 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  // SSE: shopId → 연결된 대시보드 클라이언트 목록
+  const shopSseClients = new Map<number, Set<any>>();
+
+  function notifyShop(shopId: number, payload: object) {
+    const clients = shopSseClients.get(shopId);
+    if (!clients || clients.size === 0) return;
+    const data = `data: ${JSON.stringify(payload)}\n\n`;
+    clients.forEach(res => { try { res.write(data); } catch {} });
+  }
+
   const SessionStore = MemoryStore(session);
   
   app.set("trust proxy", 1);
@@ -425,6 +435,28 @@ export async function registerRoutes(
   app.use('/api/bookings', (req: any, res: any, next: any) => {
     if (req.method === 'POST' && req.path === '/') return next();
     return requireActiveSubscription(req, res, next);
+  });
+
+  // ── SSE 엔드포인트 ──────────────────────────────────────────────────────────
+  app.get('/api/sse/bookings', requireAuth, (req: any, res: any) => {
+    const shopId: number = req.user?.shopId;
+    if (!shopId) return res.status(400).end();
+
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders();
+
+    if (!shopSseClients.has(shopId)) shopSseClients.set(shopId, new Set());
+    shopSseClients.get(shopId)!.add(res);
+
+    // 연결 유지용 heartbeat (30초마다)
+    const heartbeat = setInterval(() => { try { res.write(': heartbeat\n\n'); } catch {} }, 30000);
+
+    req.on('close', () => {
+      clearInterval(heartbeat);
+      shopSseClients.get(shopId)?.delete(res);
+    });
   });
 
   passport.use(new LocalStrategy(
@@ -1243,6 +1275,9 @@ export async function registerRoutes(
         isFirstVisit,
       } as any);
       
+      // 해당 shop의 대시보드에 새 예약 알림 푸시
+      if (booking.shopId) notifyShop(booking.shopId, { type: 'new-booking' });
+
       res.status(201).json(booking);
     } catch (err) {
       if (err instanceof z.ZodError) {
