@@ -66,7 +66,7 @@ const ITEMS_PER_PAGE = 10;
 // 헬퍼 컴포넌트
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** 행에 표시할 단순 활성/비활성 배지 */
+/** 행에 표시할 활성/무료체험/비활성 배지 */
 function StatusBadge({ status }: { status: string | null }) {
   if (status === "active") {
     return (
@@ -75,13 +75,23 @@ function StatusBadge({ status }: { status: string | null }) {
       </Badge>
     );
   }
+  if (status === "trialing") {
+    return (
+      <Badge className="bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-100 text-xs">
+        무료체험 중
+      </Badge>
+    );
+  }
   return <Badge variant="secondary" className="text-xs">비활성</Badge>;
 }
 
-/** 상세 패널의 구독 상태 배지 (active / 그 외 모두 비활성) */
+/** 상세 패널의 구독 상태 배지 */
 function SubDetailBadge({ status }: { status: string | null }) {
   if (status === "active") {
     return <Badge className="bg-green-100 text-green-700 border-green-200 hover:bg-green-100">활성</Badge>;
+  }
+  if (status === "trialing") {
+    return <Badge className="bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-100">무료체험 중</Badge>;
   }
   return <Badge variant="secondary">비활성</Badge>;
 }
