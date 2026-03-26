@@ -261,8 +261,54 @@ export default function Subscription() {
   }
 
   // ══════════════════════════════════════════════════════════════════════════════
-  // 공통 레이아웃 — 설정 페이지 스타일
+  // 뷰 2: 무료체험 만료 — 구독 시작 유도 (서비스 소개 카드)
   // ══════════════════════════════════════════════════════════════════════════════
+  if (status === "pending_payment") {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-primary/5 to-background py-12 px-4">
+        <div className="max-w-lg mx-auto">
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-red-100 mb-4">
+              <Lock className="w-7 h-7 text-red-500" />
+            </div>
+            <h1 className="text-3xl font-bold mb-2">무료체험이 종료되었습니다</h1>
+            <p className="text-muted-foreground text-sm">
+              서비스를 계속 이용하려면 구독을 시작해주세요.
+            </p>
+          </div>
+          <div className="rounded-xl border border-primary/20 shadow-sm p-6 bg-card mb-4">
+            <div className="text-center mb-5">
+              <p className="text-sm text-muted-foreground mb-1">{PLAN.name} 플랜</p>
+              <p className="text-4xl font-bold">
+                {PLAN.price.toLocaleString()}
+                <span className="text-xl font-normal text-muted-foreground">원/월</span>
+              </p>
+            </div>
+            <ul className="space-y-2.5 mb-6">
+              {PLAN.features.map((f) => (
+                <li key={f} className="flex items-center gap-2.5 text-sm">
+                  <Check className="w-4 h-4 text-primary flex-shrink-0" />
+                  {f}
+                </li>
+              ))}
+            </ul>
+            <Button className="w-full" size="lg"
+              onClick={handleRegisterCard}
+              disabled={isRegisteringCard}>
+              {isRegisteringCard
+                ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />처리 중...</>
+                : <><CreditCard className="w-4 h-4 mr-2" />지금 구독 시작하기</>}
+            </Button>
+            <p className="text-xs text-muted-foreground text-center mt-3">
+              카드 등록 즉시 {PLAN.price.toLocaleString()}원 결제 후 모든 기능 이용 가능
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+
   return (
     <div className="min-h-screen bg-background py-10 px-4">
       <div className="max-w-2xl mx-auto">
