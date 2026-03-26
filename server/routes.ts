@@ -701,7 +701,7 @@ export async function registerRoutes(
   // 가맹점 등록 (등록 즉시 활성화 — 승인 절차 없음)
   app.post('/api/shops/register', async (req, res) => {
     try {
-      const { email, password, shop: shopData } = req.body;
+      const { email, password, ownerPhone, shop: shopData } = req.body;
       
       if (!email || !password) {
         return res.status(400).json({ message: "이메일과 비밀번호를 입력해주세요." });
@@ -768,7 +768,7 @@ export async function registerRoutes(
         status: 'active',
         shopId: shop.id,
         shopName: shop.name,
-        phone: shop.phone,
+        phone: ownerPhone || shop.phone, // 사장님 휴대폰 우선, 없으면 가게 전화
         address: shop.address,
         businessNumber,
       });
