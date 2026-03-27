@@ -73,7 +73,7 @@ export default function Home() {
                   지금 시작하기
                 </button>
               </Link>
-              <p className="text-xs text-muted-foreground">30일 무료체험 · 카드 등록 불필요</p>
+              <p className="text-xs text-muted-foreground">30일 무료체험 · 체험 후 카드 등록으로 계속 이용 가능</p>
             </div>
           </motion.div>
         </div>
