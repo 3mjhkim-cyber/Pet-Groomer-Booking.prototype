@@ -2130,7 +2130,8 @@ export async function registerRoutes(
       depositRequired: false,
     });
   }
-  if (await storage.getUserByUsername(PG_TEST_EMAIL) === undefined) {
+  const pgTestUser = await storage.getUserByUsername(PG_TEST_EMAIL);
+  if (pgTestUser === undefined) {
     const hashedPassword = await hashPassword("pgtest1234!");
     const pgUser = await storage.createUser({
       email: PG_TEST_EMAIL,
@@ -2143,7 +2144,6 @@ export async function registerRoutes(
       address: "테스트 주소",
       businessNumber: null,
     });
-    // 무료체험 없이 바로 결제 필요 상태로 설정 (trialStart/End는 NOT NULL이므로 과거 더미값 사용)
     const dummyPast = new Date('2000-01-01');
     await storage.createUserSubscription({
       userId: pgUser.id,
@@ -2152,6 +2152,19 @@ export async function registerRoutes(
       trialEndDate: dummyPast,
       nextBillingDate: null,
     });
+  } else {
+    // 유저는 있지만 구독이 없는 경우 (이전 버그로 구독 생성 실패한 케이스) 복구
+    const existingSub = await storage.getUserSubscription(pgTestUser.id);
+    if (!existingSub) {
+      const dummyPast = new Date('2000-01-01');
+      await storage.createUserSubscription({
+        userId: pgTestUser.id,
+        status: 'pending_payment',
+        trialStartDate: dummyPast,
+        trialEndDate: dummyPast,
+        nextBillingDate: null,
+      });
+    }
   }
 
   // PG 테스트 계정 삭제 엔드포인트 (슈퍼어드민 전용)
