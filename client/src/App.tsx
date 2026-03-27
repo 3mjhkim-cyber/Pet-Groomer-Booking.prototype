@@ -64,7 +64,6 @@ function Router() {
 
       <footer className="hidden lg:block py-6 text-center text-muted-foreground text-sm border-t border-border bg-white">
         <p>&copy; 2024 정리하개. All rights reserved.</p>
-        <p className="mt-1">서울시 송파구 오금로 35길 17 · 010-5292-4773</p>
       </footer>
     </div>
   );

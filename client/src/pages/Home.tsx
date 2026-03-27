@@ -208,6 +208,8 @@ export default function Home() {
             <span>상호: 정리하개</span>
             <span>대표자: 김제훈</span>
             <span>사업자등록번호: 855-17-02648</span>
+            <span>주소: 서울시 송파구 오금로 35길 17</span>
+            <span>연락처: 010-5292-4773</span>
           </div>
         </div>
       </footer>
