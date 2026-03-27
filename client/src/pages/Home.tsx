@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { Scissors, Calendar, BarChart3, Users, Clock, Shield } from "lucide-react";
+import { Scissors, Calendar, BarChart3, Users, Clock, Shield, LogIn } from "lucide-react";
 import { motion } from "framer-motion";
 
 export default function Home() {
@@ -63,24 +63,17 @@ export default function Home() {
             </p>
 
             {/* CTA 버튼 */}
-            <div className="flex flex-col sm:flex-row gap-3 md:gap-4 justify-center w-full sm:w-auto">
-              <Link href="/book/gangnam" className="w-full sm:w-auto">
-                <button
-                  className="w-full sm:w-auto px-7 py-3.5 md:px-8 md:py-4 bg-primary hover:bg-primary/90 text-white rounded-2xl text-base md:text-lg font-bold shadow-xl shadow-primary/25 hover:-translate-y-1 transition-all duration-200 flex items-center justify-center gap-2"
-                  data-testid="button-book-now"
-                >
-                  <Calendar className="w-5 h-5" />
-                  예약 페이지 체험
-                </button>
-              </Link>
+            <div className="flex flex-col items-center gap-3">
               <Link href="/login" className="w-full sm:w-auto">
                 <button
-                  className="w-full sm:w-auto px-7 py-3.5 md:px-8 md:py-4 bg-white hover:bg-gray-50 text-foreground rounded-2xl text-base md:text-lg font-bold shadow-lg shadow-black/5 border border-border/50 hover:-translate-y-1 transition-all duration-200"
+                  className="w-full sm:w-auto px-10 py-4 md:px-12 md:py-5 bg-primary hover:bg-primary/90 text-white rounded-2xl text-lg md:text-xl font-bold shadow-2xl shadow-primary/30 hover:-translate-y-1 transition-all duration-200 flex items-center justify-center gap-2.5"
                   data-testid="button-admin-login"
                 >
-                  관리자 로그인
+                  <LogIn className="w-5 h-5 md:w-6 md:h-6" />
+                  지금 시작하기
                 </button>
               </Link>
+              <p className="text-xs text-muted-foreground">30일 무료체험 · 카드 등록 불필요</p>
             </div>
           </motion.div>
         </div>
