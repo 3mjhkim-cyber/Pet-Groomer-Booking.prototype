@@ -2112,5 +2112,62 @@ export async function registerRoutes(
     await storage.createService({ shopId: demoShop.id, name: "목욕", duration: 60, price: 20000 });
   }
 
+  // ── PG 심사용 임시 테스트 계정 ─────────────────────────────────────────────
+  // 무료체험 없이 바로 결제 화면으로 연결되는 독립 계정
+  // 삭제: DELETE /api/admin/pg-test-account (슈퍼어드민 전용)
+  const PG_TEST_EMAIL = "pgtest@jeongrihagae.com";
+  const PG_TEST_SLUG  = "pg-test-shop";
+
+  let pgTestShop = await storage.getShopBySlug(PG_TEST_SLUG);
+  if (!pgTestShop) {
+    pgTestShop = await storage.createShop({
+      name: "PG심사 테스트샵",
+      slug: PG_TEST_SLUG,
+      phone: "010-0000-0000",
+      address: "테스트 주소",
+      businessHours: "09:00-18:00",
+      depositAmount: 0,
+      depositRequired: false,
+    });
+  }
+  if (await storage.getUserByUsername(PG_TEST_EMAIL) === undefined) {
+    const hashedPassword = await hashPassword("pgtest1234!");
+    const pgUser = await storage.createUser({
+      email: PG_TEST_EMAIL,
+      password: hashedPassword,
+      role: 'shop_owner',
+      status: 'approved',
+      shopId: pgTestShop.id,
+      shopName: "PG심사 테스트샵",
+      phone: "010-0000-0000",
+      address: "테스트 주소",
+      businessNumber: null,
+    });
+    // 무료체험 없이 바로 결제 필요 상태로 설정
+    await storage.createUserSubscription({
+      userId: pgUser.id,
+      status: 'pending_payment',
+      trialEndDate: null,
+      nextBillingDate: null,
+    });
+  }
+
+  // PG 테스트 계정 삭제 엔드포인트 (슈퍼어드민 전용)
+  app.delete('/api/admin/pg-test-account', requireSuperAdmin, async (req, res) => {
+    const shop = await storage.getShopBySlug(PG_TEST_SLUG);
+    if (!shop) return res.status(404).json({ message: "테스트 계정이 존재하지 않습니다." });
+    const { db: dbConn } = await import('./db');
+    const { userSubscriptions: userSubTable, users: usersTable } = await import('@shared/schema');
+    const { eq, inArray } = await import('drizzle-orm');
+    // userSubscriptions 먼저 삭제
+    const shopUsers = await dbConn.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.shopId, shop.id));
+    const userIds = shopUsers.map((u: { id: number }) => u.id);
+    if (userIds.length > 0) {
+      await dbConn.delete(userSubTable).where(inArray(userSubTable.userId, userIds));
+    }
+    await storage.deleteShop(shop.id);
+    res.json({ message: "PG 테스트 계정이 삭제되었습니다." });
+  });
+
   return httpServer;
 }
