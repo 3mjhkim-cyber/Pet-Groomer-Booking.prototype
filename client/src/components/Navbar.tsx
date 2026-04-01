@@ -8,6 +8,10 @@ export function Navbar() {
   const [location] = useLocation();
 
   const isBookingPage = location.startsWith('/book/');
+  const isLandingPage = location === '/';
+
+  // Landing page has its own nav
+  if (isLandingPage && !user) return null;
 
   return (
     <nav className="sticky top-0 z-50 w-full border-b border-border/50 bg-white/80 backdrop-blur-md">

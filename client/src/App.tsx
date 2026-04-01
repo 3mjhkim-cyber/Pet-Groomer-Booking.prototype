@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -29,6 +29,7 @@ import ForgotPassword from "@/pages/ForgotPassword";
 import NotFound from "@/pages/not-found";
 
 function Router() {
+  const [location] = useLocation();
   return (
     <div className="flex flex-col min-h-screen">
       <Navbar />
@@ -62,9 +63,11 @@ function Router() {
 
       <MobileBottomNav />
 
-      <footer className="hidden lg:block py-6 text-center text-muted-foreground text-sm border-t border-border bg-white">
-        <p>&copy; 2024 정리하개. All rights reserved.</p>
-      </footer>
+      {location !== '/' && (
+        <footer className="hidden lg:block py-6 text-center text-muted-foreground text-sm border-t border-border bg-white">
+          <p>&copy; 2024 정리하개. All rights reserved.</p>
+        </footer>
+      )}
     </div>
   );
 }
