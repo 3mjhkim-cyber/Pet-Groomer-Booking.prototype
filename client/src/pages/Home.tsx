@@ -10,6 +10,7 @@ import {
   BarChart3,
   MessageSquare,
   Link2,
+  ArrowRight,
 } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 
@@ -373,8 +374,9 @@ export default function Home() {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
             <Link href="/register">
-              <button className="w-full sm:w-auto px-8 py-4 bg-primary text-white rounded-lg font-semibold text-lg hover:bg-primary/90 transition-colors">
+              <button className="flex items-center gap-2 w-full sm:w-auto px-8 py-4 bg-primary text-white rounded-lg font-semibold text-lg hover:bg-primary/90 transition-colors">
                 지금 시작하기
+                <ArrowRight className="w-5 h-5" />
               </button>
             </Link>
             <button
@@ -608,8 +610,9 @@ export default function Home() {
 
           <div className="text-center">
             <Link href="/register">
-              <button className="px-8 py-4 bg-primary text-white rounded-lg font-semibold text-lg hover:bg-primary/90 transition-colors">
+              <button className="flex items-center gap-2 mx-auto px-8 py-4 bg-primary text-white rounded-lg font-semibold text-lg hover:bg-primary/90 transition-colors">
                 지금 시작하기
+                <ArrowRight className="w-5 h-5" />
               </button>
             </Link>
             <p className="mt-4 text-sm text-gray-600 font-normal">신용카드 불필요 · 언제든 해지 가능</p>
@@ -649,8 +652,9 @@ export default function Home() {
           <h2 className="text-4xl md:text-5xl font-semibold text-white mb-5">지금 바로 시작해보세요</h2>
           <p className="text-white/80 text-lg mb-10 leading-relaxed font-normal">30일 동안 모든 기능을 무료로 사용할 수 있어요. 신용카드도 필요 없어요.</p>
           <Link href="/register">
-            <button className="px-8 py-4 bg-white text-primary rounded-lg font-semibold text-lg hover:bg-white/90 transition-colors">
+            <button className="flex items-center gap-2 px-8 py-4 bg-white text-primary rounded-lg font-semibold text-lg hover:bg-white/90 transition-colors">
               지금 시작하기
+              <ArrowRight className="w-5 h-5" />
             </button>
           </Link>
           <p className="mt-5 text-white/60 text-sm font-normal">30일 무료 체험 후 월 39,000원 · 언제든 해지 가능</p>
