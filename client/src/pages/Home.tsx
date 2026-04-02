@@ -356,47 +356,43 @@ export default function Home() {
       </nav>
 
       {/* ── 2. Hero ────────────────────────────────────────────── */}
-      <section className="py-20 md:py-48 px-4 text-center bg-white">
-        <div className="max-w-3xl mx-auto">
+      <section className="py-32 md:py-52 px-4 text-center bg-white">
+        <div className="max-w-2xl mx-auto">
           {/* Top tagline */}
-          <p className="text-xs md:text-sm text-blue-500 font-medium mb-8 tracking-wide" style={{ wordBreak: "keep-all" }}>
+          <p className="text-xs md:text-sm text-primary font-medium mb-12 tracking-wide" style={{ wordBreak: "keep-all" }}>
             펫미용샵의 여정을 한 곳에서 관리하세요
           </p>
 
-          {/* Main title with icon */}
-          <div className="mb-8">
-            <div className="inline-flex items-center justify-center gap-3 mb-6">
-              <div className="w-14 h-14 bg-primary rounded-2xl flex items-center justify-center">
-                <Scissors className="w-7 h-7 text-white" />
-              </div>
-              <h1 className="text-5xl md:text-7xl font-bold text-primary leading-tight">
-                미용샵 운영,
-              </h1>
+          {/* Main title with icon - first line */}
+          <div className="mb-2 flex items-center justify-center gap-3">
+            <div className="w-16 h-16 bg-primary rounded-2xl flex items-center justify-center flex-shrink-0">
+              <Scissors className="w-9 h-9 text-white" />
             </div>
-            <p className="text-gray-700 text-2xl md:text-3xl font-normal mb-2" style={{ wordBreak: "keep-all" }}>
-              이제
-            </p>
-            <h2 className="text-4xl md:text-6xl font-bold text-primary leading-tight" style={{ wordBreak: "keep-all" }}>
-              제대로 정리하세요
-            </h2>
+            <h1 className="text-6xl md:text-7xl font-bold text-primary leading-tight" style={{ wordBreak: "keep-all" }}>
+              미용샵 운영,
+            </h1>
           </div>
 
+          {/* Second line */}
+          <h2 className="text-5xl md:text-6xl text-gray-900 font-normal mb-6" style={{ wordBreak: "keep-all" }}>
+            제대로 정리하세요
+          </h2>
+
           {/* Description */}
-          <p className="text-gray-600 text-sm md:text-base max-w-xl mx-auto mb-12 leading-relaxed font-normal" style={{ wordBreak: "keep-all" }}>
-            예약 접수부터 시작하고, 예약금 관리, 고객 관리까지<br />
+          <p className="text-gray-600 text-sm md:text-base mb-12 leading-relaxed" style={{ wordBreak: "keep-all" }}>
+            예약 접수부터 숨이, 예약금 관리, 고객 관리까지<br />
             미용샵 운영에 필요한 모든 기능을 하나로
           </p>
 
           {/* CTA Button */}
           <Link href="/register">
-            <button className="flex items-center justify-center gap-2 mx-auto px-8 py-4 bg-primary text-white rounded-xl font-bold text-lg hover:bg-primary/90 transition-colors mb-4">
-              <ArrowRight className="w-5 h-5" />
+            <button className="mx-auto block px-8 py-3 bg-primary text-white rounded-lg font-bold text-base hover:bg-primary/90 transition-colors mb-6">
               지금 시작하기
             </button>
           </Link>
 
           {/* Footer note */}
-          <p className="text-xs md:text-sm text-gray-400 font-normal">30일 무료체험 · 신용카드 불필요 · 언제든 해지 가능</p>
+          <p className="text-xs text-gray-400 font-normal">30일 무료체험 · 신용카드 불필요 · 언제든 해지 가능</p>
         </div>
       </section>
 
