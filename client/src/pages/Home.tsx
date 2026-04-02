@@ -10,6 +10,7 @@ import {
   BarChart3,
   MessageSquare,
   Link2,
+  LogIn,
 } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 
@@ -39,8 +40,8 @@ function DashboardMockup() {
           <span className="text-red-600 text-sm font-medium">60일 이상 미방문 고객 12명</span>
         </div>
       </div>
-      {/* Stat cards */}
-      <div className="grid grid-cols-3 gap-3">
+      {/* Stat cards — single column on mobile, 3 cols on sm+ */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className="bg-white rounded-lg border border-gray-100 p-3">
           <p className="text-xs text-gray-400 mb-1">이번 달 매출</p>
           <p className="font-bold text-gray-900 text-base leading-tight">6,100,000원</p>
@@ -106,7 +107,8 @@ function CustomersMockup() {
 
   return (
     <div className="bg-gray-50 rounded-xl p-4 text-sm">
-      <div className="bg-white rounded-lg border border-gray-100 overflow-hidden">
+      <div className="overflow-x-auto">
+      <div className="bg-white rounded-lg border border-gray-100 overflow-hidden min-w-[480px]">
         <div className="grid grid-cols-4 px-4 py-2 bg-gray-50 border-b border-gray-100 text-xs text-gray-400 font-medium">
           <span>고객</span>
           <span>최근 방문</span>
@@ -140,6 +142,7 @@ function CustomersMockup() {
             </span>
           </div>
         ))}
+      </div>
       </div>
     </div>
   );
@@ -230,52 +233,57 @@ function CalendarMockup() {
           ))}
         </div>
       </div>
-      {/* Day headers */}
-      <div className="grid grid-cols-7 mb-1">
-        {["일", "월", "화", "수", "목", "금", "토"].map((d) => (
-          <div key={d} className="text-center text-xs text-gray-400 py-1 font-medium">
-            {d}
+      {/* Scrollable calendar grid wrapper */}
+      <div className="overflow-x-auto">
+        <div className="min-w-[480px]">
+          {/* Day headers */}
+          <div className="grid grid-cols-7 mb-1">
+            {["일", "월", "화", "수", "목", "금", "토"].map((d) => (
+              <div key={d} className="text-center text-xs text-gray-400 py-1 font-medium">
+                {d}
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
-      {/* Calendar grid */}
-      <div className="space-y-0.5">
-        {WEEKS.map((week, wi) => (
-          <div key={wi} className="grid grid-cols-7">
-            {week.map((cell, di) => (
-              <div
-                key={di}
-                className="min-h-[52px] p-1 border border-gray-100 bg-white first:rounded-l last:rounded-r"
-              >
-                <div className="flex justify-center mb-0.5">
-                  <span
-                    className={`text-xs w-5 h-5 flex items-center justify-center rounded-full font-medium ${
-                      cell.isToday
-                        ? "bg-primary text-white"
-                        : cell.isCurrentMonth
-                        ? "text-gray-800"
-                        : "text-gray-300"
-                    }`}
-                  >
-                    {cell.day}
-                  </span>
-                </div>
-                {cell.events?.map((ev, ei) => (
+          {/* Calendar grid */}
+          <div className="space-y-0.5">
+            {WEEKS.map((week, wi) => (
+              <div key={wi} className="grid grid-cols-7">
+                {week.map((cell, di) => (
                   <div
-                    key={ei}
-                    className={`text-[9px] px-1 py-0.5 rounded font-medium truncate leading-tight ${
-                      ev.color === "blue"
-                        ? "bg-blue-100 text-blue-700"
-                        : "bg-green-100 text-green-700"
-                    }`}
+                    key={di}
+                    className="min-h-[52px] p-1 border border-gray-100 bg-white first:rounded-l last:rounded-r"
                   >
-                    {ev.label}
+                    <div className="flex justify-center mb-0.5">
+                      <span
+                        className={`text-xs w-5 h-5 flex items-center justify-center rounded-full font-medium ${
+                          cell.isToday
+                            ? "bg-primary text-white"
+                            : cell.isCurrentMonth
+                            ? "text-gray-800"
+                            : "text-gray-300"
+                        }`}
+                      >
+                        {cell.day}
+                      </span>
+                    </div>
+                    {cell.events?.map((ev, ei) => (
+                      <div
+                        key={ei}
+                        className={`text-[9px] px-1 py-0.5 rounded font-medium truncate leading-tight ${
+                          ev.color === "blue"
+                            ? "bg-blue-100 text-blue-700"
+                            : "bg-green-100 text-green-700"
+                        }`}
+                      >
+                        {ev.label}
+                      </div>
+                    ))}
                   </div>
                 ))}
               </div>
             ))}
           </div>
-        ))}
+        </div>
       </div>
     </div>
   );
@@ -336,55 +344,89 @@ export default function Home() {
   ];
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-gradient-to-b from-background to-secondary/20">
       {/* ── 1. Navigation ──────────────────────────────────────── */}
-      <nav className="sticky top-0 z-50 bg-white border-b border-gray-100">
-        <div className="max-w-6xl mx-auto px-4 md:px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Scissors className="w-5 h-5 text-primary" />
-            <span className="font-bold text-gray-900 text-lg">정리하개</span>
+      <nav className="sticky top-0 z-50 w-full border-b border-border/50 bg-white/80 backdrop-blur-md">
+        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-2 group">
+            <div className="bg-primary/20 p-2 rounded-full group-hover:bg-primary/30 transition-colors">
+              <Scissors className="h-6 w-6 text-primary group-hover:rotate-12 transition-transform" />
+            </div>
+            <span className="text-xl font-bold text-foreground">정리하개</span>
           </div>
-          <Link href="/register">
-            <button className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-semibold hover:bg-primary/90 transition-colors shadow-sm">
-              무료로 시작하기
+          <Link href="/login">
+            <button className="flex items-center gap-2 px-5 py-2 rounded-full bg-primary text-white hover:bg-primary/90 shadow-md shadow-primary/25 transition-all text-sm font-semibold">
+              <LogIn className="h-4 w-4" />
+              <span>로그인</span>
             </button>
           </Link>
         </div>
       </nav>
 
       {/* ── 2. Hero ────────────────────────────────────────────── */}
-      <section className="py-20 md:py-32 px-4 text-center">
-        <div className="max-w-3xl mx-auto">
-          <span className="inline-flex items-center px-3 py-1 rounded-full bg-blue-50 text-primary text-xs font-semibold border border-blue-100 mb-6">
-            반려동물 미용샵 전용 SaaS
+      <section className="relative pt-16 pb-24 md:pt-24 md:pb-40 px-4 overflow-hidden">
+        {/* Decorative blur orbs */}
+        <div className="absolute top-1/2 left-10 w-72 h-72 bg-primary/8 rounded-full blur-3xl -z-10 animate-pulse" />
+        <div className="absolute top-20 right-10 w-80 h-80 bg-blue-400/8 rounded-full blur-3xl -z-10 animate-pulse delay-700" />
+
+        <div className="container mx-auto max-w-4xl text-center relative z-10">
+          {/* 배지 */}
+          <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary font-semibold text-[11px] tracking-[0.14em] uppercase mb-5 md:mb-6 border border-primary/15">
+            반려동물 미용샵 토탈 솔루션
           </span>
+
+          {/* 브랜드명 */}
+          <div className="flex items-center justify-center gap-2.5 md:gap-3 mb-6 md:mb-8">
+            <div className="bg-primary p-2 md:p-2.5 rounded-xl md:rounded-2xl shadow-lg shadow-primary/30 flex-shrink-0">
+              <Scissors className="w-6 h-6 md:w-8 md:h-8 text-white" />
+            </div>
+            <span
+              className="text-4xl sm:text-5xl md:text-7xl font-black text-primary"
+              style={{ letterSpacing: "-0.035em" }}
+            >
+              정리하개
+            </span>
+          </div>
+
+          {/* 헤드라인 */}
           <h1
-            className="text-4xl md:text-6xl font-bold text-gray-900 mb-6 leading-tight"
-            style={{ wordBreak: "keep-all" }}
+            className="text-[1.85rem] sm:text-4xl md:text-[3.25rem] font-bold text-foreground mb-6 md:mb-8"
+            style={{ lineHeight: 1.35, wordBreak: "keep-all" }}
           >
-            미용샵 운영, 이제
+            일은 줄이고
             <br />
-            제대로 정리하세요
+            <span className="text-primary relative inline-block">
+              매출은 늘리세요
+              <svg
+                className="absolute -bottom-1.5 left-0 w-full h-2.5 md:h-3 text-primary/30"
+                viewBox="0 0 100 10"
+                preserveAspectRatio="none"
+              >
+                <path d="M0 5 Q 50 10 100 5" stroke="currentColor" strokeWidth="8" fill="none" />
+              </svg>
+            </span>
           </h1>
-          <p className="text-lg text-gray-500 mb-10" style={{ wordBreak: "keep-all" }}>
-            예약부터 고객 관리, 매출 분석까지 미용샵에 꼭 필요한 기능만 담았어요
+
+          {/* 서브타이틀 */}
+          <p
+            className="text-base md:text-lg text-muted-foreground mb-9 md:mb-11 max-w-md mx-auto"
+            style={{ lineHeight: 1.9, wordBreak: "keep-all" }}
+          >
+            예약 접수부터 승인, 예약금 관리, 고객 관리까지
+            <br className="hidden sm:block" />
+            {" "}미용샵 운영에 필요한 모든 기능을 하나로
           </p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <Link href="/register">
-              <button className="w-full sm:w-auto px-8 py-4 bg-primary text-white rounded-xl font-semibold text-lg hover:bg-primary/90 transition-colors shadow-lg shadow-primary/25">
-                30일 무료 체험하기
+
+          {/* CTA */}
+          <div className="flex flex-col items-center gap-3">
+            <Link href="/login" className="w-full sm:w-auto">
+              <button className="w-full sm:w-auto px-10 py-4 md:px-12 md:py-5 bg-primary hover:bg-primary/90 text-white rounded-2xl text-lg md:text-xl font-bold shadow-2xl shadow-primary/30 hover:-translate-y-1 transition-all duration-200 flex items-center justify-center gap-2.5">
+                <LogIn className="w-5 h-5 md:w-6 md:h-6" />
+                지금 시작하기
               </button>
             </Link>
-            <button
-              className="w-full sm:w-auto px-8 py-4 border-2 border-gray-200 text-gray-700 rounded-xl font-semibold text-lg hover:border-gray-300 transition-colors"
-              onClick={() =>
-                document.getElementById("features")?.scrollIntoView({ behavior: "smooth" })
-              }
-            >
-              기능 살펴보기
-            </button>
+            <p className="text-xs text-muted-foreground">30일 무료체험 · 체험 후 카드 등록으로 계속 이용 가능</p>
           </div>
-          <p className="mt-5 text-sm text-gray-400">신용카드 불필요 · 월 39,000원 · 언제든 해지 가능</p>
         </div>
       </section>
 
