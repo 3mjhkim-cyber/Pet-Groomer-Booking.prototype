@@ -1,12 +1,13 @@
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { useCustomerHistory } from "@/hooks/use-shop";
-import { format, differenceInDays } from "date-fns";
+import { useCustomerHistory, useUpdateCustomer } from "@/hooks/use-shop";
+import { format } from "date-fns";
 import { ko } from "date-fns/locale";
+import { useState } from "react";
 import {
   Phone, PawPrint, Calendar, Clock, Award, TrendingUp,
-  AlertCircle, Loader2, FileText, Star,
+  AlertCircle, Loader2, FileText, Star, Pencil, Check, X,
 } from "lucide-react";
 import type { Customer } from "@shared/schema";
 
@@ -22,6 +23,28 @@ export default function CustomerDetailSheet({ customer, open, onClose }: Custome
   const { data: historyData, isLoading: isHistoryLoading } = useCustomerHistory(
     open && customer ? customer.phone : null
   );
+  const updateCustomer = useUpdateCustomer();
+
+  const [editingField, setEditingField] = useState<"memo" | "behaviorNotes" | "specialNotes" | null>(null);
+  const [draftValue, setDraftValue] = useState("");
+
+  function startEdit(field: "memo" | "behaviorNotes" | "specialNotes", current: string | null) {
+    setEditingField(field);
+    setDraftValue(current ?? "");
+  }
+
+  function cancelEdit() {
+    setEditingField(null);
+    setDraftValue("");
+  }
+
+  function saveEdit() {
+    if (!customer || editingField === null) return;
+    updateCustomer.mutate(
+      { id: customer.id, data: { [editingField]: draftValue } },
+      { onSuccess: () => { setEditingField(null); setDraftValue(""); } }
+    );
+  }
 
   if (!customer) return null;
 
@@ -157,33 +180,117 @@ export default function CustomerDetailSheet({ customer, open, onClose }: Custome
           </div>
 
           {/* 메모 / 특이사항 */}
-          {(customer.memo || customer.behaviorNotes || customer.specialNotes) && (
-            <div>
-              <h3 className="text-sm font-semibold text-muted-foreground mb-2 flex items-center gap-1">
-                <FileText className="w-4 h-4" /> 메모 / 특이사항
-              </h3>
-              <div className="space-y-2">
-                {customer.memo && (
-                  <div className="bg-secondary/30 rounded-xl p-3 text-sm">
-                    <div className="text-xs text-muted-foreground mb-1">메모</div>
-                    <p className="whitespace-pre-wrap">{customer.memo}</p>
+          <div>
+            <h3 className="text-sm font-semibold text-muted-foreground mb-2 flex items-center gap-1">
+              <FileText className="w-4 h-4" /> 메모 / 특이사항
+            </h3>
+            <div className="space-y-2">
+              {/* 메모 */}
+              {editingField === "memo" ? (
+                <div className="bg-secondary/30 rounded-xl p-3 text-sm space-y-2">
+                  <div className="text-xs text-muted-foreground">메모</div>
+                  <textarea
+                    className="w-full rounded-lg border border-input bg-background p-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/40"
+                    rows={3}
+                    value={draftValue}
+                    onChange={(e) => setDraftValue(e.target.value)}
+                    autoFocus
+                  />
+                  <div className="flex gap-2 justify-end">
+                    <button onClick={cancelEdit} className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs text-muted-foreground hover:bg-secondary transition-colors">
+                      <X className="w-3 h-3" /> 취소
+                    </button>
+                    <button onClick={saveEdit} disabled={updateCustomer.isPending} className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs bg-primary text-white hover:bg-primary/90 transition-colors disabled:opacity-50">
+                      <Check className="w-3 h-3" /> 저장
+                    </button>
                   </div>
-                )}
-                {customer.behaviorNotes && (
-                  <div className="bg-orange-50 rounded-xl p-3 text-sm">
-                    <div className="text-xs text-orange-500 mb-1">행동 특이사항</div>
-                    <p className="whitespace-pre-wrap">{customer.behaviorNotes}</p>
+                </div>
+              ) : (
+                <div className="bg-secondary/30 rounded-xl p-3 text-sm">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs text-muted-foreground">메모</span>
+                    <button onClick={() => startEdit("memo", customer.memo)} className="p-1 rounded hover:bg-secondary transition-colors">
+                      <Pencil className="w-3 h-3 text-muted-foreground" />
+                    </button>
                   </div>
-                )}
-                {customer.specialNotes && (
-                  <div className="bg-blue-50 rounded-xl p-3 text-sm">
-                    <div className="text-xs text-blue-500 mb-1">특별 요청</div>
-                    <p className="whitespace-pre-wrap">{customer.specialNotes}</p>
+                  {customer.memo
+                    ? <p className="whitespace-pre-wrap">{customer.memo}</p>
+                    : <p className="text-muted-foreground italic">메모 없음 — 연필 아이콘을 눌러 추가하세요</p>
+                  }
+                </div>
+              )}
+
+              {/* 행동 특이사항 */}
+              {editingField === "behaviorNotes" ? (
+                <div className="bg-orange-50 rounded-xl p-3 text-sm space-y-2">
+                  <div className="text-xs text-orange-500">행동 특이사항</div>
+                  <textarea
+                    className="w-full rounded-lg border border-input bg-background p-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/40"
+                    rows={3}
+                    value={draftValue}
+                    onChange={(e) => setDraftValue(e.target.value)}
+                    autoFocus
+                  />
+                  <div className="flex gap-2 justify-end">
+                    <button onClick={cancelEdit} className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs text-muted-foreground hover:bg-secondary transition-colors">
+                      <X className="w-3 h-3" /> 취소
+                    </button>
+                    <button onClick={saveEdit} disabled={updateCustomer.isPending} className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs bg-primary text-white hover:bg-primary/90 transition-colors disabled:opacity-50">
+                      <Check className="w-3 h-3" /> 저장
+                    </button>
                   </div>
-                )}
-              </div>
+                </div>
+              ) : (customer.behaviorNotes || true) && (
+                <div className="bg-orange-50 rounded-xl p-3 text-sm">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs text-orange-500">행동 특이사항</span>
+                    <button onClick={() => startEdit("behaviorNotes", customer.behaviorNotes)} className="p-1 rounded hover:bg-orange-100 transition-colors">
+                      <Pencil className="w-3 h-3 text-orange-400" />
+                    </button>
+                  </div>
+                  {customer.behaviorNotes
+                    ? <p className="whitespace-pre-wrap">{customer.behaviorNotes}</p>
+                    : <p className="text-orange-300 italic">없음</p>
+                  }
+                </div>
+              )}
+
+              {/* 특별 요청 */}
+              {editingField === "specialNotes" ? (
+                <div className="bg-blue-50 rounded-xl p-3 text-sm space-y-2">
+                  <div className="text-xs text-blue-500">특별 요청</div>
+                  <textarea
+                    className="w-full rounded-lg border border-input bg-background p-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/40"
+                    rows={3}
+                    value={draftValue}
+                    onChange={(e) => setDraftValue(e.target.value)}
+                    autoFocus
+                  />
+                  <div className="flex gap-2 justify-end">
+                    <button onClick={cancelEdit} className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs text-muted-foreground hover:bg-secondary transition-colors">
+                      <X className="w-3 h-3" /> 취소
+                    </button>
+                    <button onClick={saveEdit} disabled={updateCustomer.isPending} className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs bg-primary text-white hover:bg-primary/90 transition-colors disabled:opacity-50">
+                      <Check className="w-3 h-3" /> 저장
+                    </button>
+                  </div>
+                </div>
+              ) : (customer.specialNotes || true) && (
+                <div className="bg-blue-50 rounded-xl p-3 text-sm">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs text-blue-500">특별 요청</span>
+                    <button onClick={() => startEdit("specialNotes", customer.specialNotes)} className="p-1 rounded hover:bg-blue-100 transition-colors">
+                      <Pencil className="w-3 h-3 text-blue-400" />
+                    </button>
+                  </div>
+                  {customer.specialNotes
+                    ? <p className="whitespace-pre-wrap">{customer.specialNotes}</p>
+                    : <p className="text-blue-300 italic">없음</p>
+                  }
+                </div>
+              )}
             </div>
-          )}
+          </div>
 
           {/* 방문 이력 */}
           <div>
