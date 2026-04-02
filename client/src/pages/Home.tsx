@@ -10,7 +10,6 @@ import {
   BarChart3,
   MessageSquare,
   Link2,
-  ArrowRight,
 } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 
@@ -340,47 +339,44 @@ export default function Home() {
     <div className="min-h-screen bg-white">
       {/* ── 1. Navigation ──────────────────────────────────────── */}
       <nav className="sticky top-0 z-50 bg-white border-b border-gray-100">
-        <div className="max-w-7xl mx-auto px-4 md:px-6 h-16 flex items-center justify-between">
+        <div className="max-w-6xl mx-auto px-4 md:px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-              <Scissors className="w-4 h-4 text-white" />
-            </div>
-            <span className="font-semibold text-gray-900 text-base md:text-lg">정리하개</span>
+            <Scissors className="w-5 h-5 text-primary" />
+            <span className="font-bold text-gray-900 text-lg">정리하개</span>
           </div>
           <Link href="/register">
-            <button className="px-5 py-2.5 bg-primary text-white rounded-lg text-sm font-semibold hover:bg-primary/90 transition-colors">
-              시작하기
+            <button className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-semibold hover:bg-primary/90 transition-colors shadow-sm">
+              무료로 시작하기
             </button>
           </Link>
         </div>
       </nav>
 
       {/* ── 2. Hero ────────────────────────────────────────────── */}
-      <section className="py-16 md:py-40 px-4 text-center">
-        <div className="max-w-4xl mx-auto">
-          <span className="inline-flex items-center px-3.5 py-1.5 rounded-full bg-blue-50 text-primary text-xs font-semibold border border-blue-200/50 mb-6">
-            펫 미용샵을 위한 올인원 운영 솔루션
+      <section className="py-20 md:py-32 px-4 text-center">
+        <div className="max-w-3xl mx-auto">
+          <span className="inline-flex items-center px-3 py-1 rounded-full bg-blue-50 text-primary text-xs font-semibold border border-blue-100 mb-6">
+            반려동물 미용샵 전용 SaaS
           </span>
           <h1
-            className="text-5xl md:text-7xl font-semibold text-gray-900 mb-6 leading-tight tracking-tight"
+            className="text-4xl md:text-6xl font-bold text-gray-900 mb-6 leading-tight"
             style={{ wordBreak: "keep-all" }}
           >
-            미용샵 운영,<br />
-            <span className="relative">제대로 정리하세요<span className="absolute bottom-0 left-0 right-0 h-1 bg-primary/30"></span></span>
+            미용샵 운영, 이제
+            <br />
+            제대로 정리하세요
           </h1>
-          <p className="text-lg md:text-xl text-gray-600 mb-10 leading-relaxed max-w-2xl mx-auto font-normal" style={{ wordBreak: "keep-all" }}>
-            예약부터 고객 관리, 매출 분석까지<br />
-            미용샵에 꼭 필요한 기능만 담았어요
+          <p className="text-lg text-gray-500 mb-10" style={{ wordBreak: "keep-all" }}>
+            예약부터 고객 관리, 매출 분석까지 미용샵에 꼭 필요한 기능만 담았어요
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Link href="/register">
-              <button className="flex items-center gap-2 w-full sm:w-auto px-8 py-4 bg-primary text-white rounded-lg font-semibold text-lg hover:bg-primary/90 transition-colors">
-                지금 시작하기
-                <ArrowRight className="w-5 h-5" />
+              <button className="w-full sm:w-auto px-8 py-4 bg-primary text-white rounded-xl font-semibold text-lg hover:bg-primary/90 transition-colors shadow-lg shadow-primary/25">
+                30일 무료 체험하기
               </button>
             </Link>
             <button
-              className="w-full sm:w-auto px-8 py-4 border-2 border-gray-300 text-gray-700 rounded-lg font-semibold text-lg hover:bg-gray-50 transition-colors"
+              className="w-full sm:w-auto px-8 py-4 border-2 border-gray-200 text-gray-700 rounded-xl font-semibold text-lg hover:border-gray-300 transition-colors"
               onClick={() =>
                 document.getElementById("features")?.scrollIntoView({ behavior: "smooth" })
               }
@@ -388,27 +384,26 @@ export default function Home() {
               기능 살펴보기
             </button>
           </div>
-          <p className="mt-6 text-sm text-gray-500 font-normal">신용카드 불필요 · 월 39,000원 · 언제든 해지 가능</p>
+          <p className="mt-5 text-sm text-gray-400">신용카드 불필요 · 월 39,000원 · 언제든 해지 가능</p>
         </div>
       </section>
 
       {/* ── 3. Product Showcase ────────────────────────────────── */}
-      <section className="py-20 md:py-32 px-4">
-        <div className="max-w-5xl mx-auto">
-          <div className="text-center mb-12">
-            <h2 className="text-4xl md:text-5xl font-semibold text-gray-900 mb-3">이렇게 생겼어요</h2>
-            <p className="text-gray-600 text-lg font-normal">직관적인 인터페이스로 누구나 쉽게 사용할 수 있어요</p>
+      <section className="py-16 md:py-24 bg-gray-50 px-4">
+        <div className="max-w-4xl mx-auto">
+          <div className="text-center mb-10">
+            <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">이렇게 생겼어요</h2>
           </div>
           {/* Tabs */}
-          <div className="flex gap-2 bg-white rounded-lg p-1.5 border border-gray-200 mb-8 w-fit mx-auto shadow-sm">
+          <div className="flex gap-1 bg-white rounded-xl p-1 border border-gray-100 mb-6 w-fit mx-auto shadow-sm">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`px-5 py-2.5 rounded-lg text-sm font-semibold transition-colors ${
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                   activeTab === tab.id
-                    ? "bg-primary text-white"
-                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                    ? "bg-primary text-white shadow-sm"
+                    : "text-gray-500 hover:text-gray-700"
                 }`}
               >
                 {tab.label}
@@ -416,7 +411,7 @@ export default function Home() {
             ))}
           </div>
           {/* Mockup */}
-          <div className="bg-white rounded-xl border border-gray-200 shadow-lg overflow-hidden p-6 md:p-8">
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-xl overflow-hidden p-6">
             {activeTab === "dashboard" && <DashboardMockup />}
             {activeTab === "customers" && <CustomersMockup />}
             {activeTab === "calendar" && <CalendarMockup />}
@@ -425,13 +420,13 @@ export default function Home() {
       </section>
 
       {/* ── 4. No-show Calculator ──────────────────────────────── */}
-      <section className="py-20 md:py-32 px-4 bg-gray-50">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-14">
-            <h2 className="text-4xl md:text-5xl font-semibold text-gray-900 mb-4">
+      <section className="py-16 md:py-24 px-4">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-12">
+            <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-3">
               지금 얼마를 잃고 있는지 확인해보세요
             </h2>
-            <p className="text-gray-600 text-lg max-w-2xl mx-auto font-normal" style={{ wordBreak: "keep-all" }}>
+            <p className="text-gray-500 max-w-xl mx-auto" style={{ wordBreak: "keep-all" }}>
               노쇼 한 건은 단순한 빈 시간이 아니에요. 카카오 알림톡 리마인더로 노쇼를 확실히 줄일 수 있어요.
             </p>
           </div>
@@ -495,12 +490,12 @@ export default function Home() {
               </div>
 
               {/* Kakao preview */}
-              <div className="bg-blue-50 rounded-xl border border-blue-200 p-6">
-                <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-4">
+              <div className="bg-blue-50 rounded-2xl border border-blue-100 p-5">
+                <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-3">
                   자동 발송되는 카카오 알림톡
                 </p>
                 {/* Message bubble */}
-                <div className="bg-white rounded-xl shadow-md p-4 mb-4 border border-gray-200/50">
+                <div className="bg-white rounded-xl shadow-sm p-4 mb-4">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="w-7 h-7 rounded-full bg-yellow-400 flex items-center justify-center text-xs font-bold text-yellow-900">
                       정
@@ -569,77 +564,76 @@ export default function Home() {
       </section>
 
       {/* ── 5. ROI Copy ────────────────────────────────────────── */}
-      <section className="py-20 md:py-32 px-4 bg-gray-50">
-        <div className="max-w-5xl mx-auto">
-          <div className="text-center mb-14">
+      <section className="py-16 md:py-24 px-4 bg-[#EFF6FF]">
+        <div className="max-w-4xl mx-auto">
+          <div className="text-center mb-10">
             <span className="text-xs font-semibold text-primary uppercase tracking-wide">
               월 39,000원의 가치
             </span>
-            <h2 className="text-4xl md:text-5xl font-semibold text-gray-900 mt-3 mb-4">
+            <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mt-2 mb-3">
               구독료보다 훨씬 더 많이 돌아와요
             </h2>
-            <p className="text-gray-600 text-lg max-w-2xl mx-auto font-normal" style={{ wordBreak: "keep-all" }}>
+            <p className="text-gray-500 max-w-xl mx-auto" style={{ wordBreak: "keep-all" }}>
               노쇼로 잃는 돈, 관리 못 해서 떠나는 단골 고객. 정리하개 하나로 이 손실을 막을 수 있어요.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-10">
             {/* Card 1 */}
-            <div className="bg-white rounded-xl p-8 shadow-sm border border-gray-200">
-              <p className="text-sm text-gray-600 mb-3 font-semibold">월 구독료</p>
-              <p className="text-4xl font-semibold text-red-500 mb-2">39,000원</p>
-              <p className="text-sm text-gray-600 font-normal">하루 1,300원 / 커피 한 잔보다 저렴해요</p>
+            <div className="bg-white rounded-2xl p-6 shadow-sm border border-blue-50">
+              <p className="text-sm text-gray-500 mb-2">월 구독료</p>
+              <p className="text-3xl font-bold text-red-500 mb-1">39,000원</p>
+              <p className="text-xs text-gray-400">하루 1,300원 / 커피 한 잔보다 저렴해요</p>
             </div>
             {/* Card 2 */}
-            <div className="bg-white rounded-xl p-8 shadow-sm border border-gray-200">
-              <p className="text-sm text-gray-600 mb-3 font-semibold">노쇼 2건만 막아도</p>
-              <p className="text-4xl font-semibold text-primary mb-2">{fmt(avgPrice * 2)}</p>
-              <p className="text-sm text-gray-600 font-normal">
+            <div className="bg-white rounded-2xl p-6 shadow-sm border border-blue-50">
+              <p className="text-sm text-gray-500 mb-2">노쇼 2건만 막아도</p>
+              <p className="text-3xl font-bold text-primary mb-1">{fmt(avgPrice * 2)}</p>
+              <p className="text-xs text-gray-400">
                 구독료의 {roiMultiplier}배 / 바로 본전 이상 뽑아요
               </p>
             </div>
             {/* Card 3 */}
-            <div className="bg-white rounded-xl p-8 shadow-sm border border-gray-200">
-              <p className="text-sm text-gray-600 mb-3 font-semibold">연간 순이익</p>
-              <p className={`text-4xl font-semibold mb-2 ${annualNetProfit >= 0 ? "text-green-600" : "text-red-500"}`}>
+            <div className="bg-white rounded-2xl p-6 shadow-sm border border-blue-50">
+              <p className="text-sm text-gray-500 mb-2">연간 순이익</p>
+              <p className={`text-3xl font-bold mb-1 ${annualNetProfit >= 0 ? "text-green-600" : "text-red-500"}`}>
                 {annualNetProfit >= 0 ? "+" : ""}{fmt(annualNetProfit)}
               </p>
-              <p className="text-sm text-gray-600 font-normal">회수 금액 - 연간 구독료 / 고스란히 내 수익으로</p>
+              <p className="text-xs text-gray-400">회수 금액 - 연간 구독료 / 고스란히 내 수익으로</p>
             </div>
           </div>
 
           <div className="text-center">
             <Link href="/register">
-              <button className="flex items-center gap-2 mx-auto px-8 py-4 bg-primary text-white rounded-lg font-semibold text-lg hover:bg-primary/90 transition-colors">
-                지금 시작하기
-                <ArrowRight className="w-5 h-5" />
+              <button className="px-8 py-4 bg-primary text-white rounded-xl font-semibold text-lg hover:bg-primary/90 transition-colors shadow-lg shadow-primary/25">
+                30일 무료로 시작하기
               </button>
             </Link>
-            <p className="mt-4 text-sm text-gray-600 font-normal">신용카드 불필요 · 언제든 해지 가능</p>
+            <p className="mt-3 text-sm text-gray-400">신용카드 불필요 · 언제든 해지 가능</p>
           </div>
         </div>
       </section>
 
       {/* ── 6. Feature Cards ───────────────────────────────────── */}
-      <section id="features" className="py-20 md:py-32 px-4">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-semibold text-gray-900 mb-4">
+      <section id="features" className="py-16 md:py-24 px-4">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-12">
+            <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-3">
               미용샵 운영에 필요한 건 다 있어요
             </h2>
-            <p className="text-gray-600 text-lg font-normal">복잡한 교육 없이 오늘부터 바로 쓸 수 있어요</p>
+            <p className="text-gray-500">복잡한 교육 없이 오늘부터 바로 쓸 수 있어요</p>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
             {features.map((f, i) => (
               <div
                 key={i}
-                className="bg-white rounded-xl border border-gray-200 p-7 shadow-sm hover:shadow-md transition-shadow"
+                className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm hover:shadow-md transition-shadow"
               >
-                <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-5">
+                <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center mb-4">
                   {f.icon}
                 </div>
-                <h3 className="font-semibold text-gray-900 mb-2.5 text-lg">{f.title}</h3>
-                <p className="text-gray-600 leading-relaxed text-sm font-normal">{f.desc}</p>
+                <h3 className="font-bold text-gray-900 mb-2">{f.title}</h3>
+                <p className="text-sm text-gray-500 leading-relaxed">{f.desc}</p>
               </div>
             ))}
           </div>
@@ -647,17 +641,16 @@ export default function Home() {
       </section>
 
       {/* ── 7. Bottom CTA ──────────────────────────────────────── */}
-      <section className="py-20 md:py-32 px-4 bg-primary">
-        <div className="max-w-2xl mx-auto text-center">
-          <h2 className="text-4xl md:text-5xl font-semibold text-white mb-5">지금 바로 시작해보세요</h2>
-          <p className="text-white/80 text-lg mb-10 leading-relaxed font-normal">30일 동안 모든 기능을 무료로 사용할 수 있어요. 신용카드도 필요 없어요.</p>
+      <section className="py-16 md:py-24 px-4 bg-primary">
+        <div className="max-w-xl mx-auto text-center">
+          <h2 className="text-2xl md:text-3xl font-bold text-white mb-3">지금 바로 시작해보세요</h2>
+          <p className="text-white/70 mb-8">30일 동안 모든 기능을 무료로 사용할 수 있어요</p>
           <Link href="/register">
-            <button className="flex items-center gap-2 px-8 py-4 bg-white text-primary rounded-lg font-semibold text-lg hover:bg-white/90 transition-colors">
-              지금 시작하기
-              <ArrowRight className="w-5 h-5" />
+            <button className="px-8 py-4 bg-white text-primary rounded-xl font-semibold text-lg hover:bg-white/90 transition-colors shadow-xl">
+              무료로 시작하기
             </button>
           </Link>
-          <p className="mt-5 text-white/60 text-sm font-normal">30일 무료 체험 후 월 39,000원 · 언제든 해지 가능</p>
+          <p className="mt-4 text-white/50 text-sm">30일 무료 체험 후 월 39,000원</p>
         </div>
       </section>
 
